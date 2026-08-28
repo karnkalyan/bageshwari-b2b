@@ -135,7 +135,11 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
       <Card>
         <CardContent className="p-0">
           <ProductsTableClient products={plainProducts} sellerSlug={sellerSlug} globalVatPercent={globalVat} />
-          <Pagination totalPages={Math.ceil(totalCount / pageSize)} />
+          {Math.ceil(totalCount / pageSize) > 1 && (
+            <div className="p-4 border-t border-border bg-muted/20">
+              <Pagination totalPages={Math.ceil(totalCount / pageSize)} />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

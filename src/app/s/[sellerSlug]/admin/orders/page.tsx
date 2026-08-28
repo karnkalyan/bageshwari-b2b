@@ -185,7 +185,11 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
             </tbody>
           </table>
         </div>
-        <Pagination totalPages={Math.ceil(totalCount / pageSize)} />
+        {Math.ceil(totalCount / pageSize) > 1 && (
+          <div className="p-4 border-t border-border bg-muted/20">
+            <Pagination totalPages={Math.ceil(totalCount / pageSize)} />
+          </div>
+        )}
       </div>
     </div>
   );

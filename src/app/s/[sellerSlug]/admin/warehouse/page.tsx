@@ -23,14 +23,16 @@ import {
 } from "lucide-react";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+import { Pagination } from "@/components/ui/pagination";
 import { sendWorkflowNotification } from "@/services/notification.service";
 import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
 
 interface WarehousePageProps {
   params: Promise<{ sellerSlug: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function WarehousePortalPage({ params }: WarehousePageProps) {
+export default async function WarehousePortalPage({ params, searchParams }: WarehousePageProps) {
   const { sellerSlug } = await params;
   const ctx = await getTenantContext(sellerSlug);
 
@@ -79,7 +81,12 @@ export default async function WarehousePortalPage({ params }: WarehousePageProps
 
   const readyOrdersWhere: any = { sellerId: ctx.sellerId, status: "READY_FOR_WAREHOUSE" };
 
-  const [pickLists, readyOrders, warehouseStaff] = await Promise.all([
+  const resolvedSearchParams = await searchParams;
+  const currentPage = Number(resolvedSearchParams?.page) || 1;
+  const limit = 20;
+  const offset = (currentPage - 1) * limit;
+
+  const [pickLists, totalPickLists, readyOrders, warehouseStaff] = await Promise.all([
     prisma.pickList.findMany({
       where: pickListWhere,
       orderBy: { createdAt: "desc" },
@@ -96,7 +103,10 @@ export default async function WarehousePortalPage({ params }: WarehousePageProps
         picker: { select: { id: true, name: true, email: true } },
         completedBy: { select: { id: true, name: true } },
       },
+      skip: offset,
+      take: limit,
     }),
+    prisma.pickList.count({ where: pickListWhere }),
     prisma.order.findMany({
       where: readyOrdersWhere,
       include: {
@@ -125,6 +135,8 @@ export default async function WarehousePortalPage({ params }: WarehousePageProps
       },
     }),
   ]);
+
+  const totalPages = Math.ceil(totalPickLists / limit);
 
   // Server Action: Complete Picking
   async function completePickListAction(formData: FormData) {
@@ -381,7 +393,7 @@ export default async function WarehousePortalPage({ params }: WarehousePageProps
       <div className="glass-card overflow-hidden">
         <div className="p-4 border-b border-border font-bold text-sm bg-muted/40 text-foreground flex items-center justify-between">
           <span>{isManager ? "All Warehouse Pick Lists & Logistics Manifests" : "Pick Lists Assigned to You"}</span>
-          <span className="text-xs text-muted-foreground font-normal">Total: {pickLists.length}</span>
+          <span className="text-xs text-muted-foreground font-normal">Total: {totalPickLists}</span>
         </div>
 
         {pickLists.length === 0 ? (
@@ -556,6 +568,11 @@ export default async function WarehousePortalPage({ params }: WarehousePageProps
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-border bg-muted/20">
+            <Pagination totalPages={totalPages} />
           </div>
         )}
       </div>

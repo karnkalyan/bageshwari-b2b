@@ -22,6 +22,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { Pagination } from "@/components/ui/pagination";
 import {
   DealerApplicationReviewDialog,
   type SerializedDealerApplication,
@@ -54,7 +55,11 @@ export interface SerializedDealer {
 interface DealersDirectoryClientProps {
   sellerSlug: string;
   dealers: SerializedDealer[];
+  totalDealers?: number;
+  dealersPage?: number;
   applications: SerializedDealerApplication[];
+  totalApps?: number;
+  appsPage?: number;
   dealerGroups: DealerGroupOption[];
   pricingGroups: PricingGroupOption[];
 }
@@ -62,7 +67,11 @@ interface DealersDirectoryClientProps {
 export function DealersDirectoryClient({
   sellerSlug,
   dealers,
+  totalDealers,
+  dealersPage,
   applications,
+  totalApps,
+  appsPage,
   dealerGroups,
   pricingGroups,
 }: DealersDirectoryClientProps) {
@@ -159,6 +168,14 @@ export function DealersDirectoryClient({
                   </tbody>
                 </table>
               </div>
+              {totalDealers !== undefined && dealersPage !== undefined && Math.ceil(totalDealers / 20) > 1 && (
+                <div className="p-4 border-t">
+                  <Pagination 
+                    totalPages={Math.ceil(totalDealers / 20)} 
+                    searchParamName="dealersPage"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -262,6 +279,14 @@ export function DealersDirectoryClient({
                   </tbody>
                 </table>
               </div>
+              {totalApps !== undefined && appsPage !== undefined && Math.ceil(totalApps / 20) > 1 && (
+                <div className="p-4 border-t">
+                  <Pagination 
+                    totalPages={Math.ceil(totalApps / 20)} 
+                    searchParamName="appsPage"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

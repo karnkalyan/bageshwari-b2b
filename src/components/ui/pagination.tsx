@@ -6,18 +6,19 @@ import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 
 interface PaginationProps {
   totalPages: number;
+  searchParamName?: string;
 }
 
-export function Pagination({ totalPages }: PaginationProps) {
+export function Pagination({ totalPages, searchParamName = "page" }: PaginationProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const currentPage = Number(searchParams.get("page")) || 1;
+  const currentPage = Number(searchParams.get(searchParamName)) || 1;
 
   const createPageURL = (pageNumber: number | string) => {
     const params = new URLSearchParams(searchParams);
-    params.set("page", pageNumber.toString());
+    params.set(searchParamName, pageNumber.toString());
     return `${pathname}?${params.toString()}`;
   };
 

@@ -7,12 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Clock, CheckCircle2, Eye, ShieldCheck, DollarSign, Download, Printer, ArrowRight } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { Pagination } from "@/components/ui/pagination";
 
 interface AccountsPageProps {
   params: Promise<{ sellerSlug: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function AccountsPortalPage({ params }: AccountsPageProps) {
+export default async function AccountsPortalPage({ params, searchParams }: AccountsPageProps) {
   const { sellerSlug } = await params;
   const ctx = await getTenantContext(sellerSlug);
 
@@ -25,7 +27,14 @@ export default async function AccountsPortalPage({ params }: AccountsPageProps) 
     redirect("/admin");
   }
 
-  const [reviewPendingOrders, proformas, finalInvoices] = await Promise.all([
+  const resolvedSearchParams = await searchParams;
+  const proformasPage = Number(resolvedSearchParams?.proformasPage) || 1;
+  const invoicesPage = Number(resolvedSearchParams?.invoicesPage) || 1;
+  const limit = 10;
+  const proformasOffset = (proformasPage - 1) * limit;
+  const invoicesOffset = (invoicesPage - 1) * limit;
+
+  const [reviewPendingOrders, proformas, totalProformas, finalInvoices, totalInvoices] = await Promise.all([
     prisma.order.findMany({
       where: { sellerId: ctx.sellerId, status: "PENDING_ACCOUNTS_REVIEW" },
       include: { dealer: { select: { tradingName: true, code: true } } },
@@ -34,14 +43,18 @@ export default async function AccountsPortalPage({ params }: AccountsPageProps) 
       where: { sellerId: ctx.sellerId },
       orderBy: { createdAt: "desc" },
       include: { order: { include: { dealer: { select: { tradingName: true } } } } },
-      take: 20,
+      skip: proformasOffset,
+      take: limit,
     }),
+    prisma.proformaInvoice.count({ where: { sellerId: ctx.sellerId } }),
     prisma.finalInvoice.findMany({
       where: { sellerId: ctx.sellerId },
       orderBy: { createdAt: "desc" },
       include: { order: { include: { dealer: { select: { tradingName: true } } } } },
-      take: 20,
+      skip: invoicesOffset,
+      take: limit,
     }),
+    prisma.finalInvoice.count({ where: { sellerId: ctx.sellerId } }),
   ]);
 
   return (
@@ -136,7 +149,7 @@ export default async function AccountsPortalPage({ params }: AccountsPageProps) 
             {proformas.length === 0 ? (
               <div className="p-8 text-center text-xs text-muted-foreground">No proforma invoices generated yet.</div>
             ) : (
-              proformas.slice(0, 8).map((pi) => (
+              proformas.map((pi) => (
                 <div key={pi.id} className="p-3.5 flex items-center justify-between hover:bg-muted/30 transition-colors">
                   <div>
                     <div className="font-bold text-foreground">{pi.proformaNumber}</div>
@@ -158,6 +171,11 @@ export default async function AccountsPortalPage({ params }: AccountsPageProps) 
               ))
             )}
           </div>
+          {Math.ceil(totalProformas / limit) > 1 && (
+            <div className="p-4 border-t border-border bg-muted/20">
+              <Pagination totalPages={Math.ceil(totalProformas / limit)} searchParamName="proformasPage" />
+            </div>
+          )}
         </div>
 
         {/* Final Tax Invoices */}
@@ -172,7 +190,7 @@ export default async function AccountsPortalPage({ params }: AccountsPageProps) 
             {finalInvoices.length === 0 ? (
               <div className="p-8 text-center text-xs text-muted-foreground">No tax invoices issued yet.</div>
             ) : (
-              finalInvoices.slice(0, 8).map((inv) => (
+              finalInvoices.map((inv) => (
                 <div key={inv.id} className="p-3.5 flex items-center justify-between hover:bg-muted/30 transition-colors">
                   <div>
                     <div className="font-bold text-foreground">{inv.invoiceNumber}</div>
@@ -194,6 +212,11 @@ export default async function AccountsPortalPage({ params }: AccountsPageProps) 
               ))
             )}
           </div>
+          {Math.ceil(totalInvoices / limit) > 1 && (
+            <div className="p-4 border-t border-border bg-muted/20">
+              <Pagination totalPages={Math.ceil(totalInvoices / limit)} searchParamName="invoicesPage" />
+            </div>
+          )}
         </div>
       </div>
     </div>

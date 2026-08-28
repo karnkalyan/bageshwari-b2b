@@ -35,7 +35,7 @@ export function PublicHeader({
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card/95 shadow-sm backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border bg-card shadow-sm">
       <div className="site-container flex h-[74px] items-center gap-5">
         <Link href={base || "/"} className="flex min-w-0 items-center gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-red-500 text-red-500">
@@ -150,7 +150,7 @@ export function PublicHeader({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-black/80" onClick={() => setOpen(false)}>
           <div
             className="ml-auto h-full w-[min(88vw,360px)] bg-card p-5 shadow-2xl overflow-y-auto"
             onClick={(event) => event.stopPropagation()}

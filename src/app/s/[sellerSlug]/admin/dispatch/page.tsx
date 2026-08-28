@@ -22,14 +22,16 @@ import {
 } from "lucide-react";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+import { Pagination } from "@/components/ui/pagination";
 import { nextDocumentNumber } from "@/services/number-sequence.service";
 import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
 
 interface DispatchPageProps {
   params: Promise<{ sellerSlug: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function DispatchPortalPage({ params }: DispatchPageProps) {
+export default async function DispatchPortalPage({ params, searchParams }: DispatchPageProps) {
   const { sellerSlug } = await params;
   const ctx = await getTenantContext(sellerSlug);
 
@@ -118,7 +120,17 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
     revalidatePath(`/s/${sellerSlug}/admin/dispatch`);
   }
 
-  const [readyToDispatchOrders, shippedOrders, carriers] = await Promise.all([
+  const resolvedSearchParams = await searchParams;
+  const currentPage = Number(resolvedSearchParams?.page) || 1;
+  const limit = 20;
+  const offset = (currentPage - 1) * limit;
+
+  const shippedOrdersWhere: any = {
+    sellerId: ctx.sellerId,
+    status: { in: ["SHIPPED", "IN_TRANSIT", "DELIVERED", "COMPLETED"] },
+  };
+
+  const [readyToDispatchOrders, shippedOrders, totalShipped, carriers] = await Promise.all([
     prisma.order.findMany({
       where: {
         sellerId: ctx.sellerId,
@@ -155,13 +167,18 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
         packages: true,
         shipments: { orderBy: { createdAt: "desc" }, take: 1 },
       },
+      skip: offset,
+      take: limit,
     }),
+    prisma.order.count({ where: shippedOrdersWhere }),
     prisma.transportCompany.findMany({
       where: { sellerId: ctx.sellerId, status: "ACTIVE" },
       orderBy: { name: "asc" },
       select: { id: true, name: true, phone: true },
     }),
   ]);
+
+  const totalPages = Math.ceil(totalShipped / limit);
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
@@ -404,6 +421,11 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
               </tbody>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-border bg-muted/20">
+              <Pagination totalPages={totalPages} />
+            </div>
+          )}
         </div>
       </div>
     </div>

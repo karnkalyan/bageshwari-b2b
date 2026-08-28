@@ -23,14 +23,20 @@ import {
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { UserActions } from "./user-actions";
+import { Pagination } from "@/components/ui/pagination";
 
 interface UsersPageProps {
   params: Promise<{ sellerSlug: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function AdminUsersPage({ params }: UsersPageProps) {
+export default async function AdminUsersPage({ params, searchParams }: UsersPageProps) {
   const { sellerSlug } = await params;
   const ctx = await getTenantContext(sellerSlug);
+  const resolvedSearchParams = await searchParams;
+  const currentPage = Number(resolvedSearchParams?.page) || 1;
+  const limit = 20;
+  const offset = (currentPage - 1) * limit;
 
   if (!hasRole(ctx, "SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN", "STAFF")) {
     redirect("/admin");
@@ -142,14 +148,16 @@ export default async function AdminUsersPage({ params }: UsersPageProps) {
     revalidatePath(`/s/${sellerSlug}/admin/users`);
   }
 
-  const [users, availableRoles] = await Promise.all([
+  const where = {
+    OR: [
+      { memberships: { some: { sellerId: ctx.sellerId } } },
+      { userRoles: { some: { sellerId: ctx.sellerId } } },
+    ],
+  };
+
+  const [users, totalUsers, availableRoles] = await Promise.all([
     prisma.user.findMany({
-      where: {
-        OR: [
-          { memberships: { some: { sellerId: ctx.sellerId } } },
-          { userRoles: { some: { sellerId: ctx.sellerId } } },
-        ],
-      },
+      where,
       include: {
         userRoles: {
           where: { OR: [{ sellerId: ctx.sellerId }, { sellerId: null }] },
@@ -157,12 +165,17 @@ export default async function AdminUsersPage({ params }: UsersPageProps) {
         },
       },
       orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
     }),
+    prisma.user.count({ where }),
     prisma.role.findMany({
       where: { OR: [{ sellerId: ctx.sellerId }, { sellerId: null }] },
       orderBy: { name: "asc" },
     }),
   ]);
+
+  const totalPages = Math.ceil(totalUsers / limit);
 
   const activeCount = users.filter((u) => u.status === "ACTIVE").length;
   const adminCount = users.filter((u) =>
@@ -191,7 +204,7 @@ export default async function AdminUsersPage({ params }: UsersPageProps) {
               <UserCog className="h-4 w-4 text-indigo-500" />
             </div>
           </div>
-          <div className="text-2xl font-black text-foreground mt-2">{users.length}</div>
+          <div className="text-2xl font-black text-foreground mt-2">{totalUsers}</div>
           <div className="text-xs text-muted-foreground mt-0.5">Enrolled system accounts</div>
         </div>
 
@@ -224,7 +237,7 @@ export default async function AdminUsersPage({ params }: UsersPageProps) {
         <div className="glass-card overflow-hidden">
           <div className="p-4 border-b border-border font-bold text-sm bg-muted/40 text-foreground flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <UserCog className="h-4 w-4 text-indigo-500" /> Staff & User Directory ({users.length})
+              <UserCog className="h-4 w-4 text-indigo-500" /> Staff & User Directory ({totalUsers})
             </span>
           </div>
 
@@ -330,6 +343,11 @@ export default async function AdminUsersPage({ params }: UsersPageProps) {
               </tbody>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-border bg-muted/20">
+              <Pagination totalPages={totalPages} />
+            </div>
+          )}
         </div>
 
         {/* Add New Staff Form */}

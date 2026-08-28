@@ -11,9 +11,10 @@ import { DealersDirectoryClient } from "@/components/admin/dealers-directory-cli
 
 interface DealersPageProps {
   params: Promise<{ sellerSlug: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function AdminDealersPage({ params }: DealersPageProps) {
+export default async function AdminDealersPage({ params, searchParams }: DealersPageProps) {
   const { sellerSlug } = await params;
   const ctx = await getTenantContext(sellerSlug);
 
@@ -26,10 +27,19 @@ export default async function AdminDealersPage({ params }: DealersPageProps) {
     redirect("/admin");
   }
 
-  const [dealers, applications, dealerGroups, pricingGroups] = await Promise.all([
+  const resolvedSearchParams = await searchParams;
+  const dealersPage = Number(resolvedSearchParams?.dealersPage) || 1;
+  const appsPage = Number(resolvedSearchParams?.appsPage) || 1;
+  const limit = 20;
+  const dealersOffset = (dealersPage - 1) * limit;
+  const appsOffset = (appsPage - 1) * limit;
+
+  const [dealers, totalDealers, applications, totalApps, dealerGroups, pricingGroups] = await Promise.all([
     prisma.dealer.findMany({
       where: { sellerId: ctx.sellerId },
       orderBy: { createdAt: "desc" },
+      skip: dealersOffset,
+      take: limit,
       include: {
         dealerGroup: true,
         pricingGroup: true,
@@ -37,10 +47,14 @@ export default async function AdminDealersPage({ params }: DealersPageProps) {
         _count: { select: { orders: true } },
       },
     }),
+    prisma.dealer.count({ where: { sellerId: ctx.sellerId } }),
     prisma.dealerApplication.findMany({
       where: { sellerId: ctx.sellerId },
       orderBy: { createdAt: "desc" },
+      skip: appsOffset,
+      take: limit,
     }),
+    prisma.dealerApplication.count({ where: { sellerId: ctx.sellerId } }),
     prisma.dealerGroup.findMany({
       where: { sellerId: ctx.sellerId, active: true },
       select: { id: true, name: true, code: true },
@@ -133,7 +147,11 @@ export default async function AdminDealersPage({ params }: DealersPageProps) {
       <DealersDirectoryClient
         sellerSlug={sellerSlug}
         dealers={serializedDealers}
+        totalDealers={totalDealers}
+        dealersPage={dealersPage}
         applications={serializedApplications}
+        totalApps={totalApps}
+        appsPage={appsPage}
         dealerGroups={dealerGroups}
         pricingGroups={pricingGroups}
       />
