@@ -17,9 +17,10 @@ RUN corepack enable pnpm && pnpm install --frozen-lockfile
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
+RUN npx prisma generate
 RUN npm run build
 
 # Production Runner Stage
