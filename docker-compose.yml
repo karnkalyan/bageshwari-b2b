@@ -1,112 +1,35 @@
-x-database-environment: &database-environment
-  DATABASE_HOST: "${DATABASE_HOST:?DATABASE_HOST is required}"
-  DATABASE_PORT: "${DATABASE_PORT:?DATABASE_PORT is required}"
-  DATABASE_USER: "${DATABASE_USER:?DATABASE_USER is required}"
-  DATABASE_NAME: "${DATABASE_NAME:?DATABASE_NAME is required}"
-  DATABASE_PASSWORD_FILE: /run/secrets/database_password
-
-x-container-security: &container-security
-  init: true
-  read_only: true
-  # Local Compose secrets retain their host ownership. The entrypoint reads
-  # them as root, then drops permanently to the image's nextjs user.
-  user: "0:0"
-  cap_drop:
-    - ALL
-  cap_add:
-    - SETGID
-    - SETUID
-  security_opt:
-    - no-new-privileges:true
-  pids_limit: 256
-  tmpfs:
-    - /tmp:rw,noexec,nosuid,nodev,size=64m
-
 services:
-  migrate:
-    <<: *container-security
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: tools
-    command: ["pnpm", "exec", "prisma", "db", "push", "--skip-generate"]
-    environment: *database-environment
-    extra_hosts:
-      - host.docker.internal:host-gateway
-    secrets:
-      - database_password
-    restart: "no"
-
-  seed:
-    <<: *container-security
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: tools
-    command: ["pnpm", "run", "db:seed"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    environment:
-      <<: *database-environment
-      SEED_PASSWORD_FILE: /run/secrets/seed_password
-    extra_hosts:
-      - host.docker.internal:host-gateway
-    secrets:
-      - database_password
-      - seed_password
-    restart: "no"
-    profiles:
-      - seed
-
   app:
-    <<: *container-security
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+    build: .
+    container_name: bageshwari-b2b
     restart: unless-stopped
+    init: true
+    env_file:
+      - .env
     environment:
-      <<: *database-environment
-      AUTH_URL: "${AUTH_URL:?AUTH_URL is required}"
-      AUTH_SECRET_FILE: /run/secrets/auth_secret
+      NODE_ENV: production
+      PORT: "3011"
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: "mysql://admin:quantumSql%40123@host.docker.internal:3306/bageshwari_b2b"
+      SEED_PASSWORD: "quantumSql@123"
     ports:
-      - "${APP_BIND_ADDRESS:?APP_BIND_ADDRESS is required}:${APP_PORT:?APP_PORT is required}:3000"
+      - "3011:3011"
     extra_hosts:
       - host.docker.internal:host-gateway
-    secrets:
-      - database_password
-      - auth_secret
     volumes:
       - app_uploads:/app/public/uploads
-      - app_cache:/app/.next/cache
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,size=64m
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:3011/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
-    stop_grace_period: 30s
-
-secrets:
-  database_password:
-    file: "${DATABASE_PASSWORD_FILE:?DATABASE_PASSWORD_FILE is required}"
-  auth_secret:
-    file: "${AUTH_SECRET_FILE:?AUTH_SECRET_FILE is required}"
-  seed_password:
-    file: "${SEED_PASSWORD_FILE:?SEED_PASSWORD_FILE is required}"
+      start_period: 60s
 
 volumes:
   app_uploads:
-  app_cache:
