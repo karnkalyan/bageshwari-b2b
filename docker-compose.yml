@@ -10,7 +10,7 @@ services:
       NODE_ENV: production
       PORT: "3011"
       HOSTNAME: 0.0.0.0
-      DATABASE_URL: "mysql://admin:quantumSql%40123@host.docker.internal:3306/bageshwari_b2b"
+      DATABASE_URL: "mysql://root:quantumSql%40123@host.docker.internal:3306/bageshwari_b2b"
       SEED_PASSWORD: "quantumSql@123"
     ports:
       - "3011:3011"
