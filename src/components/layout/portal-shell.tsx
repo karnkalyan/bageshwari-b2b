@@ -54,7 +54,7 @@ export function PortalShell({
         <div className="truncate text-xs font-bold">{user?.name}</div>
         <div className="truncate text-[10px] text-blue-200/70">{user?.email}</div>
         <button
-          onClick={() => signOut({ callbackUrl: "/staff/login" })}
+          onClick={() => signOut({ callbackUrl: window.location.origin + "/staff/login" })}
           className="mt-3 flex items-center gap-2 text-xs font-bold text-blue-100"
         >
           <LogOut className="h-4 w-4" /> Sign out

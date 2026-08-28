@@ -46,19 +46,8 @@ export function ThemeProvider({
     const root = document.documentElement;
 
     const applyTheme = () => {
-      let active: "light" | "dark" = "light";
-      if (theme === "system") {
-        active = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      } else {
-        active = theme === "dark" ? "dark" : "light";
-      }
-
-      setResolvedTheme(active);
-      if (active === "dark") {
-        root.classList.add("dark");
-      } else {
-        root.classList.remove("dark");
-      }
+      setResolvedTheme("light");
+      root.classList.remove("dark");
     };
 
     applyTheme();

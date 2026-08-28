@@ -7,32 +7,5 @@ export function HowItWorks() {
     [PackageCheck, "Warehouse pick", "Actual quantities"], [FileText, "Final invoice", "Payment or credit"],
     [Truck, "Dispatch", "Shipment tracking"],
   ];
-  return (
-    <section id="how-it-works" className="bg-[#050505] py-16 border-b border-slate-800">
-      <div className="site-container">
-        <div className="text-center">
-          <div className="inline-block rounded-full bg-blue-950 px-3 py-1 text-[10px] font-bold text-blue-400 mb-3">
-            Simple and controlled
-          </div>
-          <h2 className="text-3xl font-black text-white">Seven-step B2B ordering process</h2>
-        </div>
-        <div className="mt-12 grid gap-4 md:grid-cols-4 xl:grid-cols-7 animate-in slide-in-from-bottom-8 duration-700 fade-in fill-mode-both">
-          {steps.map(([Icon, title, detail], index) => { 
-            const StepIcon = Icon as React.ElementType; 
-            return (
-              <div key={title as string} className="relative bg-slate-900 rounded-2xl p-5 text-center border-none shadow-xl transition-transform hover:-translate-y-2 hover:bg-slate-800">
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-800 text-blue-400">
-                  <StepIcon className="h-6 w-6" />
-                </div>
-                <div className="mt-4 text-[10px] font-black uppercase tracking-wider text-red-500">Step {index + 1}</div>
-                <div className="mt-1 text-sm font-black text-white">{title as string}</div>
-                <div className="mt-1.5 text-[10px] leading-4 text-slate-400">{detail as string}</div>
-                {index < steps.length - 1 && <ArrowRight className="absolute -right-4 top-10 z-10 hidden h-5 w-5 text-slate-600 xl:block" />}
-              </div>
-            ); 
-          })}
-        </div>
-      </div>
-    </section>
-  );
+  return <section id="how-it-works" className="border-y border-border bg-card py-12"><div className="site-container"><div className="text-center"><div className="section-kicker">Simple and controlled</div><h2 className="mt-1 text-2xl font-black text-foreground">Seven-step B2B ordering process</h2></div><div className="mt-8 grid gap-3 md:grid-cols-4 xl:grid-cols-7 stagger-children">{steps.map(([Icon, title, detail], index) => { const StepIcon = Icon as React.ElementType; return <div key={title as string} className="relative glass-card p-4 text-center"><div className="mx-auto grid h-11 w-11 place-items-center rounded-full border border-border bg-card text-primary shadow-sm"><StepIcon className="h-5 w-5" /></div><div className="mt-3 text-[9px] font-black uppercase tracking-wider text-red-500">Step {index + 1}</div><div className="mt-1 text-xs font-black text-foreground">{title as string}</div><div className="mt-1 text-[9px] leading-4 text-muted-foreground">{detail as string}</div>{index < steps.length - 1 && <ArrowRight className="absolute -right-3 top-9 z-10 hidden h-4 w-4 text-blue-400 xl:block" />}</div>; })}</div></div></section>;
 }

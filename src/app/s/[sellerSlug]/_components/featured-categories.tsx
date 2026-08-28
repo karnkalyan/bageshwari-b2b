@@ -6,46 +6,15 @@ type Props = { categories: Category[]; sellerSlug: string; section?: { title?: s
 
 export function FeaturedCategories({ categories, sellerSlug, section }: Props) {
   const icons = [Tractor, Cog, Wrench, Package, Droplets, BatteryCharging];
-  
-  return (
-    <section className="bg-[#050505] py-16 border-b border-slate-800">
-      <div className="site-container">
-        <div className="mb-10 flex items-end justify-between border-b border-slate-800 pb-4">
-          <div>
-            <div className="inline-block rounded-full bg-blue-950 px-3 py-1 text-[10px] font-bold text-blue-400 mb-3">
-              Browse the catalogue
-            </div>
-            <h2 className="text-3xl font-black text-white">{section?.title || "Featured Product Categories"}</h2>
-          </div>
-          <Link href="/products" className="group hidden items-center gap-2 text-sm font-bold text-red-500 hover:text-red-400 sm:flex transition-colors">
-            View all categories <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </Link>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-          {categories.map((category, index) => { 
-            const Icon = icons[index % icons.length]; 
-            return (
-              <Link 
-                key={category.id} 
-                href={`/products?category=${category.slug}`} 
-                className="group flex min-h-40 flex-col rounded-2xl bg-slate-900 p-5 shadow-xl transition-all hover:-translate-y-2 hover:bg-slate-800 hover:shadow-2xl hover:shadow-blue-900/20 border-none"
-              >
-                <div className="mb-5 grid h-12 w-12 place-items-center rounded-xl bg-slate-800 text-blue-400 group-hover:bg-red-950 group-hover:text-red-400 transition-colors">
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div className="text-sm font-black text-white">{category.name}</div>
-                <div className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-400">
-                  {category.description || "Dealer-ready products and genuine parts"}
-                </div>
-                <div className="mt-auto pt-4 text-xs font-bold text-red-500">
-                  {category._count.products.toLocaleString()} products
-                </div>
-              </Link>
-            ); 
-          })}
-        </div>
+  return <section className="bg-[#f7f9fc] py-12">
+    <div className="site-container">
+      <div className="mb-6 flex items-end justify-between"><div><div className="section-kicker">Browse the catalogue</div><h2 className="mt-1 text-2xl font-black text-[#092f5c]">{section?.title || "Featured product categories"}</h2></div><Link href="/products" className="hidden items-center gap-1 text-xs font-extrabold text-red-600 sm:flex">View all categories <ArrowRight className="h-4 w-4" /></Link></div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {categories.map((category, index) => { const Icon = icons[index % icons.length]; return <Link key={category.id} href={`/products?category=${category.slug}`} className="group flex min-h-36 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:border-red-200 hover:shadow-lg">
+          <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-[#0e4f94] group-hover:bg-red-50 group-hover:text-red-600"><Icon className="h-5 w-5" /></div>
+          <div className="text-sm font-black text-[#092f5c]">{category.name}</div><div className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">{category.description || "Dealer-ready products and genuine parts"}</div><div className="mt-auto pt-3 text-[10px] font-bold text-red-600">{category._count.products.toLocaleString()} products</div>
+        </Link>; })}
       </div>
-    </section>
-  );
+    </div>
+  </section>;
 }

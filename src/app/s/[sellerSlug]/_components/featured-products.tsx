@@ -43,22 +43,22 @@ export function FeaturedProducts({
   const base = "";
 
   return (
-    <section className={`py-16 ${bgClass || "bg-[#0A0A0B] dark:bg-[#050505]"}`}>
+    <section className={`py-12 ${bgClass || "bg-white"}`}>
       <div className="site-container">
-        <div className="mb-10 flex items-end justify-between border-b border-slate-800 pb-4">
+        <div className="mb-6 flex items-end justify-between">
           <div>
-            <div className="inline-block rounded-full bg-blue-950 px-3 py-1 text-[10px] font-bold text-blue-400 mb-3">
+            <div className="section-kicker">
               {isDealer ? "Unlocked Dealer Catalogue" : "Dealer catalogue"}
             </div>
-            <h2 className="text-3xl font-black text-white">{title}</h2>
-            {subtitle && <p className="mt-2 text-sm text-slate-400">{subtitle}</p>}
+            <h2 className="mt-1 text-2xl font-black text-[#092f5c]">{title}</h2>
+            {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
           </div>
-          <Link href={`${base}/products`} className="group flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-400 transition-colors">
-            View all <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          <Link href={`${base}/products`} className="flex items-center gap-1 text-xs font-extrabold text-red-600">
+            View all <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
           {products.map((product) => {
             const mrp = Number(product.variants?.[0]?.mrp || 0);
             const dp = product.dealerPrice ?? mrp;
@@ -67,62 +67,57 @@ export function FeaturedProducts({
             return (
               <article
                 key={product.id}
-                className="group flex min-w-0 flex-col overflow-hidden rounded-2xl bg-slate-900 border-none shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-900/20"
+                className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-red-200 hover:shadow-lg"
               >
                 <Link
                   href={`${base}/products/${product.sku}`}
-                  className="relative flex items-center justify-center aspect-square bg-[#111113] overflow-hidden"
+                  className="relative grid aspect-square place-items-center bg-gradient-to-br from-slate-50 to-slate-100"
                 >
-                  {/* Subtle glow behind icon */}
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                     <div className="w-24 h-24 bg-red-500/20 rounded-full blur-2xl" />
-                  </div>
-                  <Package className="h-16 w-16 text-slate-700 transition-transform duration-500 group-hover:scale-110 group-hover:text-slate-500 relative z-10" />
-                  
+                  <Package className="h-14 w-14 text-slate-200 transition group-hover:scale-110" />
                   {(product.featured || product.newArrival) && (
-                    <span className="absolute left-3 top-3 rounded-md bg-red-600 px-2 py-1 text-[9px] font-black uppercase text-white shadow-md z-20">
-                      {product.newArrival ? "New Arrival" : "Featured"}
+                    <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-1 text-[8px] font-black uppercase text-white">
+                      {product.newArrival ? "New" : "Featured"}
                     </span>
                   )}
                   {isDealer && discountPercent > 0 && (
-                    <span className="absolute right-3 top-3 rounded-md bg-emerald-600 px-2 py-1 text-[9px] font-black text-white shadow-md z-20">
-                      {discountPercent}% OFF
+                    <span className="absolute right-2 top-2 rounded bg-emerald-600 px-1.5 py-0.5 text-[8px] font-black text-white">
+                      -{discountPercent}%
                     </span>
                   )}
                 </Link>
 
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="truncate text-[10px] font-bold uppercase tracking-wider text-red-500">
+                <div className="flex flex-1 flex-col p-3">
+                  <div className="truncate text-[9px] font-bold uppercase tracking-wide text-red-600">
                     {product.category?.name || "Catalogue"}
                   </div>
                   <Link
                     href={`${base}/products/${product.sku}`}
-                    className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-black leading-tight text-white hover:text-red-400 transition-colors"
+                    className="mt-1 line-clamp-2 min-h-8 text-[11px] font-extrabold leading-4 text-[#092f5c] hover:text-red-600"
                   >
                     {product.name}
                   </Link>
-                  <div className="mt-2 truncate text-[10px] font-mono text-slate-500">SKU: {product.sku}</div>
+                  <div className="mt-1 truncate text-[9px] text-slate-400">SKU: {product.sku}</div>
 
-                  <div className="mt-4 border-t border-slate-800 pt-3 space-y-1.5">
+                  <div className="mt-3 border-t pt-2 space-y-1">
                     {isDealer ? (
                       <>
-                        <div className="flex items-center justify-between text-xs text-slate-400">
+                        <div className="flex items-center justify-between text-[9px] text-slate-400">
                           <span>MRP</span>
                           <span className="line-through">{formatCurrency(mrp)}</span>
                         </div>
-                        <div className="flex items-center justify-between text-sm font-black text-emerald-400">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-emerald-700">
                           <span>DP</span>
                           <strong>{formatCurrency(dp)}</strong>
                         </div>
                       </>
                     ) : (
                       <>
-                        <div className="flex items-center justify-between text-xs text-slate-400">
+                        <div className="flex items-center justify-between text-[9px] text-slate-500">
                           <span>MRP</span>
-                          <strong className="text-sm font-bold text-white">{formatCurrency(mrp)}</strong>
+                          <strong className="text-[11px] text-[#092f5c]">{formatCurrency(mrp)}</strong>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-500 mt-1">
-                          <LockKeyhole className="h-3 w-3" /> Dealer pricing locked
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
+                          <LockKeyhole className="h-3 w-3" /> Dealer price after login
                         </div>
                       </>
                     )}
@@ -130,28 +125,28 @@ export function FeaturedProducts({
 
                   {isDealer ? (
                     onAddToCart ? (
-                      <div className="mt-4">
+                      <div className="mt-3">
                         <AddToCartButton
                           productId={product.id}
                           quantity={1}
                           action={onAddToCart}
-                          className="w-full h-10 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white transition-colors border-none"
+                          className="w-full h-8 text-[10px] font-black bg-emerald-600 hover:bg-emerald-700 text-white"
                         />
                       </div>
                     ) : (
                       <Link
                         href={`${base}/products/${product.sku}`}
-                        className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 h-10 text-xs font-black text-white hover:bg-emerald-500 transition-colors border-none"
+                        className="mt-3 flex items-center justify-center gap-1 rounded-md bg-emerald-600 py-2 text-[9px] font-black text-white hover:bg-emerald-700 transition"
                       >
-                        <ShoppingCart className="h-4 w-4" /> Order Now
+                        <ShoppingCart className="h-3 w-3" /> Order
                       </Link>
                     )
                   ) : (
                     <Link
                       href="/inquiry"
-                      className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-red-600 h-10 text-xs font-black text-white hover:bg-red-500 transition-colors border-none"
+                      className="mt-3 flex items-center justify-center gap-1 rounded-md bg-red-600 py-2 text-[9px] font-black text-white hover:bg-red-700 transition"
                     >
-                      <ShoppingCart className="h-4 w-4" /> Add to Inquiry
+                      <ShoppingCart className="h-3 w-3" /> Add to inquiry
                     </Link>
                   )}
                 </div>

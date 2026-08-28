@@ -346,7 +346,7 @@ export function AdminShell({
           {(!collapsed || isMobile) && (
             <button
               aria-label="Sign out"
-              onClick={() => signOut({ callbackUrl: "/staff/login" })}
+              onClick={() => signOut({ callbackUrl: window.location.origin + "/staff/login" })}
               className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
               title="Sign out"
             >

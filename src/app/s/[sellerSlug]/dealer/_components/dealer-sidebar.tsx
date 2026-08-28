@@ -42,7 +42,7 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
       </nav>
       <div className="border-t border-white/10 p-3">
         <Link href="/" className="mb-3 flex items-center justify-between rounded-lg bg-white/8 px-3 py-2.5 text-xs font-semibold"><span className="flex items-center gap-2"><Store className="h-4 w-4 text-red-400" />Storefront</span><ArrowUpRight className="h-3.5 w-3.5" /></Link>
-        <div className="flex items-center gap-2 rounded-xl bg-[#052546] p-3"><CircleUserRound className="h-7 w-7 text-blue-200" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold">{user?.name || "Dealer User"}</div><div className="truncate text-[9px] text-blue-200/70">{user?.email}</div></div><button aria-label="Sign out" onClick={() => signOut({ callbackUrl: "/dealer/login" })}><LogOut className="h-4 w-4 text-blue-200" /></button></div>
+        <div className="flex items-center gap-2 rounded-xl bg-[#052546] p-3"><CircleUserRound className="h-7 w-7 text-blue-200" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold">{user?.name || "Dealer User"}</div><div className="truncate text-[9px] text-blue-200/70">{user?.email}</div></div><button aria-label="Sign out" onClick={() => signOut({ callbackUrl: window.location.origin + "/dealer/login" })}><LogOut className="h-4 w-4 text-blue-200" /></button></div>
       </div>
     </aside>
   );
