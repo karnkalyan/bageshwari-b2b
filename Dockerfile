@@ -3,6 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat openssl
+RUN chown -R node:node /app
 
 COPY --chown=node:node package.json package-lock.json ./
 COPY --chown=node:node prisma ./prisma
