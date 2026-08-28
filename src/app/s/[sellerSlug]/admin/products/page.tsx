@@ -104,9 +104,9 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="section-kicker">Catalogue operations</div>
-          <h1 className="text-2xl font-black text-[#0b2d55]">Product Catalogue, Pricing & VAT Manager</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <div className="section-kicker">Catalog Operations</div>
+          <h1 className="text-2xl font-black text-foreground">Product Catalogue, Pricing & VAT Manager</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage catalogue items, set individual & category VAT % rates, upload product photos, and print barcode price stickers with VAT included.
           </p>
         </div>

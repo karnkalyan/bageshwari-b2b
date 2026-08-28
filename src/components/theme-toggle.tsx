@@ -12,9 +12,9 @@ export function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
 
   if (!mounted) {
     return (
-      <button className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white/60" aria-label="Toggle theme">
-        <Monitor className="h-4 w-4" />
-      </button>
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <Monitor className="h-3.5 w-3.5" />
+      </div>
     );
   }
 
@@ -37,17 +37,17 @@ export function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
     return (
       <button
         onClick={next}
-        className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/8 text-white/70 hover:bg-white/14 hover:text-white transition-all shadow-sm"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-accent transition-all shadow-2xs"
         title={`Theme: ${current.label}`}
         aria-label={`Toggle theme (${current.label})`}
       >
-        <Icon className="h-4 w-4" />
+        <Icon className="h-3.5 w-3.5 text-foreground" />
       </button>
     );
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-xl bg-white/6 p-1 border border-white/10">
+    <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5">
       {modes.map((m) => {
         const MIcon = m.icon;
         const active = theme === m.key;
@@ -55,15 +55,15 @@ export function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
           <button
             key={m.key}
             onClick={() => setTheme(m.key)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold transition-all ${
               active
-                ? "bg-white/20 text-white shadow-sm font-semibold"
-                : "text-white/50 hover:text-white/80"
+                ? "bg-card text-foreground shadow-2xs border border-border/80"
+                : "text-muted-foreground hover:text-foreground hover:bg-card/40"
             }`}
             aria-label={`${m.label} theme`}
           >
-            <MIcon className="h-3.5 w-3.5" />
-            <span className="sidebar-item-text">{m.label}</span>
+            <MIcon className={`h-3.5 w-3.5 ${active ? "text-primary" : "text-muted-foreground"}`} />
+            <span className="text-[11px]">{m.label}</span>
           </button>
         );
       })}

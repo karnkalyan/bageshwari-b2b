@@ -114,16 +114,16 @@ export default async function AdminDealersPage({ params }: DealersPageProps) {
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="section-kicker">Dealer management</div>
-          <h1 className="text-2xl font-black text-[#0b2d55]">Dealer Directory & Applications</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <div className="section-kicker">Dealer Network</div>
+          <h1 className="text-2xl font-black text-foreground">Dealer Directory & Applications</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage dealer profiles, approve new applications, and configure credit profiles
           </p>
         </div>
 
         <div>
           <Link href="/admin/orders/new">
-            <Button className="bg-[#0b2d55] hover:bg-[#124177] text-white font-bold text-xs h-9 shadow-sm flex items-center gap-1.5">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-9 shadow-xs flex items-center gap-1.5">
               <Plus className="h-4 w-4" /> Create Sales Order
             </Button>
           </Link>
