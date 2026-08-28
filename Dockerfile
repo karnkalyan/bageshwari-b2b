@@ -9,7 +9,7 @@ COPY --chown=node:node prisma ./prisma
 
 USER node
 
-RUN npm ci
+RUN npm install
 
 COPY --chown=node:node . .
 
