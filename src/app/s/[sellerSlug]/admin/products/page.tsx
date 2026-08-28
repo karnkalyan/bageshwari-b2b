@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { ProductsTableClient, type SerializedProduct } from "./products-table-client";
+import { Pagination } from "@/components/ui/pagination";
 
 interface AdminProductsProps {
   params: Promise<{ sellerSlug: string }>;
@@ -134,6 +135,7 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
       <Card>
         <CardContent className="p-0">
           <ProductsTableClient products={plainProducts} sellerSlug={sellerSlug} globalVatPercent={globalVat} />
+          <Pagination totalPages={Math.ceil(totalCount / pageSize)} />
         </CardContent>
       </Card>
     </div>

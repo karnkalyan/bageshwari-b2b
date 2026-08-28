@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ShoppingCart, Search, Filter, Eye, Plus, ChevronRight } from "lucide-react";
 import { formatCurrency, formatDate, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
+import { Pagination } from "@/components/ui/pagination";
 
 interface OrdersPageProps {
   params: Promise<{ sellerSlug: string }>;
-  searchParams: Promise<{ status?: string; search?: string }>;
+  searchParams: Promise<{ status?: string; search?: string; page?: string }>;
 }
 
 export default async function AdminOrdersPage({ params, searchParams }: OrdersPageProps) {
@@ -34,14 +35,22 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
     ];
   }
 
-  const orders = await prisma.order.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: {
-      dealer: { select: { tradingName: true, code: true, contactName: true } },
-      _count: { select: { items: true } },
-    },
-  });
+  const currentPage = parseInt(query.page || "1", 10);
+  const pageSize = 20;
+
+  const [orders, totalCount] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+      include: {
+        dealer: { select: { tradingName: true, code: true, contactName: true } },
+        _count: { select: { items: true } },
+      },
+    }),
+    prisma.order.count({ where })
+  ]);
 
   const baseUrl = `/admin/orders`;
 
@@ -176,6 +185,7 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
             </tbody>
           </table>
         </div>
+        <Pagination totalPages={Math.ceil(totalCount / pageSize)} />
       </div>
     </div>
   );

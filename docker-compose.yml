@@ -11,7 +11,7 @@ services:
       PORT: "3011"
       HOSTNAME: 0.0.0.0
       DATABASE_URL: "mysql://root:quantumSql%40123@host.docker.internal:3306/bageshwari_b2b"
-      SEED_PASSWORD: "quantumSql@123"
+      SEED_PASSWORD: "Admin@123"
     ports:
       - "3011:3011"
     extra_hosts:
@@ -19,13 +19,7 @@ services:
     volumes:
       - app_uploads:/app/public/uploads
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3011/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
-        ]
+      test: [ "CMD", "node", "-e", "fetch('http://127.0.0.1:3011/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))" ]
       interval: 15s
       timeout: 5s
       retries: 5

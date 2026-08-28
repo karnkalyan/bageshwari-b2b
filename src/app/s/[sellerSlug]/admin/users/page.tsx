@@ -22,6 +22,7 @@ import {
   Search,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { UserActions } from "./user-actions";
 
 interface UsersPageProps {
   params: Promise<{ sellerSlug: string }>;
@@ -248,6 +249,7 @@ export default async function AdminUsersPage({ params }: UsersPageProps) {
                 ) : (
                   users.map((u) => {
                     const rolesList = u.userRoles.map((ur) => ur.role.name || ur.role.code);
+                    const currentRoleIds = u.userRoles.map((ur) => ur.roleId);
                     return (
                       <tr key={u.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3.5">
@@ -310,6 +312,16 @@ export default async function AdminUsersPage({ params }: UsersPageProps) {
                               {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
                             </Button>
                           </form>
+                          <div className="mt-2 flex justify-end">
+                            <UserActions 
+                              userId={u.id} 
+                              userName={u.name || "User"} 
+                              sellerId={ctx.sellerId}
+                              sellerSlug={sellerSlug}
+                              currentRoles={currentRoleIds}
+                              availableRoles={availableRoles.map(r => ({ id: r.id, code: r.code, name: r.name || "" }))}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
