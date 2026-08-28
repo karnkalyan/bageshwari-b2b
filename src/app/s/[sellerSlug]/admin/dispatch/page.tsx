@@ -3,7 +3,6 @@ import { getTenantContext, hasRole, hasPermission } from "@/lib/tenant";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -61,7 +60,7 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
     "use server";
     const actionCtx = await getTenantContext(sellerSlug);
     const orderId = String(formData.get("orderId") || "");
-    const transporter = String(formData.get("transporter") || "Bageshwari Dedicated Fleet");
+    const transporter = String(formData.get("transporter") || "").trim() || "Dedicated Carrier";
     const driverName = String(formData.get("driverName") || "");
     const driverPhone = String(formData.get("driverPhone") || "");
     const vehicleNumber = String(formData.get("vehicleNumber") || "");
@@ -81,7 +80,7 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
         const challanNumber = await nextDocumentNumber(tx, actionCtx.sellerId, "CHALLAN", "CHL");
         const shipmentNumber = await nextDocumentNumber(tx, actionCtx.sellerId, "SHIPMENT", "SHP");
 
-        // Create or update shipment
+        // Create shipment record
         await tx.shipment.create({
           data: {
             sellerId: actionCtx.sellerId,
@@ -100,7 +99,7 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
         });
       });
 
-      // Advance Order Workflow to SHIPPED and trigger dealer notifications
+      // Advance Order Workflow to SHIPPED
       await executeOrderWorkflowAction({
         sellerId: actionCtx.sellerId,
         orderId,
@@ -119,7 +118,7 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
     revalidatePath(`/s/${sellerSlug}/admin/dispatch`);
   }
 
-  const [readyToDispatchOrders, shippedOrders] = await Promise.all([
+  const [readyToDispatchOrders, shippedOrders, carriers] = await Promise.all([
     prisma.order.findMany({
       where: {
         sellerId: ctx.sellerId,
@@ -157,89 +156,97 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
         shipments: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     }),
+    prisma.transportCompany.findMany({
+      where: { sellerId: ctx.sellerId, status: "ACTIVE" },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, phone: true },
+    }),
   ]);
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
       <div>
         <div className="section-kicker">Logistics & Dispatch Operations</div>
-        <h1 className="text-2xl font-black text-[#0b2d55]">Dispatch, Delivery Challans & Carrier Tracking</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="text-2xl font-black text-foreground">Dispatch, Delivery Challans & Carrier Tracking</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Carrier assignment, carton manifest verification, printable Delivery Challans, and dealer dispatch notifications.
         </p>
       </div>
 
       {/* 1. ORDERS READY FOR DISPATCH */}
-      <Card className="border-blue-200">
-        <CardHeader className="bg-blue-50/70 border-b pb-3">
-          <CardTitle className="text-sm font-bold text-[#0b2d55] flex items-center gap-2">
-            <Truck className="h-4 w-4 text-blue-700" />
-            Orders Ready for Transport & Delivery Challan ({readyToDispatchOrders.length})
-          </CardTitle>
-          <CardDescription className="text-xs text-blue-900/70">
-            Final tax invoices and packaging manifests ready. Assign carrier to generate challan and notify dealer.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
+      <div className="glass-card overflow-hidden border-l-4 border-l-blue-500">
+        <div className="bg-muted/40 p-4 border-b border-border flex items-center justify-between">
+          <div>
+            <div className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Truck className="h-4 w-4 text-blue-500" />
+              Orders Ready for Transport & Delivery Challan ({readyToDispatchOrders.length})
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Final tax invoices and packaging manifests ready. Assign carrier to generate challan and notify dealer.
+            </div>
+          </div>
+        </div>
+
+        <div>
           {readyToDispatchOrders.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400">
+            <div className="p-8 text-center text-xs text-muted-foreground">
               No orders waiting for dispatch at this time.
             </div>
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {readyToDispatchOrders.map((ord) => {
                 const addr = ord.dealer?.addresses?.[0];
-                const dest = addr ? `${addr.city || ""}, ${addr.district || ""}` : "Nepalgunj";
+                const dest = addr ? `${addr.city || ""}, ${addr.district || ""}`.replace(/^,\s*/, "") : "Direct Destination";
                 const cartonCount = ord.packages.length || 1;
 
                 return (
-                  <div key={ord.id} className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                  <div key={ord.id} className="p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 hover:bg-muted/30 transition-colors">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-sm text-slate-900">{ord.orderNumber}</span>
-                        <Badge className="bg-blue-100 text-blue-800 text-[10px]">{ord.status}</Badge>
-                        <span className="text-xs text-slate-500">• {ord.items.length} items ({cartonCount} cartons)</span>
+                        <span className="font-mono font-bold text-sm text-foreground">{ord.orderNumber}</span>
+                        <Badge className="bg-blue-500/10 text-blue-500 border border-blue-500/20 text-[10px]">{ord.status}</Badge>
+                        <span className="text-xs text-muted-foreground">• {ord.items.length} items ({cartonCount} cartons)</span>
                       </div>
-                      <div className="font-semibold text-xs text-slate-800">
+                      <div className="font-semibold text-xs text-foreground">
                         {ord.dealer.tradingName || ord.dealer.legalName}
                       </div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-slate-400" /> Destination: {dest}
+                      <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-muted-foreground" /> Destination: {dest}
                       </div>
                     </div>
 
-                    <form action={confirmDispatchAction} className="flex flex-wrap items-center gap-2 bg-white p-2.5 rounded-lg border">
+                    <form action={confirmDispatchAction} className="flex flex-wrap items-center gap-2 bg-card p-2.5 rounded-xl border border-border">
                       <input type="hidden" name="orderId" value={ord.id} />
                       <input type="hidden" name="totalCartons" value={cartonCount} />
 
-                      <div className="w-36">
+                      <div className="w-40">
                         <Input
                           name="transporter"
                           placeholder="Carrier / Transporter"
-                          defaultValue="Sundar Transport"
-                          className="h-8 text-xs"
+                          defaultValue={carriers[0]?.name || "Direct Logistics Carrier"}
+                          className="h-8 text-xs bg-background text-foreground"
                           required
                         />
                       </div>
-                      <div className="w-28">
+                      <div className="w-32">
                         <Input
                           name="vehicleNumber"
                           placeholder="Vehicle No (e.g. BA 2 KHA 4910)"
-                          className="h-8 text-xs font-mono"
+                          className="h-8 text-xs font-mono bg-background text-foreground"
                         />
                       </div>
                       <div className="w-28">
                         <Input
                           name="driverName"
                           placeholder="Driver Name"
-                          className="h-8 text-xs"
+                          className="h-8 text-xs bg-background text-foreground"
                         />
                       </div>
                       <div className="w-28">
                         <Input
                           name="driverPhone"
                           placeholder="Driver Phone"
-                          className="h-8 text-xs"
+                          className="h-8 text-xs bg-background text-foreground"
                         />
                       </div>
                       <div className="w-20">
@@ -248,14 +255,14 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
                           placeholder="Weight kg"
                           type="number"
                           step="0.1"
-                          className="h-8 text-xs"
+                          className="h-8 text-xs bg-background text-foreground"
                         />
                       </div>
 
                       <Button
                         type="submit"
                         size="sm"
-                        className="h-8 text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold px-3 shadow-xs"
+                        className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 shadow-xs"
                       >
                         <Send className="h-3 w-3 mr-1" /> Confirm Dispatch
                       </Button>
@@ -265,21 +272,21 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 2. DISPATCHED & IN-TRANSIT ORDERS */}
-      <Card>
-        <CardHeader className="bg-slate-50 border-b pb-3">
-          <CardTitle className="text-sm font-bold text-slate-900 flex items-center justify-between">
-            <span>Dispatched & In-Transit Orders ({shippedOrders.length})</span>
-            <span className="text-xs text-slate-500 font-normal">Active Carrier Manifests</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+      <div className="glass-card overflow-hidden">
+        <div className="bg-muted/40 p-4 border-b border-border flex items-center justify-between">
+          <div className="text-sm font-bold text-foreground">
+            Dispatched & In-Transit Orders ({shippedOrders.length})
+          </div>
+          <span className="text-xs text-muted-foreground font-normal">Active Carrier Manifests</span>
+        </div>
+        <div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-500 uppercase border-b text-[10px] font-semibold">
+              <thead className="bg-muted/50 text-muted-foreground uppercase border-b border-border text-[10px] font-bold">
                 <tr>
                   <th className="px-4 py-3">Order & Challan No</th>
                   <th className="px-4 py-3">Dealer</th>
@@ -289,49 +296,49 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
                   <th className="px-4 py-3 text-right">Documents & Tracking</th>
                 </tr>
               </thead>
-              <tbody className="divide-y text-slate-700">
+              <tbody className="divide-y divide-border text-foreground">
                 {shippedOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                       No dispatched orders yet.
                     </td>
                   </tr>
                 ) : (
                   shippedOrders.map((o) => {
                     const addr = o.dealer?.addresses?.[0];
-                    const destination = addr ? `${addr.city || ""}, ${addr.district || ""}` : "Nepalgunj";
+                    const destination = addr ? `${addr.city || ""}, ${addr.district || ""}`.replace(/^,\s*/, "") : "Direct Destination";
                     const shipment = o.shipments[0];
 
                     return (
-                      <tr key={o.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={o.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3.5">
-                          <div className="font-bold font-mono text-slate-900">{o.orderNumber}</div>
+                          <div className="font-bold font-mono text-foreground">{o.orderNumber}</div>
                           {shipment?.challanNumber && (
-                            <div className="text-[10px] text-blue-700 font-mono font-bold">
+                            <div className="text-[10px] text-blue-500 font-mono font-bold">
                               Challan: {shipment.challanNumber}
                             </div>
                           )}
                         </td>
                         <td className="px-4 py-3.5">
-                          <div className="font-semibold text-slate-900">{o.dealer?.tradingName || o.dealer?.legalName}</div>
-                          <div className="text-[10px] text-slate-400">{destination}</div>
+                          <div className="font-semibold text-foreground">{o.dealer?.tradingName || o.dealer?.legalName}</div>
+                          <div className="text-[10px] text-muted-foreground">{destination}</div>
                         </td>
                         <td className="px-4 py-3.5">
-                          <div className="font-medium text-slate-800">{shipment?.transporter || "Dedicated Fleet"}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">
+                          <div className="font-medium text-foreground">{shipment?.transporter || "Carrier"}</div>
+                          <div className="text-[10px] text-muted-foreground font-mono">
                             {shipment?.vehicleNumber ? `Veh: ${shipment.vehicleNumber}` : "—"}
                             {shipment?.driverPhone ? ` • ${shipment.driverPhone}` : ""}
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 font-medium">
+                        <td className="px-4 py-3.5 font-medium text-foreground">
                           {shipment?.totalCartons || o.packages?.length || 1} Carton(s)
                         </td>
                         <td className="px-4 py-3.5">
                           <Badge
                             className={`text-[10px] ${
                               o.status === "COMPLETED" || o.status === "DELIVERED"
-                                ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                                : "bg-blue-100 text-blue-900 border-blue-300"
+                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                : "bg-blue-500/10 text-blue-500 border-blue-500/20"
                             }`}
                           >
                             {o.status}
@@ -344,7 +351,7 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
                               href={`/api/orders/${o.id}/documents/tax-invoice`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border bg-white hover:bg-slate-50 text-indigo-700 border-indigo-200 shadow-2xs"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-indigo-500 transition-colors shadow-2xs"
                               title="Tax Invoice"
                             >
                               <ShieldCheck className="h-3 w-3" /> Invoice
@@ -355,7 +362,7 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
                               href={`/api/orders/${o.id}/documents/packing-list`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border bg-white hover:bg-slate-50 text-emerald-700 border-emerald-200 shadow-2xs"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-emerald-500 transition-colors shadow-2xs"
                               title="Packing List"
                             >
                               <PackageCheck className="h-3 w-3" /> Packing List
@@ -366,7 +373,7 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
                               href={`/api/orders/${o.id}/documents/package-labels`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border bg-white hover:bg-slate-50 text-amber-700 border-amber-200 shadow-2xs"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-amber-500 transition-colors shadow-2xs"
                               title="Carton Labels"
                             >
                               <Tag className="h-3 w-3" /> Labels
@@ -377,14 +384,14 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
                               href={`/api/orders/${o.id}/documents/dispatch-challan`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border bg-white hover:bg-slate-50 text-blue-700 border-blue-200 shadow-2xs"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-blue-500 transition-colors shadow-2xs"
                               title="Delivery Challan"
                             >
                               <Truck className="h-3 w-3" /> Challan
                             </a>
 
                             <Link href={`/admin/orders/${o.id}`}>
-                              <Button size="sm" variant="outline" className="h-7 text-xs">
+                              <Button size="sm" variant="outline" className="h-7 text-xs border-border">
                                 View
                               </Button>
                             </Link>
@@ -397,8 +404,8 @@ export default async function DispatchPortalPage({ params }: DispatchPageProps) 
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
