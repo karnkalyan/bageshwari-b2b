@@ -15,7 +15,7 @@ corepack pnpm dev
 
 ## Secure Docker deployment
 
-The Compose stack is fail-closed: database metadata, the public URL, bind address, port, and all secret-file paths must be set. Passwords are mounted as read-only Docker secrets and are not included in the image or Compose environment.
+The Compose stack is fail-closed: database metadata, the public URL, bind address, port, and all secret-file paths must be set. Passwords are mounted as read-only Docker secrets and are not included in the image or Compose environment. Because local Compose secrets preserve host ownership, the entrypoint reads the `0600 root:root` files during bootstrap and drops permanently to UID/GID `1001` before starting Prisma or Next.js.
 
 ```bash
 cp .env.example .env

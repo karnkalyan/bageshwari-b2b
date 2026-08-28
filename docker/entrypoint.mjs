@@ -61,7 +61,20 @@ function resolveRuntimeSecrets() {
   }
 }
 
+function dropBootstrapPrivileges() {
+  if (typeof process.getuid !== "function" || process.getuid() !== 0) return;
+
+  process.setgroups([]);
+  process.setgid(1001);
+  process.setuid(1001);
+
+  if (process.getuid() !== 1001 || process.getgid() !== 1001) {
+    throw new Error("Unable to drop container bootstrap privileges.");
+  }
+}
+
 resolveRuntimeSecrets();
+dropBootstrapPrivileges();
 
 const [command, ...args] = process.argv.slice(2);
 if (!command) throw new Error("A container command is required.");
