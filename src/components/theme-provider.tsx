@@ -27,8 +27,10 @@ export function ThemeProvider({
 }) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     try {
       const savedTheme = localStorage.getItem(storageKey) as Theme | null;
       if (savedTheme && ["light", "dark", "system"].includes(savedTheme)) {
@@ -40,20 +42,19 @@ export function ThemeProvider({
   }, [storageKey]);
 
   useEffect(() => {
+    if (!mounted) return;
     const root = document.documentElement;
-    
+
     const applyTheme = () => {
-      let activeTheme: "light" | "dark" = "light";
+      let active: "light" | "dark" = "light";
       if (theme === "system") {
-        const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        activeTheme = systemPrefersDark ? "dark" : "light";
+        active = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       } else {
-        activeTheme = theme === "dark" ? "dark" : "light";
+        active = theme === "dark" ? "dark" : "light";
       }
 
-      setResolvedTheme(activeTheme);
-
-      if (activeTheme === "dark") {
+      setResolvedTheme(active);
+      if (active === "dark") {
         root.classList.add("dark");
       } else {
         root.classList.remove("dark");
@@ -68,7 +69,7 @@ export function ThemeProvider({
       mediaQuery.addEventListener("change", handler);
       return () => mediaQuery.removeEventListener("change", handler);
     }
-  }, [theme]);
+  }, [theme, mounted]);
 
   const setTheme = (newTheme: Theme) => {
     try {

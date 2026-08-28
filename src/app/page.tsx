@@ -203,7 +203,7 @@ export default async function HomePage() {
   const section = (type: string) => seller.homepageSections.find((item) => item.sectionType === type);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background text-foreground">
       <UtilityBar content={parseContent(section("UTILITY_BAR")?.contentJson)} />
       <PublicHeader
         seller={seller}

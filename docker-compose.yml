@@ -1,46 +1,36 @@
 services:
-  # MySQL Database Service
-  db:
-    image: mysql:8.0
-    container_name: bageshwari_db
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: bageshwari_b2b
-      MYSQL_USER: admin
-      MYSQL_PASSWORD: quantumSql@123
-      MYSQL_ROOT_PASSWORD: quantumSql@123
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "admin", "-pquantumSql@123"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-
-  # Next.js Application Service
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: bageshwari_app
+    container_name: bageshwari_b2b_app
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      DATABASE_URL: "mysql://admin:quantumSql%40123@db:3306/bageshwari_b2b"
-      NEXTAUTH_URL: "http://localhost:3000"
-      NEXTAUTH_SECRET: "simulcast-production-secret-bageshwari-2026-secure"
-      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
-      NEXT_PUBLIC_PLATFORM_NAME: "Bageshwari Tractors"
-      SEED_PASSWORD: "ChangeMe-Bageshwari-2026!"
-      NODE_ENV: "production"
-    depends_on:
-      db:
-        condition: service_healthy
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      DATABASE_HOST: ${DATABASE_HOST:-host.docker.internal}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_USER: ${DATABASE_USER:-admin}
+      DATABASE_PASSWORD_FILE: /run/secrets/mysql_password
+      DATABASE_NAME: ${DATABASE_NAME:-bageshwari_b2b}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-simulcast-production-secret-bageshwari-2026-secure}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_PLATFORM_NAME: ${NEXT_PUBLIC_PLATFORM_NAME:-Bageshwari Tractors}
+      SEED_PASSWORD: ${SEED_PASSWORD:-ChangeMe-Bageshwari-2026!}
+    ports:
+      - "${PORT:-3000}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    secrets:
+      - mysql_password
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-volumes:
-  mysql_data:
-    driver: local
+secrets:
+  mysql_password:
+    file: ./secrets/mysql_password.txt
