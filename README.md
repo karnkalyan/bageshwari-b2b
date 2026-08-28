@@ -8,7 +8,7 @@ Requirements: Node.js 20+, pnpm, and MySQL. Copy `.env.example` to `.env` and re
 
 ```bash
 corepack pnpm install
-corepack pnpm prisma migrate deploy
+corepack pnpm prisma db push
 corepack pnpm db:seed
 corepack pnpm dev
 ```
@@ -38,7 +38,7 @@ docker compose ps
 docker compose logs --tail=100 app
 ```
 
-`migrate` runs automatically before `app`. The explicit seed command is intentional: it prevents seed data and account password updates from running on every restart. Uploaded files and the Next.js runtime cache use named volumes.
+The schema synchronization service runs automatically before `app` and uses `prisma db push` because the existing production database was originally provisioned without Prisma migration history. It never accepts data-loss operations automatically. The explicit seed command is intentional: it prevents seed data and account password updates from running on every restart. Uploaded files and the Next.js runtime cache use named volumes. The example configuration publishes the application on host port `3011` while Next.js continues listening on container port `3000`.
 
 Primary routes:
 

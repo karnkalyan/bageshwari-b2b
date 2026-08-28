@@ -23,7 +23,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: tools
-    command: ["pnpm", "exec", "prisma", "migrate", "deploy"]
+    command: ["pnpm", "exec", "prisma", "db", "push", "--skip-generate"]
     environment: *database-environment
     extra_hosts:
       - host.docker.internal:host-gateway
