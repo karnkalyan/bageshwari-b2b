@@ -1,36 +1,106 @@
+x-database-environment: &database-environment
+  DATABASE_HOST: "${DATABASE_HOST:?DATABASE_HOST is required}"
+  DATABASE_PORT: "${DATABASE_PORT:?DATABASE_PORT is required}"
+  DATABASE_USER: "${DATABASE_USER:?DATABASE_USER is required}"
+  DATABASE_NAME: "${DATABASE_NAME:?DATABASE_NAME is required}"
+  DATABASE_PASSWORD_FILE: /run/secrets/database_password
+
+x-container-security: &container-security
+  init: true
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 256
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+
 services:
-  app:
+  migrate:
+    <<: *container-security
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: bageshwari_b2b_app
+      target: tools
+    command: ["pnpm", "exec", "prisma", "migrate", "deploy"]
+    environment: *database-environment
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    secrets:
+      - database_password
+    restart: "no"
+
+  seed:
+    <<: *container-security
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tools
+    command: ["pnpm", "run", "db:seed"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *database-environment
+      SEED_PASSWORD_FILE: /run/secrets/seed_password
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    secrets:
+      - database_password
+      - seed_password
+    restart: "no"
+    profiles:
+      - seed
+
+  app:
+    <<: *container-security
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      PORT: ${PORT:-3000}
-      DATABASE_HOST: ${DATABASE_HOST:-host.docker.internal}
-      DATABASE_PORT: ${DATABASE_PORT:-3306}
-      DATABASE_USER: ${DATABASE_USER:-admin}
-      DATABASE_PASSWORD_FILE: /run/secrets/mysql_password
-      DATABASE_NAME: ${DATABASE_NAME:-bageshwari_b2b}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-simulcast-production-secret-bageshwari-2026-secure}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      NEXT_PUBLIC_PLATFORM_NAME: ${NEXT_PUBLIC_PLATFORM_NAME:-Bageshwari Tractors}
-      SEED_PASSWORD: ${SEED_PASSWORD:-ChangeMe-Bageshwari-2026!}
+      <<: *database-environment
+      AUTH_URL: "${AUTH_URL:?AUTH_URL is required}"
+      AUTH_SECRET_FILE: /run/secrets/auth_secret
     ports:
-      - "${PORT:-3000}:3000"
+      - "${APP_BIND_ADDRESS:?APP_BIND_ADDRESS is required}:${APP_PORT:?APP_PORT is required}:3000"
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - host.docker.internal:host-gateway
     secrets:
-      - mysql_password
+      - database_password
+      - auth_secret
+    volumes:
+      - app_uploads:/app/public/uploads
+      - app_cache:/app/.next/cache
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 30s
+    stop_grace_period: 30s
 
 secrets:
-  mysql_password:
-    file: ./secrets/mysql_password.txt
+  database_password:
+    file: "${DATABASE_PASSWORD_FILE:?DATABASE_PASSWORD_FILE is required}"
+  auth_secret:
+    file: "${AUTH_SECRET_FILE:?AUTH_SECRET_FILE is required}"
+  seed_password:
+    file: "${SEED_PASSWORD_FILE:?SEED_PASSWORD_FILE is required}"
+
+volumes:
+  app_uploads:
+  app_cache:

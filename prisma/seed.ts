@@ -146,9 +146,9 @@ async function main() {
   // 4. PLATFORM SUPER ADMIN USER
   // ============================================================
   console.log("👤 Creating platform super admin...");
-  const seedPassword = process.env.SEED_PASSWORD || process.env.NEXTAUTH_SECRET;
+  const seedPassword = process.env.SEED_PASSWORD;
   if (!seedPassword || seedPassword.length < 12) {
-    throw new Error("Set SEED_PASSWORD to at least 12 characters before seeding development users.");
+    throw new Error("Set SEED_PASSWORD to at least 12 characters before creating seed users.");
   }
   const passwordHash = await bcrypt.hash(seedPassword, 12);
 
@@ -1082,7 +1082,7 @@ async function main() {
       });
     }
   } else {
-    console.log("⚠️  product.xlsx not found, creating sample products instead.");
+    throw new Error("product.xlsx is required to seed the product catalogue.");
   }
 
   let productCount = 0;
@@ -1742,7 +1742,7 @@ async function main() {
   console.log(`   Homepage Sections: ${homepageSections.length}`);
 
   console.log("\n🔑 Login Credentials:");
-  console.log("   Seed users use SEED_PASSWORD (or the documented development fallback).");
+  console.log("   Seed users use the required SEED_PASSWORD secret.");
   console.log("   Seller Owner:   owner@bageshwari.com.np");
   console.log("   Seller Admin:   admin@bageshwari.com.np");
   console.log("   Accounts:       accounts@bageshwari.com.np");

@@ -18,7 +18,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:seed": "ts-node --esm prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -78,11 +78,11 @@
     "exceljs": "^4.4.0",
     "prettier": "^3.9.6",
     "tailwindcss": "^4",
-    "ts-node": "^10.9.2",
+    "tsx": "4.20.5",
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
   "prisma": {
-    "seed": "ts-node --esm prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   }
 }

@@ -4,6 +4,7 @@ node_modules
 .gitignore
 .env*
 !.env.example
+secrets
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

@@ -2,19 +2,43 @@
 
 Single-seller dealer commerce and fulfilment system for Bageshwari Tractors, Nepalgunj, Banke, Nepal. The application covers the public catalogue, protected dealer pricing, ordering, accounts review, Proforma invoices, warehouse picking, final invoices, payments/credit, packing, transport and dispatch.
 
-## Development setup
+## Local development
 
-Requirements: Node.js 20+, pnpm, and MySQL on `localhost:3306` with the root development user and blank password.
+Requirements: Node.js 20+, pnpm, and MySQL. Copy `.env.example` to `.env` and replace the Docker-oriented entries with a local `DATABASE_URL`, `AUTH_URL`, `AUTH_SECRET`, and `SEED_PASSWORD`. No credential has an application fallback.
 
 ```bash
 corepack pnpm install
-copy .env.example .env
-corepack pnpm prisma migrate dev
-corepack pnpm prisma db seed
+corepack pnpm prisma migrate deploy
+corepack pnpm db:seed
 corepack pnpm dev
 ```
 
-The default database URL is `mysql://root:@localhost:3306/bageshwari_b2b`. Set `SEED_PASSWORD` in `.env` before seeding; all development accounts use that value.
+## Secure Docker deployment
+
+The Compose stack is fail-closed: database metadata, the public URL, bind address, port, and all secret-file paths must be set. Passwords are mounted as read-only Docker secrets and are not included in the image or Compose environment.
+
+```bash
+cp .env.example .env
+mkdir -p secrets
+openssl rand -base64 48 > secrets/auth_secret.txt
+openssl rand -base64 24 > secrets/seed_password.txt
+read -rsp "MySQL password: " DB_PASSWORD && printf '%s' "$DB_PASSWORD" > secrets/database_password.txt && unset DB_PASSWORD
+chmod 600 .env secrets/*.txt
+```
+
+Edit `.env` for the production database, HTTPS URL, and listener. The recommended host setup binds the container to `127.0.0.1` and exposes it through a TLS reverse proxy.
+
+Apply committed migrations, load the idempotent seed dataset, then recreate the application:
+
+```bash
+docker compose build --pull
+docker compose run --rm seed
+docker compose up -d --remove-orphans --force-recreate app
+docker compose ps
+docker compose logs --tail=100 app
+```
+
+`migrate` runs automatically before `app`. The explicit seed command is intentional: it prevents seed data and account password updates from running on every restart. Uploaded files and the Next.js runtime cache use named volumes.
 
 Primary routes:
 

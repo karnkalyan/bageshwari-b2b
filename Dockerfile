@@ -1,47 +1,49 @@
-# ============================================================
-# Dockerfile for Bageshwari B2B Commerce Platform
-# Multi-stage production build for Next.js with Prisma
-# ============================================================
+# syntax=docker/dockerfile:1.7
 
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl \
+    && corepack enable
 
-# Dependencies Stage
 FROM base AS deps
-COPY package.json pnpm-lock.yaml* ./
-COPY prisma ./prisma/
-RUN corepack enable pnpm && pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
+RUN pnpm install --frozen-lockfile
 
-# Build Stage
 FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-ENV DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
-RUN npx prisma generate
-RUN npm run build
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm exec prisma generate \
+    && pnpm run build
 
-# Production Runner Stage
-FROM base AS runner
-WORKDIR /app
+FROM base AS tools
 ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs nextjs
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --chown=nextjs:nodejs package.json pnpm-lock.yaml product.xlsx ./
+COPY --chown=nextjs:nodejs prisma ./prisma
+COPY --chown=nextjs:nodejs docker/entrypoint.mjs ./docker/entrypoint.mjs
+RUN pnpm exec prisma generate
+USER nextjs
+ENTRYPOINT ["node", "/app/docker/entrypoint.mjs"]
+
+FROM base AS runner
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
+ENV HOSTNAME=0.0.0.0
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs nextjs
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
+COPY --chown=nextjs:nodejs docker/entrypoint.mjs ./docker/entrypoint.mjs
+RUN mkdir -p /app/public/uploads /app/.next/cache \
+    && chown -R nextjs:nodejs /app/public/uploads /app/.next/cache
 USER nextjs
-
 EXPOSE 3000
-
+ENTRYPOINT ["node", "/app/docker/entrypoint.mjs"]
 CMD ["node", "server.js"]
