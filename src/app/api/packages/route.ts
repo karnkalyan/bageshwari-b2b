@@ -1,0 +1,6 @@
+import { z } from "zod";
+import { auth } from "@/lib/auth";
+import { apiError, apiSuccess } from "@/lib/api-response";
+import { createPackage } from "@/services/packing.service";
+const schema = z.object({ orderId: z.string().min(1), weight: z.coerce.number().positive(), length: z.coerce.number().positive().optional(), width: z.coerce.number().positive().optional(), height: z.coerce.number().positive().optional(), packageType: z.string().trim().max(100).optional(), handlingInstructions: z.string().trim().max(1000).optional(), items: z.unknown().optional(), finalize: z.boolean().optional() });
+export async function POST(request: Request) { const session = await auth(); if (!session?.user?.id || !session.sellerId || !(session.permissions || []).includes("packing.manage")) return apiError("FORBIDDEN", "Packing permission required.", 403); const parsed = schema.safeParse(await request.json().catch(() => null)); if (!parsed.success) return apiError("VALIDATION_ERROR", "Invalid package details.", 422); try { return apiSuccess(await createPackage({ sellerId: session.sellerId, actor: { userId: session.user.id, roles: session.roles || [], permissions: session.permissions || [] }, ...parsed.data }), { status: 201 }); } catch (error) { return apiError(error instanceof Error ? error.message : "PACKING_FAILED", "Package could not be created.", 409); } }

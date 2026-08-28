@@ -1,0 +1,6 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { getTenantContext } from "@/lib/tenant";
+import { formatCurrency, formatDate, ORDER_STATUS_LABELS } from "@/lib/utils";
+export default async function DealerOrdersPage() { const ctx = await getTenantContext("bageshwari", "/dealer/login"); if (!ctx.dealerId) redirect("/dealer/login"); const orders = await prisma.order.findMany({ where: { sellerId: ctx.sellerId, dealerId: ctx.dealerId }, orderBy: { createdAt: "desc" } }); return <section className="p-7"><h1 className="text-2xl font-black text-[#092f5c]">Orders</h1><div className="mt-5 overflow-hidden rounded-xl border bg-white"><div className="divide-y">{orders.map((order) => <Link key={order.id} href={`/dealer/orders/${order.id}`} className="grid gap-2 p-5 hover:bg-slate-50 sm:grid-cols-4"><strong className="text-sm text-[#092f5c]">{order.orderNumber}</strong><span className="text-xs text-slate-500">{formatDate(order.createdAt)}</span><span className="text-xs font-bold text-blue-700">{ORDER_STATUS_LABELS[order.status] || order.status}</span><strong className="text-right text-sm">{formatCurrency(Number(order.grandTotal))}</strong></Link>)}</div></div></section>; }

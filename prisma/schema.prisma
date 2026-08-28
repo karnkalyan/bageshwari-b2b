@@ -1,0 +1,2386 @@
+// ============================================================
+// Bageshwari B2B Multi-Vendor Commerce Platform
+// Prisma Schema — MySQL (utf8mb4 safe 1000-byte key compatible)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  LOCKED
+  PENDING_VERIFICATION
+}
+
+enum SellerStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  ARCHIVED
+  PENDING_SETUP
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  PENDING
+}
+
+enum DomainStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  FAILED
+  SUSPENDED
+  ACTIVE
+}
+
+enum ThemeStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  ARCHIVED
+}
+
+enum DealerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_APPROVAL
+  BLOCKED
+}
+
+enum DealerApplicationStatus {
+  SUBMITTED
+  REVIEW_PENDING
+  DOCUMENT_VERIFICATION
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+enum AddressType {
+  BILLING
+  SHIPPING
+  BOTH
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+  OUT_OF_STOCK
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  ARCHIVED
+}
+
+enum PriceType {
+  DEFAULT_DEALER
+  DEALER_GROUP
+  PRICING_GROUP
+  DEALER_SPECIFIC
+  QUANTITY_BASED
+  PROMOTIONAL
+}
+
+enum InventoryTransactionType {
+  INITIAL_STOCK
+  PURCHASE
+  SALE
+  ADJUSTMENT_ADD
+  ADJUSTMENT_REMOVE
+  TRANSFER_IN
+  TRANSFER_OUT
+  RESERVATION
+  RESERVATION_RELEASE
+  PICK
+  DAMAGE
+  RETURN
+  CORRECTION
+}
+
+enum StockReservationStatus {
+  RESERVED
+  PARTIALLY_CONSUMED
+  CONSUMED
+  RELEASED
+  CANCELLED
+}
+
+enum OrderSource {
+  DEALER_PORTAL
+  SALESPERSON_PORTAL
+  ADMIN_PANEL
+  IMPORT
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_ACCOUNTS_REVIEW
+  ACCOUNTS_REVIEW_IN_PROGRESS
+  WAITING_FOR_DEALER_CONFIRMATION
+  DEALER_CHANGE_REQUESTED
+  FINAL_ORDER_CONFIRMED
+  PROFORMA_INVOICE_GENERATED
+  PROFORMA_INVOICE_CONFIRMED
+  READY_FOR_WAREHOUSE
+  PICK_LIST_GENERATED
+  PICKING_IN_PROGRESS
+  PARTIALLY_PICKED
+  PICKING_COMPLETED
+  PICKING_EXCEPTION
+  PICK_LIST_COMPLETED
+  FINAL_INVOICE_ISSUED
+  PAYMENT_PENDING
+  PARTIALLY_PAID
+  PAID
+  CREDIT_PENDING
+  CREDIT_APPROVED
+  PAYMENT_ON_HOLD
+  PAYMENT_OVERDUE
+  PACKING_IN_PROGRESS
+  PACKED
+  PACKED_AND_LABELLED
+  SHIPPED
+  IN_TRANSIT
+  PARTIALLY_DELIVERED
+  DELIVERED
+  DELIVERY_FAILED
+  RETURNED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderItemStatus {
+  ACTIVE
+  REVISED
+  REMOVED
+  SUBSTITUTED
+  PARTIALLY_PICKED
+  PICKED
+  PICK_EXCEPTION
+  PACKED
+  SHIPPED
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+enum OrderRevisionStatus {
+  PENDING
+  SENT_TO_DEALER
+  DEALER_CONFIRMED
+  DEALER_REJECTED
+  DEALER_CHANGE_REQUESTED
+  SUPERSEDED
+}
+
+enum DealerDecision {
+  CONFIRMED
+  REJECTED
+  CHANGE_REQUESTED
+  PARTIALLY_CONFIRMED
+}
+
+enum ProformaStatus {
+  DRAFT
+  GENERATED
+  SENT
+  CONFIRMED
+  REJECTED
+  REVISED
+  CANCELLED
+  EXPIRED
+}
+
+enum PickListStatus {
+  GENERATED
+  ASSIGNED
+  PICKING_IN_PROGRESS
+  PARTIALLY_PICKED
+  COMPLETED
+  EXCEPTION
+  CANCELLED
+}
+
+enum PickingExceptionStatus {
+  REPORTED
+  UNDER_REVIEW
+  RESOLVED
+  ESCALATED
+}
+
+enum FinalInvoiceStatus {
+  DRAFT
+  ISSUED
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  CREDIT_NOTE_ISSUED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CHEQUE
+  CASH
+  CREDIT
+  ONLINE
+  MOBILE_PAYMENT
+  OTHER
+}
+
+enum CreditApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ON_HOLD
+  EXPIRED
+}
+
+enum PackageStatus {
+  CREATED
+  PACKING
+  PACKED
+  LABELLED
+  READY_FOR_DISPATCH
+  DISPATCHED
+  DELIVERED
+  DAMAGED
+}
+
+enum ShipmentStatus {
+  CREATED
+  DISPATCHED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  PARTIALLY_DELIVERED
+  FAILED
+  RETURNED
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  PENDING
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  PARTIALLY_DELIVERED
+  FAILED
+  RETURNED
+  REFUSED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum FileVisibility {
+  PUBLIC
+  PRIVATE
+  SELLER_ONLY
+  DEALER_ONLY
+}
+
+enum HomepageSectionType {
+  HERO
+  UTILITY_BAR
+  FEATURED_CATEGORIES
+  FEATURED_PRODUCTS
+  POPULAR_MODELS
+  SPARE_PARTS
+  IMPLEMENTS
+  ACCESSORIES
+  LUBRICANTS_TOOLS
+  NEW_ARRIVALS
+  BEST_SELLERS
+  OFFERS
+  DEALER_BENEFITS
+  DEALER_RECOMMENDATIONS
+  HOW_IT_WORKS
+  PLATFORM_FEATURES
+  DEALER_CTA
+  BUSINESS_STATS
+  TRUSTED_PARTNERS
+  TESTIMONIALS
+  SERVICE_CONTACT
+  CUSTOM_CONTENT
+}
+
+enum AuditSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RoleScope {
+  PLATFORM
+  SELLER
+  DEALER
+}
+
+enum Appearance {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum TableDensity {
+  COMPACT
+  COMFORTABLE
+}
+
+enum SectionAudience {
+  PUBLIC
+  DEALER_ONLY
+  ALL
+}
+
+// ============================================================
+// AUTHENTICATION MODELS (Auth.js Compatible)
+// ============================================================
+
+model User {
+  id                String     @id @default(cuid()) @db.VarChar(50)
+  name              String?
+  email             String     @unique @db.VarChar(50)
+  emailVerified     DateTime?
+  passwordHash      String?
+  phone             String?
+  image             String?
+  status            UserStatus @default(PENDING_VERIFICATION)
+  preferredLanguage String     @default("en")
+  preferredTheme    Appearance @default(SYSTEM)
+  twoFactorEnabled  Boolean    @default(false)
+  lastLoginAt       DateTime?
+  loginAttempts     Int        @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+
+  accounts                   Account[]
+  sessions                   Session[]
+  memberships                UserSellerMembership[]
+  userRoles                  UserRole[]
+  notifications              Notification[]
+  auditLogs                  AuditLog[]                 @relation("AuditUser")
+  passwordResetTokens        PasswordResetToken[]
+  twoFactorToken             TwoFactorToken?
+  loginHistory               LoginHistory[]
+  createdProducts            Product[]                  @relation("ProductCreator")
+  createdOrders              Order[]                    @relation("OrderCreator")
+  confirmedOrders            Order[]                    @relation("OrderConfirmer")
+  dealerApplicationsReviewed DealerApplication[]        @relation("ApplicationReviewer")
+  approvedDealers            Dealer[]                   @relation("DealerApprover")
+  creditApprovals            DealerCreditProfile[]      @relation("CreditApprover")
+  verifiedDocuments          DealerDocument[]           @relation("DocumentVerifier")
+  createdThemes              SellerTheme[]              @relation("ThemeCreator")
+  themeVersions              ThemeVersion[]             @relation("ThemeVersionCreator")
+  createdProformas           ProformaInvoice[]          @relation("ProformaCreator")
+  confirmedProformas         ProformaInvoice[]          @relation("ProformaConfirmer")
+  proformaRevisions          ProformaInvoiceRevision[]  @relation("ProformaRevisionCreator")
+  orderRevisions             OrderRevision[]            @relation("OrderRevisionCreator")
+  orderRemarks               OrderRemark[]
+  statusChanges              OrderStatusHistory[]       @relation("StatusChanger")
+  dealerConfirmations        DealerConfirmation[]       @relation("ConfirmationUser")
+  pickListAssignments        PickList[]                 @relation("PickListAssigner")
+  pickListPickers            PickList[]                 @relation("PickListPicker")
+  pickListCompleters         PickList[]                 @relation("PickListCompleter")
+  pickExceptionReporters     PickListException[]        @relation("ExceptionReporter")
+  pickExceptionResolvers     PickListException[]        @relation("ExceptionResolver")
+  finalInvoiceGenerators     FinalInvoice[]             @relation("FinalInvoiceGenerator")
+  payments                   Payment[]                  @relation("PaymentRecorder")
+  paymentVerifiers           Payment[]                  @relation("PaymentVerifier")
+  creditApprovalRecords      CreditApproval[]           @relation("CreditApprover2")
+  packages                   Package[]
+  shipments                  Shipment[]                 @relation("ShipmentCreator")
+  deliveryUpdates            DeliveryEvent[]            @relation("DeliveryUpdater")
+  inventoryTransactions      InventoryTransaction[]     @relation("InventoryPerformer")
+  stockAdjustments           StockAdjustment[]          @relation("AdjustmentPerformer")
+  pricesCreated              ProductPrice[]             @relation("PriceCreator")
+  sellerCreated              Seller[]                   @relation("SellerCreator")
+  featureOverrides           SellerFeature[]            @relation("FeatureOverrider")
+  homepageSections           SellerHomepageSection[]
+  userPreferences            UserAppearancePreference[]
+  inquiryAssignments         Inquiry[]                  @relation("InquiryAssigner")
+  inquiryFollowUps           InquiryFollowUp[]
+  dealerEmployees            DealerEmployee[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model Account {
+  id                String  @id @default(cuid()) @db.VarChar(50)
+  userId            String  @db.VarChar(50)
+  type              String
+  provider          String  @db.VarChar(50)
+  providerAccountId String  @db.VarChar(50)
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid()) @db.VarChar(50)
+  sessionToken String   @unique @db.VarChar(50)
+  userId       String   @db.VarChar(50)
+  expires      DateTime
+  userAgent    String?
+  ipAddress    String?
+  sellerId     String?  @db.VarChar(50)
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String   @db.VarChar(50)
+  token      String   @unique @db.VarChar(50)
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid()) @db.VarChar(50)
+  userId    String    @db.VarChar(50)
+  tokenHash String    @unique @db.VarChar(50)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TwoFactorToken {
+  id                     String    @id @default(cuid()) @db.VarChar(50)
+  userId                 String    @unique @db.VarChar(50)
+  secretEncrypted        String    @db.Text
+  recoveryCodesEncrypted String?   @db.Text
+  verifiedAt             DateTime?
+  createdAt              DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid()) @db.VarChar(50)
+  userId    String   @db.VarChar(50)
+  ipAddress String?
+  userAgent String?  @db.Text
+  success   Boolean
+  reason    String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// PLATFORM & SELLER MODELS
+// ============================================================
+
+model Seller {
+  id                 String       @id @default(cuid()) @db.VarChar(50)
+  code               String       @unique @db.VarChar(50)
+  slug               String       @unique @db.VarChar(50)
+  legalName          String
+  tradingName        String
+  description        String?      @db.Text
+  industry           String?
+  email              String?
+  phone              String?
+  website            String?
+  countryCode        String       @default("+977")
+  country            String       @default("Nepal")
+  province           String?
+  district           String?
+  city               String?
+  addressLine1       String?
+  addressLine2       String?
+  postalCode         String?
+  currencyCode       String       @default("NPR")
+  timeZone           String       @default("Asia/Kathmandu")
+  defaultLanguage    String       @default("en")
+  taxNumber          String?
+  registrationNumber String?
+  status             SellerStatus @default(PENDING_SETUP)
+  subscriptionPlanId String?      @db.VarChar(50)
+  trialEndsAt        DateTime?
+  activeFrom         DateTime?
+  activeUntil        DateTime?
+  createdById        String?      @db.VarChar(50)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+
+  createdBy                User?                         @relation("SellerCreator", fields: [createdById], references: [id])
+  subscriptionPlan         SubscriptionPlan?             @relation(fields: [subscriptionPlanId], references: [id])
+  domains                  SellerDomain[]
+  subscription             SellerSubscription?
+  themes                   SellerTheme[]
+  branches                 SellerBranch[]
+  warehouses               Warehouse[]
+  memberships              UserSellerMembership[]
+  roles                    Role[]
+  dealers                  Dealer[]
+  dealerApplications       DealerApplication[]
+  dealerGroups             DealerGroup[]
+  pricingGroups            PricingGroup[]
+  products                 Product[]
+  categories               ProductCategory[]
+  brands                   ProductBrand[]
+  attributes               ProductAttribute[]
+  orders                   Order[]
+  proformaInvoices         ProformaInvoice[]
+  finalInvoices            FinalInvoice[]
+  pickLists                PickList[]
+  payments                 Payment[]
+  creditApprovals          CreditApproval[]
+  packages                 Package[]
+  shipments                Shipment[]
+  inventories              Inventory[]
+  inventoryTransactions    InventoryTransaction[]
+  stockReservations        StockReservation[]
+  notifications            Notification[]
+  auditLogs                AuditLog[]
+  fileAssets               FileAsset[]
+  features                 SellerFeature[]
+  homepageSections         SellerHomepageSection[]
+  userPreferences          UserAppearancePreference[]
+  salespersonAssignments   SalespersonDealerAssignment[]
+  dealerCreditProfiles     DealerCreditProfile[]
+  dealerAddresses          DealerAddress[]
+  dealerDocuments          DealerDocument[]
+  dealerEmployees          DealerEmployee[]
+  productImages            ProductImage[]
+  productDocuments         ProductDocument[]
+  productVariants          ProductVariant[]
+  productAttributeValues   ProductAttributeValue[]
+  productVariantAttributes ProductVariantAttribute[]
+  productPrices            ProductPrice[]
+  orderItems               OrderItem[]
+  orderRevisions           OrderRevision[]
+  orderRevisionItems       OrderRevisionItem[]
+  orderRemarks             OrderRemark[]
+  orderStatusHistories     OrderStatusHistory[]
+  dealerConfirmations      DealerConfirmation[]
+  proformaItems            ProformaInvoiceItem[]
+  proformaRevisions        ProformaInvoiceRevision[]
+  pickListItems            PickListItem[]
+  pickListExceptions       PickListException[]
+  finalInvoiceItems        FinalInvoiceItem[]
+  stockAdjustments         StockAdjustment[]
+  deliveryEvents           DeliveryEvent[]
+  inquiries                Inquiry[]
+  numberSequences          NumberSequence[]
+  companyProfile           CompanyProfile?
+  transportCompanies       TransportCompany[]
+  transportDrivers         TransportDriver[]
+  transportVehicles        TransportVehicle[]
+
+  @@index([status])
+  @@index([slug])
+}
+
+/// The single editable company record for this application. `Seller` remains an
+/// internal ownership key for existing business records, but is never exposed as
+/// a tenant or seller-management feature.
+model CompanyProfile {
+  id                 String   @id @default("bageshwari-tractors") @db.VarChar(50)
+  sellerId           String   @unique @db.VarChar(50)
+  companyName        String
+  tradingName        String
+  contactPerson      String?
+  email              String?
+  phone              String?
+  website            String?
+  country            String   @default("Nepal")
+  province           String?
+  district           String?
+  city               String?
+  address            String?
+  panNumber          String?
+  vatNumber          String?
+  registrationNumber String?
+  defaultVatPercent  Decimal  @default(13.00) @db.Decimal(5, 2)
+  pricesIncludeVat   Boolean  @default(false)
+  bankName           String?
+  bankAccountName    String?
+  bankAccountNumber  String?
+  bankBranch         String?
+  bankSwiftCode      String?
+  currencyCode       String   @default("NPR")
+  timeZone           String   @default("Asia/Kathmandu")
+  businessHours      String?
+  footerText         String?  @db.Text
+  terms              String?  @db.LongText
+  privacyPolicy      String?  @db.LongText
+  shippingPolicy     String?  @db.LongText
+  returnPolicy       String?  @db.LongText
+  socialLinksJson    String?  @db.Text
+  logoUrl            String?
+  compactLogoUrl     String?
+  faviconUrl         String?
+  emailLogoUrl       String?
+  invoiceLogoUrl     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+}
+
+model SellerDomain {
+  id                 String       @id @default(cuid()) @db.VarChar(50)
+  sellerId           String       @db.VarChar(50)
+  hostname           String       @unique @db.VarChar(100)
+  isPrimary          Boolean      @default(false)
+  verificationToken  String?
+  verificationStatus DomainStatus @default(PENDING_VERIFICATION)
+  verifiedAt         DateTime?
+  sslStatus          String?      @default("pending")
+  status             DomainStatus @default(PENDING_VERIFICATION)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+}
+
+model SellerSubscription {
+  id           String             @id @default(cuid()) @db.VarChar(50)
+  sellerId     String             @unique @db.VarChar(50)
+  planId       String             @db.VarChar(50)
+  status       SubscriptionStatus @default(PENDING)
+  startDate    DateTime?
+  endDate      DateTime?
+  trialEndDate DateTime?
+  billingCycle String?            @default("monthly")
+  amount       Decimal            @db.Decimal(18, 2)
+  currencyCode String             @default("NPR")
+  autoRenew    Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  seller Seller           @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+}
+
+model SubscriptionPlan {
+  id           String   @id @default(cuid()) @db.VarChar(50)
+  name         String
+  code         String   @unique @db.VarChar(50)
+  description  String?  @db.Text
+  monthlyPrice Decimal  @db.Decimal(18, 2)
+  annualPrice  Decimal  @db.Decimal(18, 2)
+  currencyCode String   @default("NPR")
+  isActive     Boolean  @default(true)
+  limitsJson   String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  features      PlanFeature[]
+  sellers       Seller[]
+  subscriptions SellerSubscription[]
+}
+
+model PlanFeature {
+  id         String  @id @default(cuid()) @db.VarChar(50)
+  planId     String  @db.VarChar(50)
+  featureKey String  @db.VarChar(50)
+  enabled    Boolean @default(true)
+  limitValue Int?
+
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureKey])
+}
+
+model SellerFeature {
+  id             String   @id @default(cuid()) @db.VarChar(50)
+  sellerId       String   @db.VarChar(50)
+  featureKey     String   @db.VarChar(50)
+  enabled        Boolean  @default(true)
+  limitValue     Int?
+  overrideReason String?
+  overriddenById String?  @db.VarChar(50)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  seller       Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  overriddenBy User?  @relation("FeatureOverrider", fields: [overriddenById], references: [id])
+
+  @@unique([sellerId, featureKey])
+}
+
+model SellerBranch {
+  id           String    @id @default(cuid()) @db.VarChar(50)
+  sellerId     String    @db.VarChar(50)
+  code         String    @db.VarChar(50)
+  name         String
+  email        String?
+  phone        String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  district     String?
+  province     String?
+  country      String    @default("Nepal")
+  timeZone     String    @default("Asia/Kathmandu")
+  isHeadOffice Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  seller      Seller                 @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  warehouses  Warehouse[]
+  memberships UserSellerMembership[]
+
+  @@unique([sellerId, code])
+  @@index([sellerId])
+}
+
+model Warehouse {
+  id           String    @id @default(cuid()) @db.VarChar(50)
+  sellerId     String    @db.VarChar(50)
+  branchId     String?   @db.VarChar(50)
+  code         String    @db.VarChar(50)
+  name         String
+  addressLine1 String?
+  city         String?
+  district     String?
+  contactName  String?
+  phone        String?
+  email        String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  seller                Seller                 @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  branch                SellerBranch?          @relation(fields: [branchId], references: [id])
+  inventories           Inventory[]
+  inventoryTransactions InventoryTransaction[]
+  stockReservations     StockReservation[]
+  stockAdjustments      StockAdjustment[]
+  pickLists             PickList[]
+
+  @@unique([sellerId, code])
+  @@index([sellerId])
+}
+
+// ============================================================
+// THEME MODELS
+// ============================================================
+
+model SellerTheme {
+  id                 String      @id @default(cuid()) @db.VarChar(50)
+  sellerId           String      @db.VarChar(50)
+  name               String
+  status             ThemeStatus @default(DRAFT)
+  version            Int         @default(1)
+  logoUrl            String?
+  compactLogoUrl     String?
+  darkLogoUrl        String?
+  faviconUrl         String?
+  emailLogoUrl       String?
+  invoiceLogoUrl     String?
+  loginLogoUrl       String?
+  tokensJson         String?     @db.Text
+  lightTokensJson    String?     @db.Text
+  darkTokensJson     String?     @db.Text
+  homepageLayoutJson String?     @db.Text
+  publishedAt        DateTime?
+  scheduledAt        DateTime?
+  createdById        String?     @db.VarChar(50)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  seller    Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  createdBy User?          @relation("ThemeCreator", fields: [createdById], references: [id])
+  versions  ThemeVersion[]
+
+  @@index([sellerId])
+  @@index([sellerId, status])
+}
+
+model ThemeVersion {
+  id            String   @id @default(cuid()) @db.VarChar(50)
+  sellerThemeId String   @db.VarChar(50)
+  version       Int
+  tokensJson    String?  @db.Text
+  layoutJson    String?  @db.Text
+  createdById   String?  @db.VarChar(50)
+  createdAt     DateTime @default(now())
+
+  sellerTheme SellerTheme @relation(fields: [sellerThemeId], references: [id], onDelete: Cascade)
+  createdBy   User?       @relation("ThemeVersionCreator", fields: [createdById], references: [id])
+
+  @@index([sellerThemeId])
+}
+
+model UserAppearancePreference {
+  id                 String       @id @default(cuid()) @db.VarChar(50)
+  userId             String       @db.VarChar(50)
+  sellerId           String?      @db.VarChar(50)
+  appearance         Appearance   @default(SYSTEM)
+  sidebarCollapsed   Boolean      @default(false)
+  tableDensity       TableDensity @default(COMFORTABLE)
+  accentPreset       String?
+  language           String       @default("en")
+  defaultWarehouseId String?      @db.VarChar(50)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seller Seller? @relation(fields: [sellerId], references: [id])
+
+  @@unique([userId, sellerId])
+}
+
+model SellerHomepageSection {
+  id           String              @id @default(cuid()) @db.VarChar(50)
+  sellerId     String              @db.VarChar(50)
+  sectionType  HomepageSectionType
+  title        String?
+  subtitle     String?             @db.Text
+  layout       String?             @default("default")
+  contentJson  String?             @db.LongText
+  displayOrder Int                 @default(0)
+  enabled      Boolean             @default(true)
+  audience     SectionAudience     @default(PUBLIC)
+  bgStyle      String?
+  imageUrl     String?
+  ctaLabel     String?
+  ctaLink      String?
+  maxItems     Int?
+  startsAt     DateTime?
+  endsAt       DateTime?
+  publishedAt  DateTime?
+  createdById  String?             @db.VarChar(50)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  seller    Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id])
+
+  @@index([sellerId])
+  @@index([sellerId, sectionType])
+}
+
+// ============================================================
+// AUTHORIZATION MODELS
+// ============================================================
+
+model Role {
+  id          String    @id @default(cuid()) @db.VarChar(50)
+  sellerId    String?   @db.VarChar(50)
+  code        String    @db.VarChar(50)
+  name        String
+  description String?
+  scope       RoleScope @default(SELLER)
+  systemRole  Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  seller      Seller?          @relation(fields: [sellerId], references: [id])
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@unique([sellerId, code])
+  @@index([scope])
+}
+
+model Permission {
+  id          String  @id @default(cuid()) @db.VarChar(50)
+  code        String  @unique @db.VarChar(50)
+  name        String
+  description String?
+  module      String
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id           String @id @default(cuid()) @db.VarChar(50)
+  roleId       String @db.VarChar(50)
+  permissionId String @db.VarChar(50)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model UserSellerMembership {
+  id        String   @id @default(cuid()) @db.VarChar(50)
+  userId    String   @db.VarChar(50)
+  sellerId  String   @db.VarChar(50)
+  branchId  String?  @db.VarChar(50)
+  dealerId  String?  @db.VarChar(50)
+  status    String   @default("active")
+  isDefault Boolean  @default(false)
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seller    Seller        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  branch    SellerBranch? @relation(fields: [branchId], references: [id])
+  dealer    Dealer?       @relation(fields: [dealerId], references: [id])
+  userRoles UserRole[]
+
+  @@unique([userId, sellerId])
+  @@index([sellerId])
+}
+
+model UserRole {
+  id           String   @id @default(cuid()) @db.VarChar(50)
+  userId       String   @db.VarChar(50)
+  sellerId     String?  @db.VarChar(50)
+  roleId       String   @db.VarChar(50)
+  membershipId String?  @db.VarChar(50)
+  createdAt    DateTime @default(now())
+
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role                  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  membership UserSellerMembership? @relation(fields: [membershipId], references: [id])
+
+  @@unique([userId, roleId, sellerId])
+  @@index([userId])
+  @@index([sellerId])
+}
+
+// ============================================================
+// DEALER MODELS
+// ============================================================
+
+model Dealer {
+  id                    String       @id @default(cuid()) @db.VarChar(50)
+  sellerId              String       @db.VarChar(50)
+  code                  String       @db.VarChar(50)
+  legalName             String
+  tradingName           String?
+  contactName           String?
+  email                 String?
+  phone                 String?
+  taxNumber             String?
+  registrationNumber    String?
+  dealerGroupId         String?      @db.VarChar(50)
+  pricingGroupId        String?      @db.VarChar(50)
+  assignedSalespersonId String?      @db.VarChar(50)
+  status                DealerStatus @default(PENDING_APPROVAL)
+  creditEligible        Boolean      @default(false)
+  notes                 String?      @db.Text
+  approvedAt            DateTime?
+  approvedById          String?      @db.VarChar(50)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  deletedAt             DateTime?
+
+  seller                 Seller                        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealerGroup            DealerGroup?                  @relation(fields: [dealerGroupId], references: [id])
+  pricingGroup           PricingGroup?                 @relation(fields: [pricingGroupId], references: [id])
+  approvedBy             User?                         @relation("DealerApprover", fields: [approvedById], references: [id])
+  addresses              DealerAddress[]
+  documents              DealerDocument[]
+  employees              DealerEmployee[]
+  creditProfile          DealerCreditProfile?
+  orders                 Order[]
+  memberships            UserSellerMembership[]
+  salespersonAssignments SalespersonDealerAssignment[]
+  confirmations          DealerConfirmation[]
+  prices                 ProductPrice[]                @relation("DealerPrices")
+
+  @@unique([sellerId, code])
+  @@index([sellerId])
+  @@index([sellerId, status])
+}
+
+model DealerApplication {
+  id                   String                  @id @default(cuid()) @db.VarChar(50)
+  sellerId             String                  @db.VarChar(50)
+  businessName         String
+  contactName          String
+  email                String
+  phone                String?
+  addressLine1         String?
+  addressLine2         String?
+  city                 String?
+  municipality         String?
+  district             String?
+  province             String?
+  territory            String?
+  country              String                  @default("Nepal")
+  taxNumber            String?
+  registrationNumber   String?
+  productInterestsJson String?                 @db.Text
+  monthlyOrderEstimate Decimal?                @db.Decimal(18, 2)
+  creditRequested      Boolean                 @default(false)
+  existingBusinessInfo String?                 @db.Text
+  documentsJson        String?                 @db.Text
+  remarks              String?                 @db.Text
+  status               DealerApplicationStatus @default(SUBMITTED)
+  reviewedById         String?                 @db.VarChar(50)
+  reviewedAt           DateTime?
+  rejectionReason      String?                 @db.Text
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  seller     Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  reviewedBy User?  @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+
+  @@index([sellerId])
+  @@index([sellerId, status])
+}
+
+model DealerEmployee {
+  id          String   @id @default(cuid()) @db.VarChar(50)
+  sellerId    String   @db.VarChar(50)
+  dealerId    String   @db.VarChar(50)
+  userId      String   @db.VarChar(50)
+  designation String?
+  isPrimary   Boolean  @default(false)
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealer Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, dealerId, userId])
+  @@index([sellerId])
+}
+
+model DealerAddress {
+  id           String      @id @default(cuid()) @db.VarChar(50)
+  sellerId     String      @db.VarChar(50)
+  dealerId     String      @db.VarChar(50)
+  type         AddressType @default(BOTH)
+  label        String?
+  contactName  String?
+  phone        String?
+  addressLine1 String
+  addressLine2 String?
+  city         String?
+  district     String?
+  province     String?
+  postalCode   String?
+  country      String      @default("Nepal")
+  isDefault    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealer Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, dealerId])
+}
+
+model DealerDocument {
+  id             String    @id @default(cuid()) @db.VarChar(50)
+  sellerId       String    @db.VarChar(50)
+  dealerId       String    @db.VarChar(50)
+  fileAssetId    String?   @db.VarChar(50)
+  documentType   String
+  documentNumber String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  verifiedAt     DateTime?
+  verifiedById   String?   @db.VarChar(50)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  seller     Seller     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealer     Dealer     @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  verifiedBy User?      @relation("DocumentVerifier", fields: [verifiedById], references: [id])
+  fileAsset  FileAsset? @relation(fields: [fileAssetId], references: [id])
+
+  @@index([sellerId, dealerId])
+}
+
+model DealerGroup {
+  id          String   @id @default(cuid()) @db.VarChar(50)
+  sellerId    String   @db.VarChar(50)
+  code        String   @db.VarChar(50)
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  seller  Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealers Dealer[]
+  prices  ProductPrice[] @relation("DealerGroupPrices")
+
+  @@unique([sellerId, code])
+  @@index([sellerId])
+}
+
+model PricingGroup {
+  id          String   @id @default(cuid()) @db.VarChar(50)
+  sellerId    String   @db.VarChar(50)
+  code        String   @db.VarChar(50)
+  name        String
+  description String?
+  priority    Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  seller  Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealers Dealer[]
+  prices  ProductPrice[] @relation("PricingGroupPrices")
+
+  @@unique([sellerId, code])
+  @@index([sellerId])
+}
+
+model DealerCreditProfile {
+  id                 String    @id @default(cuid()) @db.VarChar(50)
+  sellerId           String    @db.VarChar(50)
+  dealerId           String    @unique @db.VarChar(50)
+  creditEligible     Boolean   @default(false)
+  creditLimit        Decimal   @default(0) @db.Decimal(18, 2)
+  currentOutstanding Decimal   @default(0) @db.Decimal(18, 2)
+  availableCredit    Decimal   @default(0) @db.Decimal(18, 2)
+  creditPeriodDays   Int       @default(30)
+  holdStatus         Boolean   @default(false)
+  holdReason         String?
+  approvedById       String?   @db.VarChar(50)
+  approvedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  seller     Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealer     Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  approvedBy User?  @relation("CreditApprover", fields: [approvedById], references: [id])
+
+  @@index([sellerId])
+}
+
+model SalespersonDealerAssignment {
+  id            String    @id @default(cuid()) @db.VarChar(50)
+  sellerId      String    @db.VarChar(50)
+  salespersonId String    @db.VarChar(50)
+  dealerId      String    @db.VarChar(50)
+  activeFrom    DateTime  @default(now())
+  activeUntil   DateTime?
+  isPrimary     Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealer Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, salespersonId, dealerId])
+  @@index([sellerId])
+}
+
+// ============================================================
+// CATALOGUE MODELS
+// ============================================================
+
+model ProductCategory {
+  id             String        @id @default(cuid()) @db.VarChar(50)
+  sellerId       String        @db.VarChar(50)
+  parentId       String?       @db.VarChar(50)
+  name           String
+  slug           String        @db.VarChar(50)
+  code           String        @db.VarChar(50)
+  description    String?       @db.Text
+  imageUrl       String?
+  displayOrder   Int           @default(0)
+  taxPercent     Decimal?      @db.Decimal(5, 2)
+  status         ProductStatus @default(ACTIVE)
+  seoTitle       String?
+  seoDescription String?       @db.Text
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  seller   Seller            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  parent   ProductCategory?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryChildren")
+  products Product[]
+
+  @@unique([sellerId, slug])
+  @@unique([sellerId, code])
+  @@index([sellerId])
+}
+
+model ProductBrand {
+  id          String        @id @default(cuid()) @db.VarChar(50)
+  sellerId    String        @db.VarChar(50)
+  name        String
+  slug        String        @db.VarChar(50)
+  description String?       @db.Text
+  logoUrl     String?
+  status      ProductStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  seller   Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([sellerId, slug])
+  @@index([sellerId])
+}
+
+model Product {
+  id                   String        @id @default(cuid()) @db.VarChar(50)
+  sellerId             String        @db.VarChar(50)
+  categoryId           String?       @db.VarChar(50)
+  brandId              String?       @db.VarChar(50)
+  name                 String
+  slug                 String        @db.VarChar(50)
+  sku                  String        @db.VarChar(50)
+  shortDescription     String?       @db.Text
+  description          String?       @db.LongText
+  status               ProductStatus @default(ACTIVE)
+  publishStatus        PublishStatus @default(DRAFT)
+  featured             Boolean       @default(false)
+  newArrival           Boolean       @default(false)
+  bestSeller           Boolean       @default(false)
+  onOffer              Boolean       @default(false)
+  minimumOrderQuantity Decimal       @default(1) @db.Decimal(18, 3)
+  maximumOrderQuantity Decimal?      @db.Decimal(18, 3)
+  quantityIncrement    Decimal       @default(1) @db.Decimal(18, 3)
+  unitCode             String        @default("PCS")
+  alternateUnit        String?
+  taxPercent           Decimal?      @db.Decimal(5, 2)
+  hsnCode              String?
+  warrantyText         String?       @db.Text
+  packagingText        String?
+  shippingText         String?
+  seoTitle             String?
+  seoDescription       String?       @db.Text
+  publishedAt          DateTime?
+  createdById          String?       @db.VarChar(50)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  deletedAt            DateTime?
+
+  seller      Seller            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category    ProductCategory?  @relation(fields: [categoryId], references: [id])
+  brand       ProductBrand?     @relation(fields: [brandId], references: [id])
+  createdBy   User?             @relation("ProductCreator", fields: [createdById], references: [id])
+  variants    ProductVariant[]
+  images      ProductImage[]
+  documents   ProductDocument[]
+  prices      ProductPrice[]
+  inventories Inventory[]
+  orderItems  OrderItem[]
+
+  @@unique([sellerId, sku])
+  @@unique([sellerId, slug])
+  @@index([sellerId])
+  @@index([sellerId, categoryId])
+  @@index([sellerId, brandId])
+  @@index([sellerId, status, publishStatus])
+}
+
+model ProductVariant {
+  id                   String        @id @default(cuid()) @db.VarChar(50)
+  sellerId             String        @db.VarChar(50)
+  productId            String        @db.VarChar(50)
+  name                 String
+  sku                  String        @db.VarChar(50)
+  barcode              String?
+  status               ProductStatus @default(ACTIVE)
+  mrp                  Decimal       @db.Decimal(18, 2)
+  costPrice            Decimal?      @db.Decimal(18, 2)
+  weight               Decimal?      @db.Decimal(10, 3)
+  length               Decimal?      @db.Decimal(10, 2)
+  width                Decimal?      @db.Decimal(10, 2)
+  height               Decimal?      @db.Decimal(10, 2)
+  minimumOrderQuantity Decimal?      @db.Decimal(18, 3)
+  maximumOrderQuantity Decimal?      @db.Decimal(18, 3)
+  quantityIncrement    Decimal?      @db.Decimal(18, 3)
+  isDefault            Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  deletedAt            DateTime?
+
+  seller                Seller                    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  product               Product                   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  images                ProductImage[]
+  attributes            ProductVariantAttribute[]
+  prices                ProductPrice[]            @relation("VariantPrices")
+  inventories           Inventory[]
+  orderItems            OrderItem[]
+  stockReservations     StockReservation[]
+  inventoryTransactions InventoryTransaction[]
+  pickListItems         PickListItem[]
+  documents             ProductDocument[]
+
+  @@unique([sellerId, sku])
+  @@index([sellerId])
+  @@index([sellerId, productId])
+}
+
+model ProductImage {
+  id           String   @id @default(cuid()) @db.VarChar(50)
+  sellerId     String   @db.VarChar(50)
+  productId    String   @db.VarChar(50)
+  variantId    String?  @db.VarChar(50)
+  fileAssetId  String?  @db.VarChar(50)
+  url          String?
+  altText      String?
+  displayOrder Int      @default(0)
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  seller    Seller          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  fileAsset FileAsset?      @relation(fields: [fileAssetId], references: [id])
+
+  @@index([sellerId, productId])
+}
+
+model ProductDocument {
+  id           String   @id @default(cuid()) @db.VarChar(50)
+  sellerId     String   @db.VarChar(50)
+  productId    String   @db.VarChar(50)
+  variantId    String?  @db.VarChar(50)
+  fileAssetId  String?  @db.VarChar(50)
+  documentType String
+  title        String?
+  createdAt    DateTime @default(now())
+
+  seller    Seller          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  fileAsset FileAsset?      @relation(fields: [fileAssetId], references: [id])
+
+  @@index([sellerId, productId])
+}
+
+model ProductAttribute {
+  id              String   @id @default(cuid()) @db.VarChar(50)
+  sellerId        String   @db.VarChar(50)
+  name            String
+  code            String   @db.VarChar(50)
+  type            String   @default("text")
+  filterable      Boolean  @default(false)
+  variantDefining Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  seller            Seller                    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  values            ProductAttributeValue[]
+  variantAttributes ProductVariantAttribute[]
+
+  @@unique([sellerId, code])
+  @@index([sellerId])
+}
+
+model ProductAttributeValue {
+  id           String   @id @default(cuid()) @db.VarChar(50)
+  sellerId     String   @db.VarChar(50)
+  attributeId  String   @db.VarChar(50)
+  value        String
+  displayValue String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  seller            Seller                    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  attribute         ProductAttribute          @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  variantAttributes ProductVariantAttribute[]
+
+  @@index([sellerId, attributeId])
+}
+
+model ProductVariantAttribute {
+  id               String @id @default(cuid()) @db.VarChar(50)
+  sellerId         String @db.VarChar(50)
+  variantId        String @db.VarChar(50)
+  attributeId      String @db.VarChar(50)
+  attributeValueId String @db.VarChar(50)
+
+  seller         Seller                @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  variant        ProductVariant        @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  attribute      ProductAttribute      @relation(fields: [attributeId], references: [id])
+  attributeValue ProductAttributeValue @relation(fields: [attributeValueId], references: [id])
+
+  @@unique([sellerId, variantId, attributeId])
+  @@index([sellerId])
+}
+
+// ============================================================
+// PRICING MODELS
+// ============================================================
+
+model ProductPrice {
+  id              String    @id @default(cuid()) @db.VarChar(50)
+  sellerId        String    @db.VarChar(50)
+  productId       String    @db.VarChar(50)
+  variantId       String?   @db.VarChar(50)
+  priceType       PriceType
+  dealerId        String?   @db.VarChar(50)
+  dealerGroupId   String?   @db.VarChar(50)
+  pricingGroupId  String?   @db.VarChar(50)
+  amount          Decimal   @db.Decimal(18, 2)
+  currencyCode    String    @default("NPR")
+  minimumQuantity Decimal?  @db.Decimal(18, 3)
+  maximumQuantity Decimal?  @db.Decimal(18, 3)
+  validFrom       DateTime?
+  validUntil      DateTime?
+  priority        Int       @default(0)
+  active          Boolean   @default(true)
+  createdById     String?   @db.VarChar(50)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  seller       Seller          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant      ProductVariant? @relation("VariantPrices", fields: [variantId], references: [id])
+  dealer       Dealer?         @relation("DealerPrices", fields: [dealerId], references: [id])
+  dealerGroup  DealerGroup?    @relation("DealerGroupPrices", fields: [dealerGroupId], references: [id])
+  pricingGroup PricingGroup?   @relation("PricingGroupPrices", fields: [pricingGroupId], references: [id])
+  createdBy    User?           @relation("PriceCreator", fields: [createdById], references: [id])
+
+  @@index([sellerId, variantId])
+  @@index([sellerId, dealerId])
+  @@index([sellerId, pricingGroupId])
+  @@index([sellerId, productId])
+}
+
+// ============================================================
+// INVENTORY MODELS
+// ============================================================
+
+model Inventory {
+  id                String   @id @default(cuid()) @db.VarChar(50)
+  sellerId          String   @db.VarChar(50)
+  warehouseId       String   @db.VarChar(50)
+  productId         String   @db.VarChar(50)
+  variantId         String   @db.VarChar(50)
+  availableQuantity Decimal  @default(0) @db.Decimal(18, 3)
+  reservedQuantity  Decimal  @default(0) @db.Decimal(18, 3)
+  pickedQuantity    Decimal  @default(0) @db.Decimal(18, 3)
+  damagedQuantity   Decimal  @default(0) @db.Decimal(18, 3)
+  inTransitQuantity Decimal  @default(0) @db.Decimal(18, 3)
+  reorderLevel      Decimal  @default(0) @db.Decimal(18, 3)
+  lowStockThreshold Decimal  @default(0) @db.Decimal(18, 3)
+  binLocation       String?
+  rackLocation      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  seller    Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, warehouseId, variantId])
+  @@index([sellerId])
+  @@index([sellerId, warehouseId])
+}
+
+model InventoryTransaction {
+  id              String                   @id @default(cuid()) @db.VarChar(50)
+  sellerId        String                   @db.VarChar(50)
+  warehouseId     String                   @db.VarChar(50)
+  productId       String                   @db.VarChar(50)
+  variantId       String                   @db.VarChar(50)
+  transactionType InventoryTransactionType
+  quantity        Decimal                  @db.Decimal(18, 3)
+  beforeQuantity  Decimal                  @db.Decimal(18, 3)
+  afterQuantity   Decimal                  @db.Decimal(18, 3)
+  referenceType   String?
+  referenceId     String?                  @db.VarChar(50)
+  reason          String?
+  performedById   String?                  @db.VarChar(50)
+  createdAt       DateTime                 @default(now())
+
+  seller      Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  performedBy User?          @relation("InventoryPerformer", fields: [performedById], references: [id])
+
+  @@index([sellerId])
+  @@index([sellerId, warehouseId, variantId])
+  @@index([createdAt])
+}
+
+model StockReservation {
+  id          String                 @id @default(cuid()) @db.VarChar(50)
+  sellerId    String                 @db.VarChar(50)
+  warehouseId String                 @db.VarChar(50)
+  orderId     String                 @db.VarChar(50)
+  orderItemId String                 @db.VarChar(50)
+  variantId   String                 @db.VarChar(50)
+  quantity    Decimal                @db.Decimal(18, 3)
+  status      StockReservationStatus @default(RESERVED)
+  reservedAt  DateTime               @default(now())
+  releasedAt  DateTime?
+  consumedAt  DateTime?
+
+  seller    Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([sellerId, orderId])
+}
+
+model StockAdjustment {
+  id            String   @id @default(cuid()) @db.VarChar(50)
+  sellerId      String   @db.VarChar(50)
+  warehouseId   String   @db.VarChar(50)
+  variantId     String   @db.VarChar(50)
+  type          String
+  quantity      Decimal  @db.Decimal(18, 3)
+  reason        String
+  performedById String?  @db.VarChar(50)
+  createdAt     DateTime @default(now())
+
+  seller      Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  performedBy User?     @relation("AdjustmentPerformer", fields: [performedById], references: [id])
+
+  @@index([sellerId])
+}
+
+// ============================================================
+// ORDER MODELS
+// ============================================================
+
+model Order {
+  id                    String      @id @default(cuid()) @db.VarChar(50)
+  sellerId              String      @db.VarChar(50)
+  orderNumber           String      @db.VarChar(50)
+  dealerId              String      @db.VarChar(50)
+  salespersonId         String?     @db.VarChar(50)
+  source                OrderSource @default(DEALER_PORTAL)
+  status                OrderStatus @default(DRAFT)
+  currencyCode          String      @default("NPR")
+  billingAddressJson    String?     @db.Text
+  shippingAddressJson   String?     @db.Text
+  purchaseOrderNumber   String?
+  purchaseOrderDocUrl   String?
+  requestedDeliveryDate DateTime?
+  subtotal              Decimal     @default(0) @db.Decimal(18, 2)
+  discountTotal         Decimal     @default(0) @db.Decimal(18, 2)
+  taxTotal              Decimal     @default(0) @db.Decimal(18, 2)
+  freightTotal          Decimal     @default(0) @db.Decimal(18, 2)
+  additionalChargeTotal Decimal     @default(0) @db.Decimal(18, 2)
+  grandTotal            Decimal     @default(0) @db.Decimal(18, 2)
+  dealerNotes           String?     @db.Text
+  salespersonNotes      String?     @db.Text
+  accountsNotes         String?     @db.Text
+  currentDepartment     String?
+  submittedAt           DateTime?
+  finalConfirmedAt      DateTime?
+  finalConfirmedById    String?     @db.VarChar(50)
+  lockedAt              DateTime?
+  createdById           String?     @db.VarChar(50)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  deletedAt             DateTime?
+
+  seller            Seller               @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dealer            Dealer               @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  createdBy         User?                @relation("OrderCreator", fields: [createdById], references: [id])
+  finalConfirmedBy  User?                @relation("OrderConfirmer", fields: [finalConfirmedById], references: [id])
+  items             OrderItem[]
+  revisions         OrderRevision[]
+  remarks           OrderRemark[]
+  statusHistory     OrderStatusHistory[]
+  confirmations     DealerConfirmation[]
+  proformaInvoices  ProformaInvoice[]
+  pickLists         PickList[]
+  finalInvoices     FinalInvoice[]
+  payments          Payment[]
+  creditApprovals   CreditApproval[]
+  packages          Package[]
+  shipments         Shipment[]
+  stockReservations StockReservation[]
+
+  @@unique([sellerId, orderNumber])
+  @@index([sellerId])
+  @@index([sellerId, dealerId])
+  @@index([sellerId, status])
+  @@index([sellerId, createdAt])
+}
+
+model OrderItem {
+  id               String          @id @default(cuid()) @db.VarChar(50)
+  sellerId         String          @db.VarChar(50)
+  orderId          String          @db.VarChar(50)
+  productId        String          @db.VarChar(50)
+  variantId        String          @db.VarChar(50)
+  sku              String          @db.VarChar(50)
+  productName      String
+  variantName      String?
+  originalQuantity Decimal         @db.Decimal(18, 3)
+  approvedQuantity Decimal?        @db.Decimal(18, 3)
+  pickedQuantity   Decimal?        @db.Decimal(18, 3)
+  mrp              Decimal         @db.Decimal(18, 2)
+  dealerPrice      Decimal         @db.Decimal(18, 2)
+  discountAmount   Decimal         @default(0) @db.Decimal(18, 2)
+  taxAmount        Decimal         @default(0) @db.Decimal(18, 2)
+  lineTotal        Decimal         @default(0) @db.Decimal(18, 2)
+  status           OrderItemStatus @default(ACTIVE)
+  dealerNotes      String?
+  accountsRemarks  String?         @db.Text
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  seller            Seller              @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order             Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product           Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant           ProductVariant      @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  revisionItems     OrderRevisionItem[]
+  stockReservations StockReservation[]
+
+  @@index([sellerId, orderId])
+}
+
+model OrderRevision {
+  id                 String              @id @default(cuid()) @db.VarChar(50)
+  sellerId           String              @db.VarChar(50)
+  orderId            String              @db.VarChar(50)
+  version            Int
+  status             OrderRevisionStatus @default(PENDING)
+  previousSubtotal   Decimal?            @db.Decimal(18, 2)
+  revisedSubtotal    Decimal?            @db.Decimal(18, 2)
+  previousGrandTotal Decimal?            @db.Decimal(18, 2)
+  revisedGrandTotal  Decimal?            @db.Decimal(18, 2)
+  generalRemarks     String?             @db.Text
+  createdById        String?             @db.VarChar(50)
+  sentToDealerAt     DateTime?
+  dealerRespondedAt  DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  seller       Seller               @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order        Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdBy    User?                @relation("OrderRevisionCreator", fields: [createdById], references: [id])
+  items        OrderRevisionItem[]
+  confirmation DealerConfirmation[]
+
+  @@index([sellerId, orderId])
+}
+
+model OrderRevisionItem {
+  id               String   @id @default(cuid()) @db.VarChar(50)
+  sellerId         String   @db.VarChar(50)
+  orderRevisionId  String   @db.VarChar(50)
+  orderItemId      String   @db.VarChar(50)
+  previousQuantity Decimal? @db.Decimal(18, 3)
+  revisedQuantity  Decimal? @db.Decimal(18, 3)
+  previousPrice    Decimal? @db.Decimal(18, 2)
+  revisedPrice     Decimal? @db.Decimal(18, 2)
+  changeType       String
+  reason           String?  @db.Text
+
+  seller    Seller        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  revision  OrderRevision @relation(fields: [orderRevisionId], references: [id], onDelete: Cascade)
+  orderItem OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, orderRevisionId])
+}
+
+model OrderRemark {
+  id           String   @id @default(cuid()) @db.VarChar(50)
+  sellerId     String   @db.VarChar(50)
+  orderId      String   @db.VarChar(50)
+  orderItemId  String?  @db.VarChar(50)
+  userId       String   @db.VarChar(50)
+  department   String?
+  message      String   @db.Text
+  internalOnly Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([sellerId, orderId])
+}
+
+model OrderStatusHistory {
+  id           String       @id @default(cuid()) @db.VarChar(50)
+  sellerId     String       @db.VarChar(50)
+  orderId      String       @db.VarChar(50)
+  fromStatus   OrderStatus?
+  toStatus     OrderStatus
+  changedById  String?      @db.VarChar(50)
+  remarks      String?      @db.Text
+  metadataJson String?      @db.Text
+  createdAt    DateTime     @default(now())
+
+  seller    Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User?  @relation("StatusChanger", fields: [changedById], references: [id])
+
+  @@index([sellerId, orderId])
+  @@index([createdAt])
+}
+
+model DealerConfirmation {
+  id            String         @id @default(cuid()) @db.VarChar(50)
+  sellerId      String         @db.VarChar(50)
+  orderId       String         @db.VarChar(50)
+  revisionId    String?        @db.VarChar(50)
+  dealerId      String         @db.VarChar(50)
+  decision      DealerDecision
+  remarks       String?        @db.Text
+  confirmedById String?        @db.VarChar(50)
+  confirmedAt   DateTime       @default(now())
+  ipAddress     String?
+
+  seller      Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  revision    OrderRevision? @relation(fields: [revisionId], references: [id])
+  dealer      Dealer         @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  confirmedBy User?          @relation("ConfirmationUser", fields: [confirmedById], references: [id])
+
+  @@index([sellerId, orderId])
+}
+
+// ============================================================
+// PROFORMA INVOICE MODELS
+// ============================================================
+
+model ProformaInvoice {
+  id             String         @id @default(cuid()) @db.VarChar(50)
+  sellerId       String         @db.VarChar(50)
+  orderId        String         @db.VarChar(50)
+  proformaNumber String         @db.VarChar(50)
+  version        Int            @default(1)
+  status         ProformaStatus @default(DRAFT)
+  issueDate      DateTime       @default(now())
+  validUntil     DateTime?
+  subtotal       Decimal        @default(0) @db.Decimal(18, 2)
+  discountTotal  Decimal        @default(0) @db.Decimal(18, 2)
+  taxTotal       Decimal        @default(0) @db.Decimal(18, 2)
+  freightTotal   Decimal        @default(0) @db.Decimal(18, 2)
+  grandTotal     Decimal        @default(0) @db.Decimal(18, 2)
+  paymentTerms   String?        @db.Text
+  creditTerms    String?        @db.Text
+  remarks        String?        @db.Text
+  generatedById  String?        @db.VarChar(50)
+  confirmedById  String?        @db.VarChar(50)
+  confirmedAt    DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  seller      Seller                    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order       Order                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  generatedBy User?                     @relation("ProformaCreator", fields: [generatedById], references: [id])
+  confirmedBy User?                     @relation("ProformaConfirmer", fields: [confirmedById], references: [id])
+  items       ProformaInvoiceItem[]
+  revisions   ProformaInvoiceRevision[]
+
+  @@unique([sellerId, proformaNumber])
+  @@index([sellerId])
+  @@index([sellerId, orderId])
+}
+
+model ProformaInvoiceItem {
+  id                String  @id @default(cuid()) @db.VarChar(50)
+  sellerId          String  @db.VarChar(50)
+  proformaInvoiceId String  @db.VarChar(50)
+  orderItemId       String? @db.VarChar(50)
+  productId         String  @db.VarChar(50)
+  variantId         String  @db.VarChar(50)
+  sku               String  @db.VarChar(50)
+  description       String?
+  quantity          Decimal @db.Decimal(18, 3)
+  unitPrice         Decimal @db.Decimal(18, 2)
+  discountAmount    Decimal @default(0) @db.Decimal(18, 2)
+  taxAmount         Decimal @default(0) @db.Decimal(18, 2)
+  lineTotal         Decimal @default(0) @db.Decimal(18, 2)
+
+  seller   Seller          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  proforma ProformaInvoice @relation(fields: [proformaInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, proformaInvoiceId])
+}
+
+model ProformaInvoiceRevision {
+  id                String   @id @default(cuid()) @db.VarChar(50)
+  sellerId          String   @db.VarChar(50)
+  proformaInvoiceId String   @db.VarChar(50)
+  version           Int
+  snapshotJson      String?  @db.LongText
+  reason            String?  @db.Text
+  createdById       String?  @db.VarChar(50)
+  createdAt         DateTime @default(now())
+
+  seller    Seller          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  proforma  ProformaInvoice @relation(fields: [proformaInvoiceId], references: [id], onDelete: Cascade)
+  createdBy User?           @relation("ProformaRevisionCreator", fields: [createdById], references: [id])
+
+  @@index([sellerId, proformaInvoiceId])
+}
+
+// ============================================================
+// PICK LIST MODELS
+// ============================================================
+
+model PickList {
+  id             String         @id @default(cuid()) @db.VarChar(50)
+  sellerId       String         @db.VarChar(50)
+  orderId        String         @db.VarChar(50)
+  warehouseId    String         @db.VarChar(50)
+  pickListNumber String         @db.VarChar(50)
+  status         PickListStatus @default(GENERATED)
+  assignedToId   String?        @db.VarChar(50)
+  pickerId       String?        @db.VarChar(50)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  completedById  String?        @db.VarChar(50)
+  notes          String?        @db.Text
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  seller      Seller              @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order       Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse           @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  assignedTo  User?               @relation("PickListAssigner", fields: [assignedToId], references: [id])
+  picker      User?               @relation("PickListPicker", fields: [pickerId], references: [id])
+  completedBy User?               @relation("PickListCompleter", fields: [completedById], references: [id])
+  items       PickListItem[]
+  exceptions  PickListException[]
+
+  @@unique([sellerId, pickListNumber])
+  @@index([sellerId])
+  @@index([sellerId, orderId])
+  @@index([sellerId, status])
+}
+
+model PickListItem {
+  id               String   @id @default(cuid()) @db.VarChar(50)
+  sellerId         String   @db.VarChar(50)
+  pickListId       String   @db.VarChar(50)
+  productId        String   @db.VarChar(50)
+  variantId        String   @db.VarChar(50)
+  sku              String   @db.VarChar(50)
+  rackLocation     String?
+  binLocation      String?
+  approvedQuantity Decimal  @db.Decimal(18, 3)
+  pickedQuantity   Decimal  @default(0) @db.Decimal(18, 3)
+  batchNumber      String?
+  serialNumber     String?
+  remarks          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  seller   Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  pickList PickList       @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, pickListId])
+}
+
+model PickListException {
+  id           String                 @id @default(cuid()) @db.VarChar(50)
+  sellerId     String                 @db.VarChar(50)
+  pickListId   String                 @db.VarChar(50)
+  variantId    String                 @db.VarChar(50)
+  expectedQty  Decimal                @db.Decimal(18, 3)
+  availableQty Decimal                @db.Decimal(18, 3)
+  shortageQty  Decimal                @db.Decimal(18, 3)
+  reason       String                 @db.Text
+  status       PickingExceptionStatus @default(REPORTED)
+  reportedById String?                @db.VarChar(50)
+  resolvedById String?                @db.VarChar(50)
+  resolvedAt   DateTime?
+  resolution   String?                @db.Text
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  seller     Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  pickList   PickList @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  reportedBy User?    @relation("ExceptionReporter", fields: [reportedById], references: [id])
+  resolvedBy User?    @relation("ExceptionResolver", fields: [resolvedById], references: [id])
+
+  @@index([sellerId, pickListId])
+}
+
+// ============================================================
+// FINAL INVOICE MODELS
+// ============================================================
+
+model FinalInvoice {
+  id                String             @id @default(cuid()) @db.VarChar(50)
+  sellerId          String             @db.VarChar(50)
+  orderId           String             @db.VarChar(50)
+  invoiceNumber     String             @db.VarChar(50)
+  status            FinalInvoiceStatus @default(DRAFT)
+  issueDate         DateTime           @default(now())
+  dueDate           DateTime?
+  subtotal          Decimal            @default(0) @db.Decimal(18, 2)
+  discountTotal     Decimal            @default(0) @db.Decimal(18, 2)
+  taxTotal          Decimal            @default(0) @db.Decimal(18, 2)
+  freightTotal      Decimal            @default(0) @db.Decimal(18, 2)
+  grandTotal        Decimal            @default(0) @db.Decimal(18, 2)
+  paidAmount        Decimal            @default(0) @db.Decimal(18, 2)
+  outstandingAmount Decimal            @default(0) @db.Decimal(18, 2)
+  paymentTerms      String?            @db.Text
+  remarks           String?            @db.Text
+  generatedById     String?            @db.VarChar(50)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  seller      Seller             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order       Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  generatedBy User?              @relation("FinalInvoiceGenerator", fields: [generatedById], references: [id])
+  items       FinalInvoiceItem[]
+  payments    Payment[]
+  shipments   Shipment[]
+
+  @@unique([sellerId, invoiceNumber])
+  @@index([sellerId])
+  @@index([sellerId, orderId])
+  @@index([sellerId, status])
+}
+
+model FinalInvoiceItem {
+  id             String  @id @default(cuid()) @db.VarChar(50)
+  sellerId       String  @db.VarChar(50)
+  finalInvoiceId String  @db.VarChar(50)
+  orderItemId    String? @db.VarChar(50)
+  productId      String  @db.VarChar(50)
+  variantId      String  @db.VarChar(50)
+  sku            String  @db.VarChar(50)
+  description    String?
+  quantity       Decimal @db.Decimal(18, 3)
+  unitPrice      Decimal @db.Decimal(18, 2)
+  discountAmount Decimal @default(0) @db.Decimal(18, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(18, 2)
+  lineTotal      Decimal @default(0) @db.Decimal(18, 2)
+
+  seller  Seller       @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  invoice FinalInvoice @relation(fields: [finalInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, finalInvoiceId])
+}
+
+// ============================================================
+// PAYMENT MODELS
+// ============================================================
+
+model Payment {
+  id             String        @id @default(cuid()) @db.VarChar(50)
+  sellerId       String        @db.VarChar(50)
+  orderId        String        @db.VarChar(50)
+  finalInvoiceId String?       @db.VarChar(50)
+  paymentNumber  String        @db.VarChar(50)
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  amount         Decimal       @db.Decimal(18, 2)
+  currencyCode   String        @default("NPR")
+  transactionRef String?
+  paymentDate    DateTime      @default(now())
+  receiptUrl     String?
+  remarks        String?       @db.Text
+  recordedById   String?       @db.VarChar(50)
+  verifiedById   String?       @db.VarChar(50)
+  verifiedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  seller     Seller        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  invoice    FinalInvoice? @relation(fields: [finalInvoiceId], references: [id])
+  recordedBy User?         @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  verifiedBy User?         @relation("PaymentVerifier", fields: [verifiedById], references: [id])
+
+  @@unique([sellerId, paymentNumber])
+  @@index([sellerId])
+  @@index([sellerId, orderId])
+}
+
+model CreditApproval {
+  id               String               @id @default(cuid()) @db.VarChar(50)
+  sellerId         String               @db.VarChar(50)
+  orderId          String               @db.VarChar(50)
+  status           CreditApprovalStatus @default(PENDING)
+  requestedAmount  Decimal              @db.Decimal(18, 2)
+  approvedAmount   Decimal?             @db.Decimal(18, 2)
+  creditPeriodDays Int?
+  dueDate          DateTime?
+  remarks          String?              @db.Text
+  approvedById     String?              @db.VarChar(50)
+  approvedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  seller     Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order      Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  approvedBy User?  @relation("CreditApprover2", fields: [approvedById], references: [id])
+
+  @@index([sellerId, orderId])
+}
+
+// ============================================================
+// PACKAGING & SHIPMENT MODELS
+// ============================================================
+
+model Package {
+  id                   String        @id @default(cuid()) @db.VarChar(50)
+  sellerId             String        @db.VarChar(50)
+  orderId              String        @db.VarChar(50)
+  shipmentId           String?       @db.VarChar(50)
+  packageNumber        String        @db.VarChar(50)
+  packageType          String?
+  length               Decimal?      @db.Decimal(10, 2)
+  width                Decimal?      @db.Decimal(10, 2)
+  height               Decimal?      @db.Decimal(10, 2)
+  weight               Decimal?      @db.Decimal(10, 3)
+  status               PackageStatus @default(CREATED)
+  packedById           String?       @db.VarChar(50)
+  packingDate          DateTime?
+  barcodeData          String?
+  qrCodeData           String?
+  handlingInstructions String?       @db.Text
+  itemsJson            String?       @db.Text
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  seller   Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shipment Shipment? @relation(fields: [shipmentId], references: [id])
+  packedBy User?     @relation(fields: [packedById], references: [id])
+
+  @@unique([sellerId, packageNumber])
+  @@index([sellerId, orderId])
+}
+
+model Shipment {
+  id                 String         @id @default(cuid()) @db.VarChar(50)
+  sellerId           String         @db.VarChar(50)
+  orderId            String         @db.VarChar(50)
+  finalInvoiceId     String?        @db.VarChar(50)
+  shipmentNumber     String         @db.VarChar(50)
+  status             ShipmentStatus @default(CREATED)
+  transporter        String?
+  courier            String?
+  driverName         String?
+  driverPhone        String?
+  vehicleNumber      String?
+  trackingNumber     String?
+  challanNumber      String?
+  dispatchDate       DateTime?
+  expectedDelivery   DateTime?
+  deliveredAt        DateTime?
+  totalCartons       Int            @default(0)
+  totalWeight        Decimal        @default(0) @db.Decimal(12, 3)
+  transportCompanyId String?        @db.VarChar(50)
+  driverId           String?        @db.VarChar(50)
+  vehicleId          String?        @db.VarChar(50)
+  transportReceipt   String?
+  dispatchDocUrl     String?
+  remarks            String?        @db.Text
+  createdById        String?        @db.VarChar(50)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  seller           Seller            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  finalInvoice     FinalInvoice?     @relation(fields: [finalInvoiceId], references: [id])
+  createdBy        User?             @relation("ShipmentCreator", fields: [createdById], references: [id])
+  transportCompany TransportCompany? @relation(fields: [transportCompanyId], references: [id])
+  driver           TransportDriver?  @relation(fields: [driverId], references: [id])
+  vehicle          TransportVehicle? @relation(fields: [vehicleId], references: [id])
+  packages         Package[]
+  events           DeliveryEvent[]
+
+  @@unique([sellerId, shipmentNumber])
+  @@index([sellerId])
+  @@index([sellerId, orderId])
+  @@index([transportCompanyId])
+}
+
+model TransportCompany {
+  id          String   @id @default(cuid()) @db.VarChar(50)
+  sellerId    String   @db.VarChar(50)
+  code        String   @db.VarChar(50)
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  panNumber   String?
+  vatNumber   String?
+  status      String   @default("ACTIVE")
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  seller    Seller             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  drivers   TransportDriver[]
+  vehicles  TransportVehicle[]
+  shipments Shipment[]
+
+  @@unique([sellerId, code])
+  @@index([sellerId, status])
+}
+
+model TransportDriver {
+  id                 String   @id @default(cuid()) @db.VarChar(50)
+  sellerId           String   @db.VarChar(50)
+  transportCompanyId String   @db.VarChar(50)
+  name               String
+  phone              String?
+  licenseNumber      String?
+  status             String   @default("ACTIVE")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  seller           Seller             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  transportCompany TransportCompany   @relation(fields: [transportCompanyId], references: [id], onDelete: Cascade)
+  vehicles         TransportVehicle[]
+  shipments        Shipment[]
+
+  @@index([sellerId, transportCompanyId])
+}
+
+model TransportVehicle {
+  id                 String   @id @default(cuid()) @db.VarChar(50)
+  sellerId           String   @db.VarChar(50)
+  transportCompanyId String   @db.VarChar(50)
+  driverId           String?  @db.VarChar(50)
+  vehicleNumber      String   @db.VarChar(50)
+  vehicleType        String?
+  capacity           Decimal? @db.Decimal(12, 3)
+  status             String   @default("ACTIVE")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  seller           Seller           @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  transportCompany TransportCompany @relation(fields: [transportCompanyId], references: [id], onDelete: Cascade)
+  driver           TransportDriver? @relation(fields: [driverId], references: [id])
+  shipments        Shipment[]
+
+  @@unique([sellerId, vehicleNumber])
+  @@index([sellerId, transportCompanyId])
+}
+
+model DeliveryEvent {
+  id          String         @id @default(cuid()) @db.VarChar(50)
+  sellerId    String         @db.VarChar(50)
+  shipmentId  String         @db.VarChar(50)
+  status      DeliveryStatus
+  location    String?
+  description String?        @db.Text
+  proofUrl    String?
+  updatedById String?        @db.VarChar(50)
+  createdAt   DateTime       @default(now())
+
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  shipment  Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  updatedBy User?    @relation("DeliveryUpdater", fields: [updatedById], references: [id])
+
+  @@index([sellerId, shipmentId])
+}
+
+// ============================================================
+// INQUIRY MODEL
+// ============================================================
+
+model Inquiry {
+  id                 String   @id @default(cuid()) @db.VarChar(50)
+  sellerId           String   @db.VarChar(50)
+  contactName        String
+  email              String
+  phone              String?
+  companyName        String?
+  location           String?
+  message            String?  @db.Text
+  productsJson       String?  @db.Text
+  status             String   @default("submitted")
+  assignedToId       String?  @db.VarChar(50)
+  convertedToOrderId String?  @db.VarChar(50)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  seller     Seller            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  assignedTo User?             @relation("InquiryAssigner", fields: [assignedToId], references: [id])
+  followUps  InquiryFollowUp[]
+
+  @@index([sellerId])
+}
+
+model InquiryFollowUp {
+  id        String   @id @default(cuid()) @db.VarChar(50)
+  inquiryId String   @db.VarChar(50)
+  userId    String   @db.VarChar(50)
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId])
+}
+
+// ============================================================
+// NOTIFICATION MODEL
+// ============================================================
+
+model Notification {
+  id        String              @id @default(cuid()) @db.VarChar(50)
+  sellerId  String?             @db.VarChar(50)
+  userId    String              @db.VarChar(50)
+  channel   NotificationChannel @default(IN_APP)
+  status    NotificationStatus  @default(PENDING)
+  title     String
+  message   String              @db.Text
+  linkUrl   String?
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  seller Seller? @relation(fields: [sellerId], references: [id])
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([sellerId])
+}
+
+// ============================================================
+// FILE ASSET MODEL
+// ============================================================
+
+model FileAsset {
+  id           String         @id @default(cuid()) @db.VarChar(50)
+  sellerId     String?        @db.VarChar(50)
+  fileName     String
+  fileSize     Int?
+  mimeType     String?
+  storageKey   String
+  url          String?
+  visibility   FileVisibility @default(PRIVATE)
+  uploadedById String?        @db.VarChar(50)
+  createdAt    DateTime       @default(now())
+
+  seller          Seller?           @relation(fields: [sellerId], references: [id])
+  images          ProductImage[]
+  documents       ProductDocument[]
+  dealerDocuments DealerDocument[]
+
+  @@index([sellerId])
+}
+
+// ============================================================
+// AUDIT LOG MODEL
+// ============================================================
+
+model AuditLog {
+  id        String        @id @default(cuid()) @db.VarChar(50)
+  sellerId  String?       @db.VarChar(50)
+  userId    String?       @db.VarChar(50)
+  action    String
+  entity    String
+  entityId  String?       @db.VarChar(50)
+  severity  AuditSeverity @default(LOW)
+  oldValue  String?       @db.LongText
+  newValue  String?       @db.LongText
+  ipAddress String?
+  userAgent String?
+  metadata  String?       @db.Text
+  createdAt DateTime      @default(now())
+
+  seller Seller? @relation(fields: [sellerId], references: [id])
+  user   User?   @relation("AuditUser", fields: [userId], references: [id])
+
+  @@index([sellerId])
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// NUMBER SEQUENCE MODEL
+// ============================================================
+
+model NumberSequence {
+  id         String   @id @default(cuid()) @db.VarChar(50)
+  sellerId   String   @db.VarChar(50)
+  entityType String   @db.VarChar(50)
+  prefix     String
+  lastNumber Int      @default(0)
+  padLength  Int      @default(5)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, entityType])
+}

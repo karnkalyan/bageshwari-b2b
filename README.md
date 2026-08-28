@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bageshwari Tractors B2B Commerce
 
-## Getting Started
+Single-seller dealer commerce and fulfilment system for Bageshwari Tractors, Nepalgunj, Banke, Nepal. The application covers the public catalogue, protected dealer pricing, ordering, accounts review, Proforma invoices, warehouse picking, final invoices, payments/credit, packing, transport and dispatch.
 
-First, run the development server:
+## Development setup
+
+Requirements: Node.js 20+, pnpm, and MySQL on `localhost:3306` with the root development user and blank password.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+corepack pnpm install
+copy .env.example .env
+corepack pnpm prisma migrate dev
+corepack pnpm prisma db seed
+corepack pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The default database URL is `mysql://root:@localhost:3306/bageshwari_b2b`. Set `SEED_PASSWORD` in `.env` before seeding; all development accounts use that value.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Primary routes:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Storefront: `/`, `/products`, `/products/[sku]`
+- Dealer access: `/dealer/login`, `/dealer/dashboard`
+- Staff access: `/staff/login`
+- Operations: `/admin/dashboard`, `/sales/dashboard`, `/accounts/dashboard`, `/warehouse/dashboard`, `/dispatch/dashboard`
 
-## Learn More
+## Verification
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+corepack pnpm prisma format
+corepack pnpm prisma validate
+corepack pnpm prisma generate
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm test:e2e
+corepack pnpm build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Anonymous catalogue responses are constructed from a Prisma select that never queries dealer prices. Authorized dealer responses resolve dealer-specific, group, quantity, promotional and default dealer pricing on the server.
