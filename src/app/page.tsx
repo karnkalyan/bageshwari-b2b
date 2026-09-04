@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { resolveDealerPrice } from "@/services/pricing.service";
@@ -40,7 +41,19 @@ function parseContent(value: string | null | undefined): JsonObject {
   }
 }
 
-export default async function HomePage() {
+interface HomePageProps {
+  searchParams?: Promise<{
+    category?: string;
+    search?: string;
+  }>;
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const query = (await searchParams) || {};
+  const activeCategorySlug = query.category?.trim() || "";
+  const activeSearch = query.search?.trim() || "";
+  const hasFilter = Boolean(activeCategorySlug || activeSearch);
+
   const [session, seller] = await Promise.all([
     auth(),
     prisma.seller.findFirst({
@@ -131,10 +144,54 @@ export default async function HomePage() {
     isDealer ? getDealerCartItemCount(seller.id, session?.dealerId) : Promise.resolve(0),
   ]);
 
+  let rawFilteredProducts: typeof rawFeaturedProducts = [];
+  let selectedCategoryName = "";
+
+  if (hasFilter) {
+    const filterWhere: any = {
+      sellerId: seller.id,
+      status: "ACTIVE",
+      publishStatus: "PUBLISHED",
+      deletedAt: null,
+    };
+    if (activeCategorySlug) {
+      filterWhere.category = { slug: activeCategorySlug };
+    }
+    if (activeSearch) {
+      filterWhere.OR = [
+        { name: { contains: activeSearch } },
+        { sku: { contains: activeSearch } },
+      ];
+    }
+
+    const [filteredItems, matchedCat] = await Promise.all([
+      prisma.product.findMany({
+        where: filterWhere,
+        take: 32,
+        include: {
+          category: { select: { name: true, slug: true } },
+          brand: { select: { name: true } },
+          variants: { where: { isDefault: true }, take: 1, select: { id: true, mrp: true } },
+          images: { where: { isPrimary: true }, take: 1, select: { url: true } },
+        },
+      }),
+      activeCategorySlug
+        ? prisma.productCategory.findFirst({
+            where: { sellerId: seller.id, slug: activeCategorySlug },
+            select: { name: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    rawFilteredProducts = filteredItems;
+    selectedCategoryName = matchedCat?.name || activeCategorySlug;
+  }
+
   // If dealer is logged in, resolve dealer prices for all products
   let featuredProducts = rawFeaturedProducts;
   let newArrivals = rawNewArrivals;
   let bestSellers = rawBestSellers;
+  let filteredProducts = rawFilteredProducts;
 
   if (isDealer && dealer) {
     const allProductIds = [
@@ -142,6 +199,7 @@ export default async function HomePage() {
         ...rawFeaturedProducts.map((p) => p.id),
         ...rawNewArrivals.map((p) => p.id),
         ...rawBestSellers.map((p) => p.id),
+        ...rawFilteredProducts.map((p) => p.id),
       ]),
     ];
 
@@ -170,6 +228,7 @@ export default async function HomePage() {
     featuredProducts = rawFeaturedProducts.map(enrichProduct);
     newArrivals = rawNewArrivals.map(enrichProduct);
     bestSellers = rawBestSellers.map(enrichProduct);
+    filteredProducts = rawFilteredProducts.map(enrichProduct);
   }
 
   // Server action to add to cart from homepage
@@ -221,32 +280,80 @@ export default async function HomePage() {
           isDealer={isDealer}
           isStaff={isStaff}
         />
-        <FeaturedCategories categories={categories} sellerSlug="bageshwari" section={section("FEATURED_CATEGORIES")} />
-        <FeaturedProducts
-          products={featuredProducts}
-          sellerSlug="bageshwari"
-          title="Featured Products"
-          subtitle={isDealer ? "Unlocked dealer catalogue pricing" : "Dealer-ready products from our live catalogue"}
-          isDealer={isDealer}
-          onAddToCart={isDealer ? handleAddToCart : undefined}
-        />
-        <FeaturedProducts
-          products={newArrivals}
-          sellerSlug="bageshwari"
-          title="New Arrivals"
-          subtitle={isDealer ? "Recently added with exclusive dealer prices" : "Recently added tractors, parts and workshop supplies"}
-          bgClass="bg-slate-50"
-          isDealer={isDealer}
-          onAddToCart={isDealer ? handleAddToCart : undefined}
-        />
-        <FeaturedProducts
-          products={bestSellers}
-          sellerSlug="bageshwari"
-          title="Best Sellers"
-          subtitle={isDealer ? "Top volume products with best dealer rates" : "Frequently ordered by authorized dealers"}
-          isDealer={isDealer}
-          onAddToCart={isDealer ? handleAddToCart : undefined}
-        />
+        {hasFilter ? (
+          <section id="products" className="site-container py-10 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-200">
+              <div>
+                <div className="section-kicker">Filtered Products</div>
+                <h1 className="text-xl sm:text-2xl font-black text-[#092f5c]">
+                  {activeCategorySlug
+                    ? `Category: ${selectedCategoryName}`
+                    : `Search Results: "${activeSearch}"`}
+                </h1>
+                <p className="text-xs text-slate-500 mt-1">
+                  Showing {filteredProducts.length} matching product{filteredProducts.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 text-xs font-extrabold text-red-600 hover:text-red-700 bg-white px-4 py-2.5 rounded-xl border border-red-200 shadow-xs transition hover:bg-red-50 w-fit"
+              >
+                Clear filter & show all categories
+              </Link>
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <div className="p-12 text-center rounded-2xl border border-dashed border-slate-200 bg-white space-y-3">
+                <h3 className="font-bold text-base text-slate-800">No products found</h3>
+                <p className="text-xs text-slate-500">No products match your selected category or search filter.</p>
+                <Link
+                  href="/"
+                  className="inline-block text-xs font-bold text-red-600 hover:underline"
+                >
+                  Clear filter and view all categories
+                </Link>
+              </div>
+            ) : (
+              <FeaturedProducts
+                products={filteredProducts}
+                sellerSlug="bageshwari"
+                title={activeCategorySlug ? `${selectedCategoryName}` : "Search Results"}
+                subtitle={isDealer ? "Unlocked dealer catalogue pricing" : "Products matching your criteria"}
+                isDealer={isDealer}
+                onAddToCart={isDealer ? handleAddToCart : undefined}
+              />
+            )}
+          </section>
+        ) : (
+          <>
+            <FeaturedCategories categories={categories} sellerSlug="bageshwari" section={section("FEATURED_CATEGORIES")} />
+            <FeaturedProducts
+              products={featuredProducts}
+              sellerSlug="bageshwari"
+              title="Featured Products"
+              subtitle={isDealer ? "Unlocked dealer catalogue pricing" : "Dealer-ready products from our live catalogue"}
+              isDealer={isDealer}
+              onAddToCart={isDealer ? handleAddToCart : undefined}
+            />
+            <FeaturedProducts
+              products={newArrivals}
+              sellerSlug="bageshwari"
+              title="New Arrivals"
+              subtitle={isDealer ? "Recently added with exclusive dealer prices" : "Recently added tractors, parts and workshop supplies"}
+              bgClass="bg-slate-50"
+              isDealer={isDealer}
+              onAddToCart={isDealer ? handleAddToCart : undefined}
+            />
+            <FeaturedProducts
+              products={bestSellers}
+              sellerSlug="bageshwari"
+              title="Best Sellers"
+              subtitle={isDealer ? "Top volume products with best dealer rates" : "Frequently ordered by authorized dealers"}
+              isDealer={isDealer}
+              onAddToCart={isDealer ? handleAddToCart : undefined}
+            />
+          </>
+        )}
         <HowItWorks />
         <DealerBenefits content={parseContent(section("DEALER_BENEFITS")?.contentJson)} />
         <PlatformFeatures content={parseContent(section("PLATFORM_FEATURES")?.contentJson)} />

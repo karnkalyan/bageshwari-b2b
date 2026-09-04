@@ -429,7 +429,7 @@ export function AdminShell({
           </div>
 
           {/* Right section: Search bar + Theme Toggle + Notifications */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 shrink-0">
             {/* Search Input */}
             <div className="hidden w-52 md:w-64 items-center rounded-lg border border-border bg-muted/40 px-2.5 md:flex group transition-all focus-within:border-primary focus-within:bg-card focus-within:ring-1 focus-within:ring-primary/20">
               <Search className="h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors shrink-0" />

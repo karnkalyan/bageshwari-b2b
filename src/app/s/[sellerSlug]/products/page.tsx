@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Search, Lock, ShoppingCart, Eye, Package, Filter, ChevronRight, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
+import { ProductFilters } from "@/components/products/product-filters";
 
 export const dynamic = "force-dynamic";
 
@@ -191,28 +192,31 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
         cartItemCount={cartItemCount}
       />
 
-      <div className="border-b border-slate-200 bg-[linear-gradient(110deg,#f4f8fd,#fff)] py-8">
+      <div className="border-b border-slate-200 bg-[linear-gradient(110deg,#f4f8fd,#fff)] py-5 sm:py-8">
         <div className="site-container">
           <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
             <Link href="/" className="hover:text-red-600">Home</Link>
             <ChevronRight className="h-3 w-3" />
             <span className="text-[#0b2d55]">Product Catalogue</span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="section-kicker">
                 {isDealer ? "Unlocked Dealer Catalogue" : "B2B catalogue"}
               </div>
-              <h1 className="mt-1 text-3xl font-black text-[#0b2d55]">
+              <h1 className="mt-1 text-2xl sm:text-3xl font-black text-[#0b2d55] leading-tight">
                 Products for every dealer requirement
               </h1>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-1.5 text-xs sm:text-sm text-slate-500">
                 Showing {products.length} of {totalCount} products
+                {categorySlug && categories.find((c: any) => c.slug === categorySlug)
+                  ? ` in ${categories.find((c: any) => c.slug === categorySlug)?.name}`
+                  : ""}
               </p>
             </div>
 
             {isDealer && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-lg">
                   <CheckCircle2 className="h-4 w-4" />
                   <span>Pricing Unlocked: {dealer?.tradingName}</span>
@@ -234,85 +238,18 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
         </div>
       </div>
 
-      <div className="site-container flex-1 py-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[250px_1fr]">
-          {/* Sidebar Filters */}
-          <div className="space-y-6">
-            <Card className="sticky top-24 border-slate-200 shadow-sm">
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-primary" />
-                    Filter Products
-                  </h3>
-                  {(categorySlug || brandSlug || search) && (
-                    <Link href={baseUrl} className="text-xs text-red-600 hover:underline font-medium">
-                      Reset
-                    </Link>
-                  )}
-                </div>
-
-                {/* Search */}
-                <form action={baseUrl} method="GET" className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Search</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      name="search"
-                      defaultValue={search}
-                      placeholder="Search SKU, name..."
-                      className="pl-9 h-9 text-xs"
-                    />
-                  </div>
-                  {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
-                  {brandSlug && <input type="hidden" name="brand" value={brandSlug} />}
-                </form>
-
-                {/* Categories */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Categories</label>
-                  <div className="space-y-1 max-h-60 overflow-y-auto pr-1 text-xs">
-                    <Link
-                      href={baseUrl}
-                      className={`flex items-center justify-between p-1.5 rounded hover:bg-muted ${!categorySlug ? "font-bold text-primary bg-primary/5" : "text-gray-600"}`}
-                    >
-                      <span>All Categories</span>
-                    </Link>
-                    {categories.map((cat: any) => (
-                      <Link
-                        key={cat.id}
-                        href={`${baseUrl}?category=${cat.slug}${brandSlug ? `&brand=${brandSlug}` : ""}`}
-                        className={`flex items-center justify-between p-1.5 rounded hover:bg-muted ${categorySlug === cat.slug ? "font-bold text-primary bg-primary/5" : "text-gray-600"}`}
-                      >
-                        <span className="truncate">{cat.name}</span>
-                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          {cat._count?.products || 0}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Brands */}
-                {brands.length > 0 && (
-                  <div className="space-y-2 border-t pt-3">
-                    <label className="text-xs font-medium text-muted-foreground">Brands</label>
-                    <div className="space-y-1 max-h-48 overflow-y-auto pr-1 text-xs">
-                      {brands.map((b: any) => (
-                        <Link
-                          key={b.id}
-                          href={`${baseUrl}?brand=${b.slug}${categorySlug ? `&category=${categorySlug}` : ""}`}
-                          className={`block p-1.5 rounded hover:bg-muted ${brandSlug === b.slug ? "font-bold text-primary bg-primary/5" : "text-gray-600"}`}
-                        >
-                          {b.name}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+      <div className="site-container flex-1 py-4 sm:py-8">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[260px_1fr]">
+          {/* Responsive Filters: Mobile Bar + Drawer (on click) & Desktop Sticky Sidebar */}
+          <ProductFilters
+            categories={categories}
+            brands={brands}
+            categorySlug={categorySlug}
+            brandSlug={brandSlug}
+            search={search}
+            totalCount={totalCount}
+            baseUrl={baseUrl}
+          />
 
           {/* Main Grid */}
           <div className="min-w-0 space-y-6">
@@ -362,28 +299,28 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                         <div className="space-y-2 border-t pt-3">
                           {isDealer ? (
                             <div className="p-2.5 bg-slate-50 rounded-lg space-y-1 border border-slate-200">
-                              <div className="flex items-center justify-between text-xs text-slate-400">
+                              <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-400">
                                 <span>MRP</span>
-                                <span className="line-through">{formatCurrency(product.mrp)}</span>
+                                <span className="line-through truncate max-w-[120px]">{formatCurrency(product.mrp)}</span>
                               </div>
-                              <div className="flex items-center justify-between text-sm font-bold text-emerald-700">
-                                <span>Dealer Price (DP)</span>
-                                <span>{formatCurrency(product.dealerPrice)}</span>
+                              <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs sm:text-sm font-bold text-emerald-700">
+                                <span>Dealer Price</span>
+                                <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(product.dealerPrice)}</span>
                               </div>
                             </div>
                           ) : (
-                            <>
-                              <div className="flex items-center justify-between text-xs">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs">
                                 <span className="text-muted-foreground">MRP</span>
-                                <span className="font-semibold text-foreground">{formatCurrency(product.mrp)}</span>
+                                <span className="font-bold text-foreground truncate max-w-[130px] tabular-nums">{formatCurrency(product.mrp)}</span>
                               </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Dealer Price</span>
-                                <span className="text-amber-600 flex items-center gap-1 font-medium text-[11px]">
-                                  <Lock className="h-3 w-3" /> Login to View
+                              <div className="flex items-center justify-between gap-1 text-xs">
+                                <span className="text-muted-foreground text-[11px]">Dealer Price</span>
+                                <span className="text-amber-600 flex items-center gap-1 font-medium text-[11px] truncate">
+                                  <Lock className="h-3 w-3 shrink-0" /> Login to View
                                 </span>
                               </div>
-                            </>
+                            </div>
                           )}
 
                           <div className="flex gap-2 pt-2">

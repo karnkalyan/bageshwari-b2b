@@ -39,6 +39,7 @@ export type CreateSalesOrderInput = {
   notes?: string;
   freightTotal?: number;
   submitForReview?: boolean;
+  source?: OrderSource;
 };
 
 export async function createSalesOrderForDealer(input: CreateSalesOrderInput) {
@@ -132,7 +133,7 @@ export async function createSalesOrderForDealer(input: CreateSalesOrderInput) {
         sellerId: input.sellerId,
         dealerId: input.dealerId,
         orderNumber,
-        source: OrderSource.SALESPERSON_PORTAL,
+        source: input.source || OrderSource.SALESPERSON_PORTAL,
         status: initialStatus,
         currencyCode: "NPR",
         subtotal: new Prisma.Decimal(subtotal),

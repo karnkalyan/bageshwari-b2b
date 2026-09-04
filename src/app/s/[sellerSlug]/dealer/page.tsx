@@ -69,12 +69,20 @@ export default async function DealerDashboardPage({ params }: DealerDashboardPro
             Welcome back, <span className="font-semibold text-slate-900">{dealer?.tradingName || ctx.sellerName}</span>
           </p>
         </div>
-        <Link href={`/s/${sellerSlug}/dealer/products`}>
-          <Button size="sm" className="bg-red-600 text-white hover:bg-red-700">
-            <ShoppingBag className="h-4 w-4 mr-2" />
-            Create New Bulk Order
-          </Button>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link href="/dealer/orders/new">
+            <Button size="sm" className="bg-[#0b2d55] text-white hover:bg-[#124177] font-bold">
+              <ShoppingCart className="h-4 w-4 mr-1.5 text-emerald-400" />
+              Create Sales Order
+            </Button>
+          </Link>
+          <Link href={`/s/${sellerSlug}/dealer/products`}>
+            <Button size="sm" variant="outline" className="text-xs">
+              <ShoppingBag className="h-4 w-4 mr-1.5" />
+              Browse Products
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Credit & KPI Cards */}

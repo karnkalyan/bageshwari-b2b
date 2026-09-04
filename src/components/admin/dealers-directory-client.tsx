@@ -20,7 +20,10 @@ import {
   Clock,
   ChevronRight,
   ShieldCheck,
+  Search,
+  X,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -77,10 +80,56 @@ export function DealersDirectoryClient({
 }: DealersDirectoryClientProps) {
   const [selectedApp, setSelectedApp] = useState<SerializedDealerApplication | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [dealerSearchQuery, setDealerSearchQuery] = useState("");
+  const [appSearchQuery, setAppSearchQuery] = useState("");
 
   const pendingApps = applications.filter(
     (a) => a.status === "SUBMITTED" || a.status === "REVIEW_PENDING"
   );
+
+  const filteredDealers = React.useMemo(() => {
+    if (!dealerSearchQuery.trim()) return dealers;
+    const q = dealerSearchQuery.toLowerCase().trim();
+    return dealers.filter((d) => {
+      const legalName = (d.legalName || "").toLowerCase();
+      const tradingName = (d.tradingName || "").toLowerCase();
+      const code = (d.code || "").toLowerCase();
+      const contact = (d.contactName || "").toLowerCase();
+      const phone = (d.phone || "").toLowerCase();
+      const email = (d.email || "").toLowerCase();
+      const group = (d.dealerGroup?.name || "").toLowerCase();
+      return (
+        legalName.includes(q) ||
+        tradingName.includes(q) ||
+        code.includes(q) ||
+        contact.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q) ||
+        group.includes(q)
+      );
+    });
+  }, [dealers, dealerSearchQuery]);
+
+  const filteredApplications = React.useMemo(() => {
+    if (!appSearchQuery.trim()) return applications;
+    const q = appSearchQuery.toLowerCase().trim();
+    return applications.filter((a) => {
+      const bName = (a.businessName || "").toLowerCase();
+      const cName = (a.contactName || "").toLowerCase();
+      const phone = (a.phone || "").toLowerCase();
+      const email = (a.email || "").toLowerCase();
+      const subNo = (a.submissionNumber || "").toLowerCase();
+      const taxNo = (a.taxNumber || "").toLowerCase();
+      return (
+        bName.includes(q) ||
+        cName.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q) ||
+        subNo.includes(q) ||
+        taxNo.includes(q)
+      );
+    });
+  }, [applications, appSearchQuery]);
 
   const handleReviewClick = (app: SerializedDealerApplication) => {
     setSelectedApp(app);
@@ -92,7 +141,7 @@ export function DealersDirectoryClient({
       <Tabs defaultValue="dealers">
         <TabsList className="bg-white border rounded-lg p-1">
           <TabsTrigger value="dealers" className="text-xs font-bold">
-            Active Dealers ({dealers.length})
+            Active Dealers ({filteredDealers.length}{dealers.length !== filteredDealers.length ? ` / ${dealers.length}` : ""})
           </TabsTrigger>
           <TabsTrigger value="applications" className="text-xs font-bold flex items-center gap-1.5">
             Dealer Applications
@@ -107,6 +156,36 @@ export function DealersDirectoryClient({
         {/* 1. ACTIVE DEALERS TAB */}
         <TabsContent value="dealers" className="mt-4">
           <Card>
+            {/* Live Search Bar */}
+            <div className="p-3 border-b bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Search dealers by name, code, phone, email..."
+                  value={dealerSearchQuery}
+                  onChange={(e) => setDealerSearchQuery(e.target.value)}
+                  className="h-8 pl-8 pr-7 text-xs bg-white"
+                />
+                {dealerSearchQuery && (
+                  <button
+                    onClick={() => setDealerSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                {dealerSearchQuery ? (
+                  <span className="text-emerald-700 font-bold">
+                    Found {filteredDealers.length} matching dealer{filteredDealers.length === 1 ? "" : "s"}
+                  </span>
+                ) : (
+                  <span>Showing {dealers.length} active dealers</span>
+                )}
+              </div>
+            </div>
+
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
@@ -122,7 +201,14 @@ export function DealersDirectoryClient({
                     </tr>
                   </thead>
                   <tbody className="divide-y text-slate-700">
-                    {dealers.map((d) => (
+                    {filteredDealers.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                          No dealers found matching &ldquo;{dealerSearchQuery}&rdquo;
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredDealers.map((d) => (
                       <tr key={d.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3.5">
                           <div className="font-bold text-slate-900">{d.tradingName || d.legalName}</div>
@@ -164,7 +250,8 @@ export function DealersDirectoryClient({
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -183,6 +270,36 @@ export function DealersDirectoryClient({
         {/* 2. DEALER APPLICATIONS TAB */}
         <TabsContent value="applications" className="mt-4">
           <Card>
+            {/* Live Search Bar for Applications */}
+            <div className="p-3 border-b bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Search applications by business, contact, phone, ref..."
+                  value={appSearchQuery}
+                  onChange={(e) => setAppSearchQuery(e.target.value)}
+                  className="h-8 pl-8 pr-7 text-xs bg-white"
+                />
+                {appSearchQuery && (
+                  <button
+                    onClick={() => setAppSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                {appSearchQuery ? (
+                  <span className="text-blue-700 font-bold">
+                    Found {filteredApplications.length} matching application{filteredApplications.length === 1 ? "" : "s"}
+                  </span>
+                ) : (
+                  <span>Showing {applications.length} applications</span>
+                )}
+              </div>
+            </div>
+
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
@@ -199,14 +316,14 @@ export function DealersDirectoryClient({
                     </tr>
                   </thead>
                   <tbody className="divide-y text-slate-700">
-                    {applications.length === 0 ? (
+                    {filteredApplications.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
-                          No dealership applications received yet.
+                          {appSearchQuery ? `No applications found matching "${appSearchQuery}"` : "No dealership applications received yet."}
                         </td>
                       </tr>
                     ) : (
-                      applications.map((app) => {
+                      filteredApplications.map((app) => {
                         const subNo = app.submissionNumber || `APP-${app.id.slice(-6).toUpperCase()}`;
                         const docs = app.documents || [];
                         const verifiedDocsCount = docs.filter((d) => d.verified).length;

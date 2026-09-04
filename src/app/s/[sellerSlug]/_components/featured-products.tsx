@@ -58,7 +58,7 @@ export function FeaturedProducts({
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-6">
           {products.map((product) => {
             const mrp = Number(product.variants?.[0]?.mrp || 0);
             const dp = product.dealerPrice ?? mrp;
@@ -67,59 +67,69 @@ export function FeaturedProducts({
             return (
               <article
                 key={product.id}
-                className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-red-200 hover:shadow-lg"
+                className="group flex min-w-0 flex-col justify-between overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs transition hover:border-red-200 hover:shadow-md"
               >
-                <Link
-                  href={`${base}/products/${product.sku}`}
-                  className="relative grid aspect-square place-items-center bg-gradient-to-br from-slate-50 to-slate-100"
-                >
-                  <Package className="h-14 w-14 text-slate-200 transition group-hover:scale-110" />
-                  {(product.featured || product.newArrival) && (
-                    <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-1 text-[8px] font-black uppercase text-white">
-                      {product.newArrival ? "New" : "Featured"}
-                    </span>
-                  )}
-                  {isDealer && discountPercent > 0 && (
-                    <span className="absolute right-2 top-2 rounded bg-emerald-600 px-1.5 py-0.5 text-[8px] font-black text-white">
-                      -{discountPercent}%
-                    </span>
-                  )}
-                </Link>
-
-                <div className="flex flex-1 flex-col p-3">
-                  <div className="truncate text-[9px] font-bold uppercase tracking-wide text-red-600">
-                    {product.category?.name || "Catalogue"}
-                  </div>
+                <div>
                   <Link
                     href={`${base}/products/${product.sku}`}
-                    className="mt-1 line-clamp-2 min-h-8 text-[11px] font-extrabold leading-4 text-[#092f5c] hover:text-red-600"
+                    className="relative grid aspect-square place-items-center bg-gradient-to-br from-slate-50 to-slate-100"
                   >
-                    {product.name}
+                    <Package className="h-14 w-14 text-slate-200 transition group-hover:scale-110" />
+                    {(product.featured || product.newArrival) && (
+                      <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-xs">
+                        {product.newArrival ? "New" : "Featured"}
+                      </span>
+                    )}
+                    {isDealer && discountPercent > 0 && (
+                      <span className="absolute right-2 top-2 rounded bg-emerald-600 px-1.5 py-0.5 text-[8px] font-black text-white shadow-xs">
+                        -{discountPercent}% DP
+                      </span>
+                    )}
                   </Link>
-                  <div className="mt-1 truncate text-[9px] text-slate-400">SKU: {product.sku}</div>
 
-                  <div className="mt-3 border-t pt-2 space-y-1">
+                  <div className="p-3">
+                    <div className="truncate text-[9px] font-bold uppercase tracking-wide text-red-600">
+                      {product.category?.name || "Catalogue"}
+                    </div>
+                    <Link
+                      href={`${base}/products/${product.sku}`}
+                      className="mt-1 line-clamp-2 min-h-[32px] text-xs font-bold leading-tight text-[#092f5c] hover:text-red-600 transition-colors"
+                      title={product.name}
+                    >
+                      {product.name}
+                    </Link>
+                    <div className="mt-1 truncate font-mono text-[9px] text-slate-400">SKU: {product.sku}</div>
+                  </div>
+                </div>
+
+                <div className="p-3 pt-0">
+                  <div className="border-t border-slate-100 pt-2 space-y-1.5">
                     {isDealer ? (
-                      <>
-                        <div className="flex items-center justify-between text-[9px] text-slate-400">
+                      <div className="rounded-lg bg-emerald-50/50 p-2 border border-emerald-100/70">
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-400">
                           <span>MRP</span>
-                          <span className="line-through">{formatCurrency(mrp)}</span>
+                          <span className="line-through truncate max-w-[110px]">{formatCurrency(mrp)}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] font-bold text-emerald-700">
-                          <span>DP</span>
-                          <strong>{formatCurrency(dp)}</strong>
+                        <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs font-bold text-emerald-800 mt-0.5">
+                          <span className="text-[10px] font-semibold text-emerald-700">DP</span>
+                          <strong className="text-xs sm:text-sm font-black text-emerald-950 tracking-tight tabular-nums truncate max-w-[125px]">
+                            {formatCurrency(dp)}
+                          </strong>
                         </div>
-                      </>
+                      </div>
                     ) : (
-                      <>
-                        <div className="flex items-center justify-between text-[9px] text-slate-500">
-                          <span>MRP</span>
-                          <strong className="text-[11px] text-[#092f5c]">{formatCurrency(mrp)}</strong>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-1 text-[10px] text-slate-500">
+                          <span className="font-semibold">MRP</span>
+                          <strong className="text-xs font-bold text-[#092f5c] tabular-nums truncate max-w-[125px]">
+                            {formatCurrency(mrp)}
+                          </strong>
                         </div>
                         <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
-                          <LockKeyhole className="h-3 w-3" /> Dealer price after login
+                          <LockKeyhole className="h-3 w-3 shrink-0" />
+                          <span className="truncate">Dealer price after login</span>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
 

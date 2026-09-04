@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { getTenantContext, hasRole, hasPermission } from "@/lib/tenant";
 import { createSalesOrderForDealer } from "@/services/sales-order-create.service";
+import { OrderSource } from "@prisma/client";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -10,7 +11,10 @@ export async function POST(request: Request) {
   }
 
   const ctx = await getTenantContext(session.sellerSlug || "bageshwari");
+  const isDealerUser = Boolean(ctx.dealerId) || hasRole(ctx, "DEALER", "DEALER_USER", "DEALER_OWNER");
+
   const isAuthorized =
+    isDealerUser ||
     hasRole(
       ctx,
       "SUPER_ADMIN",
@@ -35,13 +39,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { dealerId, items, notes, freightTotal, submitForReview } = body;
 
-    if (!dealerId || !Array.isArray(items) || items.length === 0) {
+    // If dealer user, force order to be for their own dealership
+    const targetDealerId = isDealerUser && ctx.dealerId ? ctx.dealerId : dealerId;
+
+    if (!targetDealerId || !Array.isArray(items) || items.length === 0) {
       return apiError("BAD_REQUEST", "Dealer and at least one item are required.", 400);
     }
 
     const order = await createSalesOrderForDealer({
       sellerId: ctx.sellerId,
-      dealerId,
+      dealerId: targetDealerId,
       createdById: ctx.userId,
       actor: {
         userId: ctx.userId,
@@ -52,6 +59,7 @@ export async function POST(request: Request) {
       notes,
       freightTotal: freightTotal ? Number(freightTotal) : 0,
       submitForReview: Boolean(submitForReview),
+      source: isDealerUser ? OrderSource.DEALER_PORTAL : OrderSource.SALESPERSON_PORTAL,
     });
 
     return apiSuccess({

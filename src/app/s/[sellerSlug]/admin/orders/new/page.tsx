@@ -40,7 +40,7 @@ export default async function NewSalesOrderPage({ params, searchParams }: NewOrd
     redirect("/admin/orders");
   }
 
-  const [dealers, products] = await Promise.all([
+  const [dealers, products, categories] = await Promise.all([
     prisma.dealer.findMany({
       where: { sellerId: ctx.sellerId },
       orderBy: { legalName: "asc" },
@@ -52,13 +52,20 @@ export default async function NewSalesOrderPage({ params, searchParams }: NewOrd
     prisma.product.findMany({
       where: { sellerId: ctx.sellerId, status: "ACTIVE" },
       orderBy: { name: "asc" },
+      take: 36,
       include: {
+        category: { select: { name: true } },
         variants: {
           where: { status: "ACTIVE" },
           include: { prices: { take: 1 } },
         },
         prices: { take: 1 },
       },
+    }),
+    prisma.productCategory.findMany({
+      where: { sellerId: ctx.sellerId, status: "ACTIVE" },
+      select: { name: true },
+      orderBy: { displayOrder: "asc" },
     }),
   ]);
 
@@ -86,6 +93,7 @@ export default async function NewSalesOrderPage({ params, searchParams }: NewOrd
       name: p.name,
       sku: p.sku,
       unitCode: p.unitCode || "PCS",
+      categoryName: p.category?.name || undefined,
       defaultPrice,
       mrp,
       variants: p.variants.map((v) => ({
@@ -122,6 +130,7 @@ export default async function NewSalesOrderPage({ params, searchParams }: NewOrd
         dealers={serializedDealers}
         products={serializedProducts}
         initialDealerId={dealerId}
+        initialCategories={categories.map((c) => c.name)}
       />
     </div>
   );

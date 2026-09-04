@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -19,11 +19,13 @@ import {
   Send,
   Save,
   ArrowRight,
+  ArrowLeft,
   ShieldAlert,
   Sparkles,
   Layers,
   ChevronDown,
   Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,6 +82,8 @@ interface SalesOrderCreatorProps {
   dealers: SerializedDealer[];
   products: SerializedProduct[];
   initialDealerId?: string;
+  isDealer?: boolean;
+  initialCategories?: string[];
 }
 
 export function SalesOrderCreator({
@@ -87,6 +91,8 @@ export function SalesOrderCreator({
   dealers,
   products,
   initialDealerId,
+  isDealer = false,
+  initialCategories,
 }: SalesOrderCreatorProps) {
   const router = useRouter();
 
@@ -98,6 +104,15 @@ export function SalesOrderCreator({
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
 
+  // Dynamic server product state
+  const [displayedProducts, setDisplayedProducts] = useState<SerializedProduct[]>(products);
+  const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+
+  // Mobile App Navigation & UI state
+  const [mobileView, setMobileView] = useState<"products" | "cart">("products");
+  const [toast, setToast] = useState<{ message: string; id: number } | null>(null);
+  const [isCartBouncing, setIsCartBouncing] = useState(false);
+
   const [orderItems, setOrderItems] = useState<SalesOrderItem[]>([]);
   const [orderNotes, setOrderNotes] = useState("");
   const [freightTotal, setFreightTotal] = useState<number>(0);
@@ -105,47 +120,135 @@ export function SalesOrderCreator({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Trigger brief floating toast and cart bounce
+  const showToast = (message: string) => {
+    const id = Date.now();
+    setToast({ message, id });
+    setIsCartBouncing(true);
+    setTimeout(() => setIsCartBouncing(false), 450);
+    setTimeout(() => {
+      setToast((current) => (current?.id === id ? null : current));
+    }, 2200);
+  };
+
   // Selected Dealer
   const currentDealer = dealers.find((d) => d.id === selectedDealerId);
 
-  // Filtered Dealers for combobox
+  // Filtered Dealers for combobox with key up search
   const filteredDealers = useMemo(() => {
-    if (!dealerQuery) return dealers;
-    const q = dealerQuery.toLowerCase();
-    return dealers.filter(
-      (d) =>
-        d.legalName.toLowerCase().includes(q) ||
-        (d.tradingName && d.tradingName.toLowerCase().includes(q)) ||
-        d.code.toLowerCase().includes(q) ||
-        (d.phone && d.phone.includes(q))
-    );
+    if (!dealerQuery.trim()) return dealers;
+    const q = dealerQuery.toLowerCase().trim();
+    return dealers.filter((d) => {
+      const legalName = (d.legalName || "").toLowerCase();
+      const tradingName = (d.tradingName || "").toLowerCase();
+      const code = (d.code || "").toLowerCase();
+      const contact = (d.contactName || "").toLowerCase();
+      const phone = (d.phone || "").toLowerCase();
+      const email = (d.email || "").toLowerCase();
+
+      return (
+        legalName.includes(q) ||
+        tradingName.includes(q) ||
+        code.includes(q) ||
+        contact.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q)
+      );
+    });
   }, [dealers, dealerQuery]);
 
-  // Extract unique categories
+  // Extract unique categories (combines server-provided categories + products)
   const categories = useMemo(() => {
     const set = new Set<string>();
+    if (initialCategories && initialCategories.length > 0) {
+      initialCategories.forEach((c) => {
+        if (c) set.add(c);
+      });
+    }
     products.forEach((p) => {
       if (p.categoryName) set.add(p.categoryName);
     });
     return ["ALL", ...Array.from(set)];
+  }, [products, initialCategories]);
+
+  // Synchronize initial products if props change
+  useEffect(() => {
+    if (!productSearch.trim()) {
+      setDisplayedProducts(products);
+    }
   }, [products]);
 
-  // Filtered Products
-  const filteredProducts = useMemo(() => {
-    const q = productSearch.toLowerCase();
-    return products.filter((p) => {
-      const matchQuery =
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        p.variants.some((v) => v.name.toLowerCase().includes(q) || v.sku.toLowerCase().includes(q));
+  // Debounced server search across full 3,500+ product catalog on key up
+  useEffect(() => {
+    const trimmed = productSearch.trim();
+    if (trimmed.length < 2) {
+      setDisplayedProducts(products);
+      setIsSearchingProducts(false);
+      return;
+    }
 
+    setIsSearchingProducts(true);
+    const timer = setTimeout(async () => {
+      try {
+        const queryParams = new URLSearchParams({
+          search: trimmed,
+          pageSize: "50",
+        });
+        if (selectedCategory && selectedCategory !== "ALL") {
+          queryParams.set("category", selectedCategory);
+        }
+
+        const res = await fetch(`/api/products?${queryParams.toString()}`);
+        const json = await res.json();
+        if (json.success && json.data?.items) {
+          const mapped: SerializedProduct[] = json.data.items.map((p: any) => {
+            const firstVariant = p.variants?.[0];
+            const defaultPrice = firstVariant?.dealerPrice || firstVariant?.mrp || 0;
+            const mrp = firstVariant?.mrp || defaultPrice;
+            return {
+              id: p.id,
+              name: p.name,
+              sku: p.sku,
+              unitCode: p.unitCode || "PCS",
+              categoryName: p.category?.name,
+              defaultPrice,
+              mrp,
+              variants: (p.variants || []).map((v: any) => ({
+                id: v.id,
+                name: v.name,
+                sku: v.sku,
+                mrp: v.mrp || mrp,
+                price: v.dealerPrice || v.mrp || defaultPrice,
+              })),
+            };
+          });
+          setDisplayedProducts(mapped);
+        }
+      } catch (err) {
+        console.error("Error searching products:", err);
+      } finally {
+        setIsSearchingProducts(false);
+      }
+    }, 220);
+
+    return () => clearTimeout(timer);
+  }, [productSearch, selectedCategory, products]);
+
+  // Filtered Products for local category / search
+  const filteredProducts = useMemo(() => {
+    if (productSearch.trim().length >= 2) {
+      return displayedProducts;
+    }
+    return displayedProducts.filter((p) => {
       const matchCategory =
         selectedCategory === "ALL" || p.categoryName === selectedCategory;
-
-      return matchQuery && matchCategory;
+      const q = productSearch.toLowerCase().trim();
+      if (!q) return matchCategory;
+      const pName = (p.name || "").toLowerCase();
+      const pSku = (p.sku || "").toLowerCase();
+      return matchCategory && (pName.includes(q) || pSku.includes(q));
     });
-  }, [products, productSearch, selectedCategory]);
+  }, [displayedProducts, productSearch, selectedCategory]);
 
   // Fast 1-Click Add / Increment
   const handleQuickAdd = (product: SerializedProduct, variantId?: string) => {
@@ -188,6 +291,8 @@ export function SalesOrderCreator({
         },
       ];
     });
+
+    showToast(`Added ${name} to order`);
   };
 
   // Decrement or Remove
@@ -279,7 +384,11 @@ export function SalesOrderCreator({
         throw new Error(json?.message || json?.error?.message || "Failed to create order.");
       }
 
-      router.push(`/s/${sellerSlug}/admin/orders/${json.data.orderId}`);
+      const targetRedirect = isDealer
+        ? `/dealer/orders/${json.data.orderId}`
+        : `/s/${sellerSlug}/admin/orders/${json.data.orderId}`;
+
+      router.push(targetRedirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Order creation failed.");
     } finally {
@@ -288,7 +397,7 @@ export function SalesOrderCreator({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-24 lg:pb-0">
       {error && (
         <div className="p-4 bg-red-50 text-red-800 rounded-xl border border-red-200 text-xs flex items-center gap-2 shadow-xs">
           <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
@@ -298,27 +407,40 @@ export function SalesOrderCreator({
 
       {/* Top Sticky Dealer Selection & Info Strip */}
       <div className="bg-white rounded-xl border p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Dealer Combobox */}
+        {/* Dealer Combobox or Fixed Dealer View */}
         <div className="flex-1 max-w-lg relative">
           <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
             Target Dealer Account
           </Label>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setDealerSearchOpen(!dealerSearchOpen)}
-              className="w-full h-10 px-3 border rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-between text-xs font-bold text-slate-800 transition"
-            >
+          {isDealer ? (
+            <div className="w-full h-10 px-3 border border-emerald-200 rounded-lg bg-emerald-50/70 flex items-center justify-between text-xs font-bold text-emerald-950">
               <div className="flex items-center gap-2 truncate">
-                <Building2 className="h-4 w-4 text-primary shrink-0" />
+                <Building2 className="h-4 w-4 text-emerald-700 shrink-0" />
                 <span className="truncate">
                   {currentDealer
                     ? `${currentDealer.tradingName || currentDealer.legalName} (${currentDealer.code})`
-                    : "Select a Dealer..."}
+                    : "My Dealership Account"}
                 </span>
               </div>
-              <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
-            </button>
+              <Badge className="bg-emerald-600 text-white text-[10px] font-bold">Authorized Account</Badge>
+            </div>
+          ) : (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDealerSearchOpen(!dealerSearchOpen)}
+                className="w-full h-10 px-3 border rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-between text-xs font-bold text-slate-800 transition"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Building2 className="h-4 w-4 text-primary shrink-0" />
+                  <span className="truncate">
+                    {currentDealer
+                      ? `${currentDealer.tradingName || currentDealer.legalName} (${currentDealer.code})`
+                      : "Select a Dealer..."}
+                  </span>
+                </div>
+                <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
+              </button>
 
             {dealerSearchOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border shadow-xl z-50 p-2 space-y-2 max-h-72 overflow-y-auto">
@@ -362,7 +484,8 @@ export function SalesOrderCreator({
               </div>
             )}
           </div>
-        </div>
+        )}
+      </div>
 
         {/* Selected Dealer Summary Metrics */}
         {currentDealer && (
@@ -379,23 +502,76 @@ export function SalesOrderCreator({
         )}
       </div>
 
+      {/* Mobile-App Tab Switcher for easy 1-click toggling */}
+      <div className="lg:hidden flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <button
+          type="button"
+          onClick={() => setMobileView("products")}
+          className={cn(
+            "flex-1 py-2.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2",
+            mobileView === "products"
+              ? "bg-[#0b2d55] text-white shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
+          )}
+        >
+          <Package className="h-4 w-4" />
+          <span>Catalogue ({filteredProducts.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileView("cart")}
+          className={cn(
+            "flex-1 py-2.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 relative",
+            mobileView === "cart"
+              ? "bg-[#0b2d55] text-white shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
+          )}
+        >
+          <ShoppingCart
+            className={cn(
+              "h-4 w-4",
+              isCartBouncing && "animate-bounce text-emerald-400"
+            )}
+          />
+          <span>Cart ({totalItemUnits})</span>
+          {totalItemUnits > 0 && (
+            <Badge className="bg-emerald-500 text-slate-950 font-black text-[10px] px-1.5 py-0">
+              {formatCurrency(grandTotal)}
+            </Badge>
+          )}
+        </button>
+      </div>
+
       {/* Main 2-Column POS Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 7 Columns: Product Catalogue & 1-Click Add */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className={cn("lg:col-span-7 space-y-4", mobileView === "cart" ? "hidden lg:block" : "block")}>
           <Card className="shadow-xs">
             <CardHeader className="pb-3 border-b bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <CardTitle className="text-sm font-bold flex items-center gap-2 text-[#0b2d55]">
                 <Package className="h-4 w-4 text-primary" /> Product Catalogue & Spare Parts
               </CardTitle>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <div className="relative w-full sm:w-72">
+                {isSearchingProducts ? (
+                  <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary animate-spin" />
+                ) : (
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                )}
                 <Input
                   placeholder="Fast search SKU or name..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  className="h-8 pl-8 text-xs bg-white"
+                  className="h-9 pl-8 pr-7 text-xs bg-white rounded-lg"
                 />
+                {productSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setProductSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             </CardHeader>
 
@@ -553,9 +729,20 @@ export function SalesOrderCreator({
         </div>
 
         {/* Right 5 Columns: Persistent Live Order Cart */}
-        <div className="lg:col-span-5 space-y-4 sticky top-20">
+        <div className={cn("lg:col-span-5 space-y-4 lg:sticky lg:top-20", mobileView === "products" ? "hidden lg:block" : "block")}>
           <Card className="shadow-md border-slate-300">
             <CardHeader className="pb-3 border-b bg-gradient-to-r from-slate-900 to-[#0b2d55] text-white rounded-t-xl">
+              {/* Mobile Back to Catalogue Button */}
+              <div className="lg:hidden flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setMobileView("products")}
+                  className="text-xs text-emerald-300 hover:text-white flex items-center gap-1 font-bold transition active:scale-95"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back to Product Catalogue
+                </button>
+              </div>
+
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-bold flex items-center gap-2 text-white">
                   <ShoppingCart className="h-4 w-4 text-emerald-400" /> Sales Order Cart
@@ -732,6 +919,50 @@ export function SalesOrderCreator({
           </Card>
         </div>
       </div>
+
+      {/* Mobile Sticky Bottom Bar (Quick Cart Summary & Action) */}
+      {orderItems.length > 0 && mobileView === "products" && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 text-white backdrop-blur-md px-4 py-3 border-t border-slate-800 shadow-2xl flex items-center justify-between lg:hidden animate-in slide-in-from-bottom duration-200">
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                "relative p-2.5 bg-emerald-600/20 rounded-xl border border-emerald-500/30 transition-transform",
+                isCartBouncing && "scale-110"
+              )}
+            >
+              <ShoppingCart className="h-5 w-5 text-emerald-400" />
+              <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-slate-950 text-[10px] font-black rounded-full h-4 w-4 flex items-center justify-center">
+                {totalItemUnits}
+              </span>
+            </div>
+            <div>
+              <div className="text-xs font-black text-white">{formatCurrency(grandTotal)}</div>
+              <div className="text-[10px] text-slate-400 font-medium">
+                {orderItems.length} item{orderItems.length === 1 ? "" : "s"} in cart
+              </div>
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => setMobileView("cart")}
+            className="h-9 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-1.5 active:scale-95 transition"
+          >
+            <span>Review Cart</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {/* Floating Toast Notification on Add */}
+      {toast && (
+        <div className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-slate-950/95 text-white px-4 py-2.5 rounded-full shadow-2xl border border-slate-800 backdrop-blur-md transition-all animate-in fade-in slide-in-from-bottom-5 duration-200 pointer-events-none max-w-[90vw]">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span className="text-xs font-semibold truncate">{toast.message}</span>
+          <span className="bg-emerald-500/20 text-emerald-300 font-mono text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0">
+            {totalItemUnits} in cart
+          </span>
+        </div>
+      )}
     </div>
   );
 }

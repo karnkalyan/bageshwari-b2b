@@ -82,16 +82,18 @@ export function PortalShell({
       )}
       <div className="min-w-0 flex-1 lg:pl-64">
         <header className="sticky top-0 z-40 flex h-[72px] items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-7">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setOpen(true)} className="rounded-lg border p-2 lg:hidden" aria-label="Open menu">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <button onClick={() => setOpen(true)} className="rounded-lg border p-2 lg:hidden shrink-0" aria-label="Open menu">
               <Menu className="h-5 w-5" />
             </button>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-red-600">Operations workspace</div>
-              <h1 className="text-lg font-black text-[#092f5c]">{title}</h1>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-red-600 truncate">Operations workspace</div>
+              <h1 className="text-base sm:text-lg font-black text-[#092f5c] truncate">{title}</h1>
             </div>
           </div>
-          <NotificationBell />
+          <div className="shrink-0">
+            <NotificationBell />
+          </div>
         </header>
         <main>{children}</main>
       </div>

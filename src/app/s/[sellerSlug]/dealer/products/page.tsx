@@ -142,14 +142,14 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
                   <h3 className="font-bold text-sm text-slate-900 line-clamp-2">{p.name}</h3>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-lg space-y-1 border">
-                  <div className="flex justify-between text-xs text-slate-400 line-through">
+                <div className="p-3 bg-slate-50 rounded-lg space-y-1.5 border border-slate-200">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-400">
                     <span>MRP</span>
-                    <span>{formatCurrency(mrp)}</span>
+                    <span className="line-through truncate max-w-[120px]">{formatCurrency(mrp)}</span>
                   </div>
-                  <div className="flex justify-between text-sm font-bold text-emerald-700">
-                    <span>Dealer Price (DP)</span>
-                    <span>{formatCurrency(dp)}</span>
+                  <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs sm:text-sm font-bold text-emerald-700">
+                    <span>Dealer Price</span>
+                    <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(dp)}</span>
                   </div>
                   <div className="text-[10px] text-slate-400 text-right">+ 13% VAT Tax</div>
                 </div>

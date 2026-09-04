@@ -47,23 +47,54 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
     </aside>
   );
 
-  return <div className="min-h-screen bg-[#f4f7fb] lg:flex">
-    <div className="fixed inset-y-0 left-0 z-50 hidden lg:block">{sidebar}</div>
-    {open && <div className="fixed inset-0 z-50 bg-slate-950/60 lg:hidden" onClick={() => setOpen(false)}><div className="h-full w-[240px]" onClick={(event) => event.stopPropagation()}>{sidebar}</div><button className="absolute right-4 top-4 rounded-full bg-white p-2" onClick={() => setOpen(false)} aria-label="Close menu"><X className="h-5 w-5" /></button></div>}
-    <div className="min-w-0 flex-1 lg:pl-[240px]">
-      <header className="sticky top-0 z-40 flex h-[72px] items-center gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-7">
-        <button className="rounded-lg border p-2 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></button>
-        <div>
-          <div className="text-[9px] font-bold uppercase tracking-[.18em] text-red-600">Bageshwari B2B</div>
-          <div className="text-lg font-extrabold text-[#0b2d55]">Dealer Portal</div>
+  return (
+    <div className="min-h-screen bg-[#f4f7fb] lg:flex">
+      <div className="fixed inset-y-0 left-0 z-50 hidden lg:block">{sidebar}</div>
+      {open && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 lg:hidden" onClick={() => setOpen(false)}>
+          <div className="h-full w-[240px]" onClick={(event) => event.stopPropagation()}>
+            {sidebar}
+          </div>
+          <button
+            className="absolute right-4 top-4 rounded-full bg-white p-2 shadow-md"
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <div className="ml-auto hidden w-full max-w-sm items-center rounded-lg border bg-slate-50 px-3 md:flex">
-          <Search className="h-4 w-4 text-slate-400" />
-          <input className="h-10 w-full bg-transparent px-2 text-xs outline-none" placeholder="Search catalogue and orders" />
-        </div>
-        <NotificationBell />
-      </header>
-      <main>{children}</main>
+      )}
+      <div className="min-w-0 flex-1 lg:pl-[240px]">
+        <header className="sticky top-0 z-40 flex h-[68px] sm:h-[72px] items-center justify-between gap-3 border-b border-slate-200 bg-white px-3.5 sm:px-6">
+          {/* Left: Mobile Hamburger & Dealer Portal Brand */}
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <button
+              className="rounded-lg border border-slate-200 p-2 text-slate-700 hover:bg-slate-100 transition shrink-0 lg:hidden"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <div className="text-[9px] font-bold uppercase tracking-[.18em] text-red-600 truncate">Bageshwari B2B</div>
+              <div className="text-base sm:text-lg font-black text-[#0b2d55] truncate">Dealer Portal</div>
+            </div>
+          </div>
+
+          {/* Right: Search Box (desktop) & Notification Bell */}
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <div className="hidden w-full max-w-xs md:max-w-sm items-center rounded-lg border bg-slate-50 px-3 md:flex">
+              <Search className="h-4 w-4 text-slate-400 shrink-0" />
+              <input
+                className="h-9 w-full bg-transparent px-2 text-xs outline-none"
+                placeholder="Search catalogue and orders"
+              />
+            </div>
+            <NotificationBell />
+          </div>
+        </header>
+        <main>{children}</main>
+      </div>
     </div>
-  </div>;
+  );
 }
