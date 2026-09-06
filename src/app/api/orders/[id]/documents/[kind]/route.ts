@@ -62,6 +62,23 @@ export async function GET(
     "package-labels",
   ].includes(kind);
 
+  const unconfirmedOrderStatuses = [
+    "DRAFT",
+    "PENDING_ACCOUNTS_REVIEW",
+    "ACCOUNTS_REVIEW_IN_PROGRESS",
+    "WAITING_FOR_DEALER_CONFIRMATION",
+    "DEALER_CHANGE_REQUESTED",
+    "CANCELLED",
+  ];
+
+  if (kind === "sales-order" && unconfirmedOrderStatuses.includes(allowed.status)) {
+    return apiError(
+      "ORDER_NOT_CONFIRMED",
+      "Sales Order document is available only after order review is completed and order is confirmed.",
+      403
+    );
+  }
+
   const isPaymentConfirmed =
     allowed.payments.length > 0 ||
     allowed.creditApprovals.length > 0 ||

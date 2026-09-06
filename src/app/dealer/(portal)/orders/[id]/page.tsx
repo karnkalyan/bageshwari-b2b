@@ -64,6 +64,14 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
   const finalInvoice = order.finalInvoices[0];
   const shipment = order.shipments[0];
   const latestRevision = order.revisions[0];
+  const isOrderConfirmed = ![
+    "DRAFT",
+    "PENDING_ACCOUNTS_REVIEW",
+    "ACCOUNTS_REVIEW_IN_PROGRESS",
+    "WAITING_FOR_DEALER_CONFIRMATION",
+    "DEALER_CHANGE_REQUESTED",
+    "CANCELLED",
+  ].includes(order.status);
 
   const workflowSteps = [
     { title: "Order Placed", done: !isDraft },
@@ -106,13 +114,22 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
 
         {/* Quick PDF Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Sales Order */}
-          <a
-            href={`/api/orders/${order.id}/documents/sales-order?download=1`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
-          >
-            <Download className="h-3.5 w-3.5" /> Sales Order PDF
-          </a>
+          {/* Sales Order: Only downloadable after review is completed and order confirmed */}
+          {isOrderConfirmed ? (
+            <a
+              href={`/api/orders/${order.id}/documents/sales-order?download=1`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
+            >
+              <Download className="h-3.5 w-3.5" /> Sales Order PDF
+            </a>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+              title="Sales Order PDF will be available once the order review is completed and confirmed."
+            >
+              <Download className="h-3.5 w-3.5" /> Sales Order ({isDraft ? "Draft" : "Review Pending"})
+            </span>
+          )}
 
           {/* Proforma Invoice PDF */}
           {proforma ? (

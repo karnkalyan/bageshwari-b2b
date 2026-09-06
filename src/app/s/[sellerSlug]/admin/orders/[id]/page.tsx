@@ -267,6 +267,15 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
       "COMPLETED",
     ].includes(order.status);
 
+  const isOrderConfirmed = ![
+    "DRAFT",
+    "PENDING_ACCOUNTS_REVIEW",
+    "ACCOUNTS_REVIEW_IN_PROGRESS",
+    "WAITING_FOR_DEALER_CONFIRMATION",
+    "DEALER_CHANGE_REQUESTED",
+    "CANCELLED",
+  ].includes(order.status);
+
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-7 p-4 md:p-7">
       {/* Navigation */}
@@ -452,15 +461,28 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Sales Order */}
-            <a
-              href={`/api/orders/${order.id}/documents/sales-order`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-            >
-              <FileText className="h-3.5 w-3.5" /> Sales Order
-            </a>
+            {/* Sales Order: Only active once order review is completed and order is confirmed */}
+            {isOrderConfirmed ? (
+              <a
+                href={`/api/orders/${order.id}/documents/sales-order`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              >
+                <FileText className="h-3.5 w-3.5" /> Sales Order
+              </a>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed"
+                title={
+                  order.status === "DRAFT"
+                    ? "Sales Order PDF available after submission & confirmation"
+                    : "Sales Order PDF available after order review is completed & confirmed"
+                }
+              >
+                <FileText className="h-3.5 w-3.5" /> Sales Order ({order.status === "DRAFT" ? "Draft" : "Review Pending"})
+              </span>
+            )}
 
             {/* Proforma Invoice: Only active if Proforma exists */}
             {proforma ? (
