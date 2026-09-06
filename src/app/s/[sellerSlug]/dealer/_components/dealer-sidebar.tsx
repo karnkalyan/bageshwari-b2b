@@ -7,6 +7,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ArrowUpRight, Boxes, CircleUserRound, FileText, LayoutDashboard, LogOut, Menu, Search, ShoppingBag, ShoppingCart, Store, Truck, WalletCards, X } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { LiveSearchInput } from "@/components/search/live-search-input";
 
 interface DealerShellProps {
   sellerSlug: string;
@@ -81,15 +82,13 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
             </div>
           </div>
 
-          {/* Right: Search Box (desktop) & Notification Bell */}
+          {/* Right: Live Search Box (desktop) & Notification Bell */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <div className="hidden w-full max-w-xs md:max-w-sm items-center rounded-lg border bg-slate-50 px-3 md:flex">
-              <Search className="h-4 w-4 text-slate-400 shrink-0" />
-              <input
-                className="h-9 w-full bg-transparent px-2 text-xs outline-none"
-                placeholder="Search catalogue and orders"
-              />
-            </div>
+            <LiveSearchInput
+              placeholder="Search catalogue..."
+              className="hidden md:block w-52 lg:w-64"
+              targetPath="/dealer/products"
+            />
             <NotificationBell />
           </div>
         </header>

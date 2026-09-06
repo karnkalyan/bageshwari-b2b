@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LiveSearchInput } from "@/components/search/live-search-input";
 
 type AdminShellProps = {
   children: React.ReactNode;
@@ -431,16 +432,11 @@ export function AdminShell({
           {/* Right section: Search bar + Theme Toggle + Notifications */}
           <div className="flex items-center gap-2.5 shrink-0">
             {/* Search Input */}
-            <div className="hidden w-52 md:w-64 items-center rounded-lg border border-border bg-muted/40 px-2.5 md:flex group transition-all focus-within:border-primary focus-within:bg-card focus-within:ring-1 focus-within:ring-primary/20">
-              <Search className="h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors shrink-0" />
-              <input
-                className="h-8 w-full bg-transparent px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground"
-                placeholder="Search orders, products, dealers..."
-              />
-              <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.2 text-[9px] font-semibold text-muted-foreground sm:inline-flex">
-                ⌘K
-              </kbd>
-            </div>
+            <LiveSearchInput
+              placeholder="Search products..."
+              className="hidden md:block w-52 md:w-64"
+              targetPath="/admin/products"
+            />
 
             {/* High-Contrast Light / Dark Mode Toggle in Navbar */}
             <ThemeToggle collapsed={false} />

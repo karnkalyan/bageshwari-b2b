@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -29,6 +29,7 @@ interface BrandItem {
   id: string;
   name: string;
   slug: string;
+  _count?: { products: number };
 }
 
 interface ProductFiltersProps {
@@ -58,10 +59,21 @@ export function ProductFilters({
   const [localSearch, setLocalSearch] = useState(search);
   const [drawerSearch, setDrawerSearch] = useState(search);
   const [mounted, setMounted] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPushedSearch = useRef<string>(search);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Synchronize when URL search changes externally
+  useEffect(() => {
+    if (search !== lastPushedSearch.current) {
+      setLocalSearch(search);
+      setDrawerSearch(search);
+      lastPushedSearch.current = search;
+    }
+  }, [search]);
 
   useEffect(() => {
     if (isDrawerOpen) {
@@ -86,7 +98,7 @@ export function ProductFilters({
     category?: string | null;
     brand?: string | null;
     search?: string | null;
-    page?: string | null;
+    sort?: string | null;
   }) => {
     const params = new URLSearchParams(searchParams ? searchParams.toString() : "");
 
@@ -105,6 +117,11 @@ export function ProductFilters({
       else params.delete("search");
     }
 
+    if (updates.sort !== undefined) {
+      if (updates.sort) params.set("sort", updates.sort);
+      else params.delete("sort");
+    }
+
     // Always reset to page 1 on filter changes
     params.delete("page");
 
@@ -114,18 +131,50 @@ export function ProductFilters({
 
   const applyUrl = (url: string) => {
     startTransition(() => {
-      router.push(url);
+      router.replace(url, { scroll: false });
     });
+  };
+
+  const handleSearchChange = (val: string) => {
+    setLocalSearch(val);
+    setDrawerSearch(val);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Keyup real-time debounced search
+    debounceTimerRef.current = setTimeout(() => {
+      const trimmed = val.trim();
+      lastPushedSearch.current = trimmed;
+      applyUrl(buildUrl({ search: trimmed || null }));
+    }, 200);
+  };
+
+  const handleClearSearch = () => {
+    setLocalSearch("");
+    setDrawerSearch("");
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    lastPushedSearch.current = "";
+    applyUrl(buildUrl({ search: null }));
   };
 
   const handleMobileSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    applyUrl(buildUrl({ search: localSearch.trim() || null }));
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    const trimmed = localSearch.trim();
+    lastPushedSearch.current = trimmed;
+    applyUrl(buildUrl({ search: trimmed || null }));
   };
 
   const handleDrawerSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    applyUrl(buildUrl({ search: drawerSearch.trim() || null }));
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    const trimmed = drawerSearch.trim();
+    lastPushedSearch.current = trimmed;
+    applyUrl(buildUrl({ search: trimmed || null }));
   };
 
   const handleSelectCategory = (slug: string | null) => {
@@ -160,17 +209,14 @@ export function ProductFilters({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search products, SKU..."
               className="h-10 pl-9 pr-8 text-xs rounded-xl bg-white border-slate-200 shadow-2xs focus-visible:ring-1 focus-visible:ring-primary"
             />
             {localSearch && (
               <button
                 type="button"
-                onClick={() => {
-                  setLocalSearch("");
-                  applyUrl(buildUrl({ search: null }));
-                }}
+                onClick={handleClearSearch}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700"
                 aria-label="Clear search"
               >
@@ -332,14 +378,14 @@ export function ProductFilters({
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     value={drawerSearch}
-                    onChange={(e) => setDrawerSearch(e.target.value)}
+                    onChange={(e) => handleSearchChange(e.target.value)}
                     placeholder="Search SKU, name, description..."
                     className="h-10 pl-9 pr-8 text-xs rounded-xl bg-slate-50 border-slate-200"
                   />
                   {drawerSearch && (
                     <button
                       type="button"
-                      onClick={() => setDrawerSearch("")}
+                      onClick={handleClearSearch}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -539,17 +585,14 @@ export function ProductFilters({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Search SKU, name..."
                   className="pl-9 pr-8 h-9 text-xs rounded-xl bg-slate-50 border-slate-200"
                 />
                 {localSearch && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setLocalSearch("");
-                      applyUrl(buildUrl({ search: null }));
-                    }}
+                    onClick={handleClearSearch}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700"
                   >
                     <X className="h-3.5 w-3.5" />

@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { ShoppingCart, Search, Filter, Eye, Plus, ChevronRight } from "lucide-react";
 import { formatCurrency, formatDate, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
 import { Pagination } from "@/components/ui/pagination";
+import { buildOrderSearchFilter } from "@/lib/search-utils";
+import { LiveSearchInput } from "@/components/search/live-search-input";
 
 interface OrdersPageProps {
   params: Promise<{ sellerSlug: string }>;
@@ -21,18 +23,14 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
   const statusFilter = query.status || "";
   const search = query.search || "";
 
-  const where: any = { sellerId: ctx.sellerId };
+  const orderSearchFilter = buildOrderSearchFilter(search);
+  const where: any = {
+    sellerId: ctx.sellerId,
+    ...(orderSearchFilter ? orderSearchFilter : {}),
+  };
 
   if (statusFilter) {
     where.status = statusFilter;
-  }
-
-  if (search) {
-    where.OR = [
-      { orderNumber: { contains: search } },
-      { dealer: { tradingName: { contains: search } } },
-      { dealer: { code: { contains: search } } },
-    ];
   }
 
   const currentPage = parseInt(query.page || "1", 10);
@@ -112,20 +110,10 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
 
       {/* Search form */}
       <div className="glass-card p-4">
-        <form action={baseUrl} method="GET" className="flex items-center gap-2 w-full sm:w-80">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              name="search"
-              defaultValue={search}
-              placeholder="Search order no, dealer..."
-              className="pl-9 h-9 text-xs bg-background text-foreground border-border"
-            />
-          </div>
-          <Button type="submit" size="sm" variant="secondary" className="h-9 text-xs border border-border">
-            Search
-          </Button>
-        </form>
+        <LiveSearchInput
+          placeholder="Search order no, dealer name, code..."
+          className="w-full sm:w-80"
+        />
       </div>
 
       {/* Orders Table */}

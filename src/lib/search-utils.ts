@@ -84,3 +84,52 @@ export function buildProductSearchFilter(query?: string): Prisma.ProductWhereInp
     OR: [exactPhraseCondition, allTokensCondition],
   };
 }
+
+/**
+ * Builds a flexible multi-token LIKE / contains search filter for Prisma Order queries.
+ * Supports tokenized matching across orderNumber, dealer tradingName, and dealer code.
+ */
+export function buildOrderSearchFilter(query?: string): Prisma.OrderWhereInput | undefined {
+  if (!query) return undefined;
+  const raw = query.trim();
+  if (!raw) return undefined;
+
+  const tokens = Array.from(
+    new Set(
+      raw
+        .split(/[\s,]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+    )
+  );
+
+  if (tokens.length === 0) return undefined;
+
+  const makeTokenCondition = (token: string): Prisma.OrderWhereInput => ({
+    OR: [
+      { orderNumber: { contains: token } },
+      { dealer: { tradingName: { contains: token } } },
+      { dealer: { code: { contains: token } } },
+    ],
+  });
+
+  if (tokens.length === 1) {
+    return makeTokenCondition(tokens[0]);
+  }
+
+  const exactPhraseCondition: Prisma.OrderWhereInput = {
+    OR: [
+      { orderNumber: { contains: raw } },
+      { dealer: { tradingName: { contains: raw } } },
+      { dealer: { code: { contains: raw } } },
+    ],
+  };
+
+  const allTokensCondition: Prisma.OrderWhereInput = {
+    AND: tokens.map((token) => makeTokenCondition(token)),
+  };
+
+  return {
+    OR: [exactPhraseCondition, allTokensCondition],
+  };
+}

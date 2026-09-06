@@ -1,11 +1,10 @@
 import { prisma } from "@/lib/db";
 import { getTenantContext } from "@/lib/tenant";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
 import { ProductsTableClient, type SerializedProduct } from "./products-table-client";
 import { Pagination } from "@/components/ui/pagination";
 import { buildProductSearchFilter } from "@/lib/search-utils";
+import { LiveSearchInput } from "@/components/search/live-search-input";
 
 interface AdminProductsProps {
   params: Promise<{ sellerSlug: string }>;
@@ -97,8 +96,6 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
     };
   });
 
-  const baseUrl = `/admin/products`;
-
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -113,17 +110,10 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
 
       <Card>
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <form action={baseUrl} method="GET" className="flex items-center gap-2 w-full sm:w-96">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                name="search"
-                defaultValue={search}
-                placeholder="Search products by SKU or name..."
-                className="pl-9 h-9 text-xs"
-              />
-            </div>
-          </form>
+          <LiveSearchInput
+            placeholder="Search products by SKU or name..."
+            className="w-full sm:w-96"
+          />
           <div className="text-xs text-muted-foreground">
             Showing {plainProducts.length} of {totalCount} products
           </div>
