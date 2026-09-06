@@ -193,6 +193,17 @@ export function AdminShell({
   const pathname = usePathname();
   const base = "/admin";
 
+  // Normalize legacy role-specific prefixes to /admin for active state detection
+  const legacyPrefixes = ["/accounts", "/warehouse", "/dispatch", "/sales"];
+  const normalizedPathname = (() => {
+    for (const prefix of legacyPrefixes) {
+      if (pathname === prefix || pathname.startsWith(prefix + "/")) {
+        return "/admin" + pathname.slice(prefix.length);
+      }
+    }
+    return pathname;
+  })();
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem("sidebar-collapsed");
@@ -229,8 +240,9 @@ export function AdminShell({
     .flatMap((group) => group.items)
     .find((item) => {
       const href = `${base}${item.segment}`;
-      return item.segment ? pathname.startsWith(href) : pathname === base;
+      return item.segment ? normalizedPathname.startsWith(href) : normalizedPathname === base;
     });
+
 
   const primaryRole = roles[0]?.replace(/_/g, " ") || "Staff Member";
   const sidebarWidth = collapsed ? "w-[68px]" : "w-[260px]";
@@ -238,7 +250,7 @@ export function AdminShell({
 
   const renderNavItem = (item: NavItem) => {
     const href = `${base}${item.segment}`;
-    const active = item.segment ? pathname.startsWith(href) : pathname === href;
+    const active = item.segment ? normalizedPathname.startsWith(href) : normalizedPathname === href;
     const Icon = item.icon;
 
     return (
@@ -285,7 +297,7 @@ export function AdminShell({
           {(!collapsed || isMobile) && (
             <div className="min-w-0 animate-fade-in">
               <div className="truncate text-xs font-black uppercase tracking-wider text-foreground">{sellerName}</div>
-              <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">B2B Management</div>
+              <div className="text-[9px] font-bold uppercase tracking-widest text-primary/70">{primaryRole}</div>
             </div>
           )}
         </Link>
