@@ -1,85 +1,20 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTenantContext } from "@/lib/tenant";
-import { getDealerCart, updateCartItemQuantity, removeCartItem, clearDealerCart } from "@/services/cart.service";
-import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
+import { getDealerCart } from "@/services/cart.service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { ShoppingCart, Trash2, ArrowRight, Package, ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
-import { revalidatePath } from "next/cache";
 import { CartItemQuantity } from "@/components/cart/cart-item-quantity";
+import { updateQuantityAction, removeItemAction, clearCartAction, submitDraft } from "./actions";
 
 export default async function DealerCartPage() {
   const ctx = await getTenantContext("bageshwari", "/dealer/login");
   if (!ctx.dealerId) redirect("/dealer/login");
 
   const draft = await getDealerCart(ctx.sellerId, ctx.dealerId);
-
-  async function updateQuantityAction(formData: FormData) {
-    "use server";
-    const actionCtx = await getTenantContext("bageshwari", "/dealer/login");
-    if (!actionCtx.dealerId) redirect("/dealer/login");
-    const itemId = String(formData.get("itemId") || "");
-    const qty = Number(formData.get("quantity") || 1);
-    if (!itemId) return;
-
-    await updateCartItemQuantity({
-      sellerId: actionCtx.sellerId,
-      dealerId: actionCtx.dealerId,
-      itemId,
-      quantity: qty,
-    });
-    revalidatePath("/dealer/cart");
-  }
-
-  async function removeItemAction(formData: FormData) {
-    "use server";
-    const actionCtx = await getTenantContext("bageshwari", "/dealer/login");
-    if (!actionCtx.dealerId) redirect("/dealer/login");
-    const itemId = String(formData.get("itemId") || "");
-    if (!itemId) return;
-
-    await removeCartItem({
-      sellerId: actionCtx.sellerId,
-      dealerId: actionCtx.dealerId,
-      itemId,
-    });
-    revalidatePath("/dealer/cart");
-  }
-
-  async function clearCartAction() {
-    "use server";
-    const actionCtx = await getTenantContext("bageshwari", "/dealer/login");
-    if (!actionCtx.dealerId) redirect("/dealer/login");
-
-    await clearDealerCart({
-      sellerId: actionCtx.sellerId,
-      dealerId: actionCtx.dealerId,
-    });
-    revalidatePath("/dealer/cart");
-  }
-
-  async function submitDraft(formData: FormData) {
-    "use server";
-    const actionCtx = await getTenantContext("bageshwari", "/dealer/login");
-    const orderId = String(formData.get("orderId") || "");
-    if (!orderId) return;
-
-    await executeOrderWorkflowAction({
-      sellerId: actionCtx.sellerId,
-      orderId,
-      targetStatus: "PENDING_ACCOUNTS_REVIEW",
-      actor: {
-        userId: actionCtx.userId,
-        permissions: actionCtx.permissions,
-        roles: actionCtx.roles,
-      },
-      reason: "Submitted by dealer from portal cart",
-    });
-    redirect("/dealer/orders");
-  }
 
   if (!draft || !draft.items.length) {
     return (

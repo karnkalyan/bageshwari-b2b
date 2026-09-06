@@ -12,8 +12,7 @@ import {
   PackageCheck, Printer, Tag, History, Edit3, UserCheck
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
-import { OrderStatus } from "@prisma/client";
-import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
+import { advanceWorkflowAction } from "./actions";
 import { AdminOrderActions } from "./admin-order-actions";
 
 interface OrderDetailsProps {
@@ -84,28 +83,6 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
   const isWarehouse = isPrivileged || hasRole(ctx, "WAREHOUSE_MANAGER", "WAREHOUSE_USER", "WAREHOUSE_PICKER") || hasPermission(ctx, "picklist.complete");
   const isDispatch = isPrivileged || hasRole(ctx, "DISPATCH_USER", "LOGISTICS_MANAGER") || hasPermission(ctx, "shipment.dispatch");
   const isSales = isPrivileged || hasRole(ctx, "SALES_REP", "SALES_MANAGER") || hasPermission(ctx, "order.submit");
-
-  // Handle standard step progression Server Action
-  async function advanceWorkflowAction(formData: FormData) {
-    "use server";
-    const rawTarget = formData.get("nextStatus");
-    const assignedWarehouseUserId = formData.get("assignedWarehouseUserId");
-    if (typeof rawTarget !== "string" || !Object.values(OrderStatus).includes(rawTarget as OrderStatus)) return;
-    const actionContext = await getTenantContext(sellerSlug);
-    try {
-      await executeOrderWorkflowAction({
-        sellerId: actionContext.sellerId,
-        orderId: rawOrder!.id,
-        targetStatus: rawTarget as OrderStatus,
-        assignedWarehouseUserId: typeof assignedWarehouseUserId === "string" && assignedWarehouseUserId ? assignedWarehouseUserId : undefined,
-        actor: { userId: actionContext.userId, permissions: actionContext.permissions, roles: actionContext.roles },
-        reason: "Workflow action from operations portal",
-      });
-    } catch (err: any) {
-      console.warn("Advance workflow action failed:", err?.message);
-    }
-    redirect(`/s/${sellerSlug}/admin/orders/${rawOrder!.id}`);
-  }
 
   // Convert raw Prisma objects with Decimal / complex types into pure serializable JSON primitives
   const order = {
@@ -354,6 +331,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* DRAFT -> Submit Sales Order */}
             {order.status === "DRAFT" && (isSales || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="PENDING_ACCOUNTS_REVIEW" />
                 <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">Submit Sales Order</Button>
               </form>
@@ -362,6 +341,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* PENDING_ACCOUNTS_REVIEW -> Send to Dealer Confirmation */}
             {order.status === "PENDING_ACCOUNTS_REVIEW" && (isAccounts || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="WAITING_FOR_DEALER_CONFIRMATION" />
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Send to Dealer Confirmation</Button>
               </form>
@@ -370,6 +351,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* WAITING_FOR_DEALER_CONFIRMATION -> Confirm Final Order */}
             {order.status === "WAITING_FOR_DEALER_CONFIRMATION" && (isAccounts || isSales || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="FINAL_ORDER_CONFIRMED" />
                 <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">Confirm Final Order</Button>
               </form>
@@ -378,6 +361,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* FINAL_ORDER_CONFIRMED -> Generate Proforma */}
             {order.status === "FINAL_ORDER_CONFIRMED" && (isAccounts || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="PROFORMA_INVOICE_GENERATED" />
                 <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">Generate Proforma Invoice</Button>
               </form>
@@ -394,6 +379,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* PROFORMA_INVOICE_CONFIRMED -> Send to Warehouse & Select Assigned Warehouse User (Only after payment is confirmed) */}
             {(order.status === "PROFORMA_INVOICE_CONFIRMED" || (order.status === "PROFORMA_INVOICE_GENERATED" && isPaymentConfirmed)) && (isAccounts || isPrivileged) && (
               <form action={advanceWorkflowAction} className="flex items-center gap-1.5">
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="READY_FOR_WAREHOUSE" />
                 {warehouseStaff.length > 0 && (
                   <select
@@ -418,6 +405,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* READY_FOR_WAREHOUSE -> Complete Pick List */}
             {order.status === "READY_FOR_WAREHOUSE" && (isWarehouse || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="PICK_LIST_COMPLETED" />
                 <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white font-bold">Complete Pick List</Button>
               </form>
@@ -426,6 +415,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* PICK_LIST_COMPLETED -> Issue Final Tax Invoice */}
             {order.status === "PICK_LIST_COMPLETED" && (isAccounts || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="FINAL_INVOICE_ISSUED" />
                 <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold">Issue Final Tax Invoice</Button>
               </form>
@@ -434,6 +425,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* FINAL_INVOICE_ISSUED -> Dispatch Shipment */}
             {order.status === "FINAL_INVOICE_ISSUED" && (isDispatch || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="SHIPPED" />
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-bold">Dispatch Shipment</Button>
               </form>
@@ -442,6 +435,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             {/* SHIPPED -> Mark Order Delivered */}
             {order.status === "SHIPPED" && (isDispatch || isPrivileged) && (
               <form action={advanceWorkflowAction}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="sellerSlug" value={sellerSlug} />
                 <input type="hidden" name="nextStatus" value="COMPLETED" />
                 <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Mark Order Delivered</Button>
               </form>

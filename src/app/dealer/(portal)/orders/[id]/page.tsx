@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getTenantContext } from "@/lib/tenant";
@@ -11,7 +10,7 @@ import {
   FileText, ShieldCheck, Truck, ArrowLeft, Download, ExternalLink,
   CheckCircle2, Clock, PackageCheck, AlertCircle, Phone, MapPin, Receipt, History, ShoppingCart
 } from "lucide-react";
-import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
+import { placeOrderAction } from "./actions";
 import { DealerOrderActions } from "./dealer-order-actions";
 
 interface DealerOrderPageProps {
@@ -59,29 +58,6 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
   });
 
   if (!order) notFound();
-
-  async function placeOrderAction() {
-    "use server";
-    const actionCtx = await getTenantContext("bageshwari", "/dealer/login");
-    if (!actionCtx.dealerId) redirect("/dealer/login");
-
-    await executeOrderWorkflowAction({
-      sellerId: actionCtx.sellerId,
-      orderId: order!.id,
-      targetStatus: "PENDING_ACCOUNTS_REVIEW",
-      actor: {
-        userId: actionCtx.userId,
-        permissions: actionCtx.permissions,
-        roles: actionCtx.roles,
-      },
-      reason: "Sales order placed by dealer from order details page",
-    });
-
-    revalidatePath(`/dealer/orders/${order!.id}`);
-    revalidatePath("/dealer/orders");
-    revalidatePath("/dealer/cart");
-    revalidatePath("/dealer/dashboard");
-  }
 
   const isDraft = order.status === "DRAFT";
   const proforma = order.proformaInvoices[0];
@@ -224,6 +200,7 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
               </Button>
             </Link>
             <form action={placeOrderAction}>
+              <input type="hidden" name="orderId" value={order.id} />
               <Button
                 type="submit"
                 className="bg-red-600 hover:bg-red-700 text-white font-black text-xs px-6 h-11 shadow-md flex items-center gap-2"
