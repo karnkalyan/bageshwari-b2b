@@ -245,11 +245,14 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
   const pickList = order.pickLists[0];
   const finalInvoice = order.finalInvoices[0];
 
+  const hasConfirmedPayment = order.payments.some((p) => p.status === "CONFIRMED");
+  const hasApprovedCredit = order.creditApprovals.some((ca) => ca.status === "APPROVED");
+  const hasPendingPayment = order.payments.some((p) => p.status === "PENDING");
+
   const isPaymentConfirmed =
-    order.payments.some((p) => p.status === "CONFIRMED") ||
-    order.creditApprovals.some((ca) => ca.status === "APPROVED") ||
+    hasConfirmedPayment ||
+    hasApprovedCredit ||
     [
-      "PROFORMA_INVOICE_CONFIRMED",
       "READY_FOR_WAREHOUSE",
       "PICK_LIST_GENERATED",
       "PICKING_IN_PROGRESS",
@@ -371,6 +374,11 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
               sellerSlug={sellerSlug}
               userRoles={ctx.roles}
               userPermissions={ctx.permissions}
+              warehouseStaff={warehouseStaff.map((ws) => ({
+                id: ws.user.id,
+                name: ws.user.name,
+                email: ws.user.email,
+              }))}
             />
 
             {/* DRAFT -> Submit Sales Order */}
@@ -414,15 +422,15 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             )}
 
             {/* PROFORMA_INVOICE_GENERATED -> When Payment is Pending, show warning / indicator */}
-            {order.status === "PROFORMA_INVOICE_GENERATED" && !isPaymentConfirmed && (
+            {order.status === "PROFORMA_INVOICE_GENERATED" && !isPaymentConfirmed && !hasPendingPayment && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
                 <CreditCard className="h-4 w-4 text-amber-600 shrink-0" />
                 <span>Awaiting Payment / Credit Confirmation</span>
               </div>
             )}
 
-            {/* PROFORMA_INVOICE_CONFIRMED -> Send to Warehouse & Select Assigned Warehouse User (Only after payment is confirmed) */}
-            {order.status === "PROFORMA_INVOICE_CONFIRMED" && isPaymentConfirmed && (isAccounts || isPrivileged) && (
+            {/* PROFORMA_INVOICE_CONFIRMED -> Send to Warehouse (Only if payment is confirmed AND no pending verification) */}
+            {order.status === "PROFORMA_INVOICE_CONFIRMED" && (hasConfirmedPayment || hasApprovedCredit) && !hasPendingPayment && (isAccounts || isPrivileged) && (
               <form action={advanceWorkflowAction} className="flex items-center gap-1.5">
                 <input type="hidden" name="orderId" value={order.id} />
                 <input type="hidden" name="sellerSlug" value={sellerSlug} />

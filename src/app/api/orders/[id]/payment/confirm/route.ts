@@ -19,6 +19,7 @@ const paymentConfirmSchema = z.object({
   amount: z.coerce.number().min(0).optional(),
   transactionRef: z.string().trim().max(100).optional(),
   remarks: z.string().trim().max(1000).optional(),
+  assignedWarehouseUserId: z.string().trim().optional(),
 });
 
 export async function POST(
@@ -55,8 +56,8 @@ export async function POST(
 
   // Authorization check based on requested action
   if (action === "RECORD_ON_BEHALF") {
-    if (!isSales && !isAccounts) {
-      return apiError("FORBIDDEN", "Only Sales personnel or Accounts can record payment on behalf of dealer.", 403);
+    if (!isSales && !isPrivileged) {
+      return apiError("FORBIDDEN", "Only Sales personnel can record payment on behalf of dealer.", 403);
     }
   } else {
     // APPROVE or REJECT: strictly Accounts or Privileged

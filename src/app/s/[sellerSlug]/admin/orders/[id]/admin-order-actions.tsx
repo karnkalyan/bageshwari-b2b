@@ -51,6 +51,7 @@ export interface AdminOrderActionsProps {
   sellerSlug: string;
   userRoles?: string[];
   userPermissions?: string[];
+  warehouseStaff?: Array<{ id: string; name?: string | null; email: string }>;
 }
 
 export function AdminOrderActions({
@@ -58,6 +59,7 @@ export function AdminOrderActions({
   sellerSlug,
   userRoles = [],
   userPermissions = [],
+  warehouseStaff = [],
 }: AdminOrderActionsProps) {
   const router = useRouter();
   const [isRevisionOpen, setIsRevisionOpen] = useState(false);
@@ -151,14 +153,24 @@ export function AdminOrderActions({
 
         {/* 3. If NO payment submitted yet and order is in Proforma stage */}
         {isProformaStage && !pendingPayment && !isPaymentConfirmed && (
-          <Button
-            size="sm"
-            onClick={() => setIsPaymentOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs"
-          >
-            <CreditCard className="h-3.5 w-3.5 mr-1.5" />
-            {isSales && !isAccounts ? "Record Payment (On Behalf of Dealer)" : "Record & Confirm Payment"}
-          </Button>
+          <>
+            {isSales && !isAccounts && (
+              <Button
+                size="sm"
+                onClick={() => setIsPaymentOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs"
+              >
+                <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                Record Payment (On Behalf of Dealer)
+              </Button>
+            )}
+            {isAccounts && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+                <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                <span>Awaiting Payment Submission from Dealer / Sales</span>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -180,6 +192,7 @@ export function AdminOrderActions({
         availableCredit={availableCredit}
         pendingPayment={pendingPayment}
         isSales={isSales && !isAccounts}
+        warehouseStaff={warehouseStaff}
         isOpen={isPaymentOpen}
         onClose={() => setIsPaymentOpen(false)}
         onSuccess={() => router.refresh()}

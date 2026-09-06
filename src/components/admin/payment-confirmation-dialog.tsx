@@ -52,6 +52,7 @@ export interface PaymentDialogProps {
   availableCredit?: number;
   pendingPayment?: SubmittedPaymentInfo | null;
   isSales?: boolean;
+  warehouseStaff?: Array<{ id: string; name?: string | null; email: string }>;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -68,6 +69,7 @@ export function PaymentConfirmationDialog({
   availableCredit = 500000,
   pendingPayment = null,
   isSales = false,
+  warehouseStaff = [],
   isOpen,
   onClose,
   onSuccess,
@@ -78,6 +80,7 @@ export function PaymentConfirmationDialog({
   const [transactionRef, setTransactionRef] = useState("");
   const [remarks, setRemarks] = useState("");
   const [accountantNotes, setAccountantNotes] = useState("");
+  const [assignedWarehouseUserId, setAssignedWarehouseUserId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,6 +89,7 @@ export function PaymentConfirmationDialog({
     setTransactionRef("");
     setRemarks("");
     setAccountantNotes("Verified in bank statement / cash register. Released to warehouse.");
+    setAssignedWarehouseUserId("");
     setError(null);
   }, [grandTotal, isOpen, pendingPayment]);
 
@@ -103,6 +107,7 @@ export function PaymentConfirmationDialog({
           method: pendingPayment?.method,
           amount: pendingPayment?.amount,
           transactionRef: pendingPayment?.transactionRef || undefined,
+          assignedWarehouseUserId: decision === "APPROVE" ? assignedWarehouseUserId || undefined : undefined,
           remarks:
             decision === "APPROVE"
               ? accountantNotes.trim() || "Payment verified by Accounts. Released to warehouse."
@@ -309,6 +314,27 @@ export function PaymentConfirmationDialog({
               </p>
             </div>
 
+            {/* Optional Warehouse Staff Selection */}
+            {warehouseStaff && warehouseStaff.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-800">
+                  Assign Warehouse User for Picking (Optional)
+                </Label>
+                <select
+                  value={assignedWarehouseUserId}
+                  onChange={(e) => setAssignedWarehouseUserId(e.target.value)}
+                  className="w-full h-8 text-xs border rounded-lg px-2 bg-white text-slate-900 border-slate-300 font-semibold"
+                >
+                  <option value="">Auto-assign / Central Warehouse</option>
+                  {warehouseStaff.map((ws) => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name || ws.email} (Warehouse)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Accountant Note */}
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-slate-800">
@@ -359,8 +385,8 @@ export function PaymentConfirmationDialog({
               </div>
             </DialogFooter>
           </div>
-        ) : (
-          /* 2. SCENARIO B: NO PAYMENT SUBMITTED YET -> RECORD ON BEHALF OF DEALER (OR ACCOUNTANT ENTRY) */
+        ) : isSales ? (
+          /* 2. SCENARIO B: NO PAYMENT SUBMITTED YET -> RECORD ON BEHALF OF DEALER (SALES ONLY) */
           <form onSubmit={handleRecordPayment} className="space-y-5 text-xs">
             {isSales && (
               <div className="p-3 bg-indigo-50/80 rounded-xl border border-indigo-200 text-indigo-950 space-y-1">
@@ -550,6 +576,22 @@ export function PaymentConfirmationDialog({
               </Button>
             </DialogFooter>
           </form>
+        ) : (
+          /* Scenario C: Accounts viewing without submitted payment */
+          <div className="p-4 bg-amber-50/80 rounded-xl border border-amber-200 text-xs space-y-3 text-amber-950">
+            <div className="flex items-center gap-2 font-bold text-amber-900">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+              <span>Awaiting Payment Submission</span>
+            </div>
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              Payment details have not been submitted for this order yet. Accounts can only verify and approve or reject payments after the Dealer (via Dealer Portal) or Salesperson (on behalf of dealer) submits payment references.
+            </p>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
         )}
       </DialogContent>
     </Dialog>

@@ -526,6 +526,7 @@ export async function confirmPaymentAndAdvancePipeline(input: {
   amount?: number;
   transactionRef?: string;
   remarks?: string;
+  assignedWarehouseUserId?: string;
   actor: TransitionActor;
 }) {
   const actionType: "APPROVE" | "REJECT" | "RECORD_ON_BEHALF" = input.action || "APPROVE";
@@ -628,40 +629,25 @@ export async function confirmPaymentAndAdvancePipeline(input: {
     }
 
     // CASE 3: Accounts Approves / Confirms Payment & Releases to Warehouse
-    const selectedMethod = (input.method || existingPendingPayment?.method || "ONLINE") as PaymentMethod;
-    const finalTransactionRef = input.transactionRef || existingPendingPayment?.transactionRef || `${selectedMethod}-PAYMENT`;
-
-    if (existingPendingPayment) {
-      await tx.payment.update({
-        where: { id: existingPendingPayment.id },
-        data: {
-          method: selectedMethod,
-          status: "CONFIRMED",
-          amount: new Prisma.Decimal(amount),
-          transactionRef: finalTransactionRef,
-          remarks: input.remarks || `Payment verified by Accounts: ${selectedMethod}`,
-          verifiedById: input.actor.userId,
-          verifiedAt: new Date(),
-        },
-      });
-    } else {
-      const paymentNumber = await nextDocumentNumber(tx, input.sellerId, "PAYMENT_RECEIPT", "REC");
-      await tx.payment.create({
-        data: {
-          sellerId: input.sellerId,
-          orderId: order.id,
-          paymentNumber,
-          method: selectedMethod,
-          status: "CONFIRMED",
-          amount: new Prisma.Decimal(amount),
-          transactionRef: finalTransactionRef,
-          remarks: input.remarks || `Payment verified by Accounts: ${selectedMethod}`,
-          recordedById: input.actor.userId,
-          verifiedById: input.actor.userId,
-          verifiedAt: new Date(),
-        },
-      });
+    if (!existingPendingPayment) {
+      throw new Error("NO_PENDING_PAYMENT: No submitted payment reference was found to verify. Please wait for Dealer or Sales to submit payment details.");
     }
+
+    const selectedMethod = (input.method || existingPendingPayment.method || "ONLINE") as PaymentMethod;
+    const finalTransactionRef = input.transactionRef || existingPendingPayment.transactionRef || `${selectedMethod}-PAYMENT`;
+
+    await tx.payment.update({
+      where: { id: existingPendingPayment.id },
+      data: {
+        method: selectedMethod,
+        status: "CONFIRMED",
+        amount: new Prisma.Decimal(amount),
+        transactionRef: finalTransactionRef,
+        remarks: input.remarks || `Payment verified by Accounts: ${selectedMethod}`,
+        verifiedById: input.actor.userId,
+        verifiedAt: new Date(),
+      },
+    });
 
     // 2. If Credit, record or update Credit Approval
     if (selectedMethod === "CREDIT") {
@@ -784,6 +770,62 @@ export async function confirmPaymentAndAdvancePipeline(input: {
 
     // 6. Step: Progress to READY_FOR_WAREHOUSE if in PROFORMA_INVOICE_CONFIRMED
     if (currentStatus === "PROFORMA_INVOICE_CONFIRMED") {
+      let defaultWarehouse = await tx.warehouse.findFirst({
+        where: { sellerId: input.sellerId, isActive: true },
+        select: { id: true },
+      });
+      if (!defaultWarehouse) {
+        defaultWarehouse = await tx.warehouse.create({
+          data: {
+            sellerId: input.sellerId,
+            code: "WH-MAIN",
+            name: "Main Central Warehouse",
+            isActive: true,
+          },
+          select: { id: true },
+        });
+      }
+
+      if (defaultWarehouse) {
+        const existingPickList = await tx.pickList.findFirst({ where: { orderId: order.id } });
+        if (!existingPickList) {
+          const number = await nextDocumentNumber(tx, input.sellerId, "PICK_LIST", "PL");
+          await tx.pickList.create({
+            data: {
+              sellerId: input.sellerId,
+              orderId: order.id,
+              warehouseId: defaultWarehouse.id,
+              pickListNumber: number,
+              status: input.assignedWarehouseUserId ? "ASSIGNED" : "GENERATED",
+              assignedToId: input.assignedWarehouseUserId || null,
+              pickerId: input.assignedWarehouseUserId || null,
+              notes: "Generated upon payment confirmation for warehouse fulfillment",
+              items: {
+                create: order.items
+                  .filter((item) => item.status !== "REMOVED")
+                  .map((item) => ({
+                    sellerId: input.sellerId,
+                    productId: item.productId,
+                    variantId: item.variantId,
+                    sku: item.sku,
+                    approvedQuantity: item.approvedQuantity ?? item.originalQuantity,
+                    pickedQuantity: 0,
+                  })),
+              },
+            },
+          });
+        } else if (input.assignedWarehouseUserId) {
+          await tx.pickList.update({
+            where: { id: existingPickList.id },
+            data: {
+              status: "ASSIGNED",
+              assignedToId: input.assignedWarehouseUserId,
+              pickerId: input.assignedWarehouseUserId,
+            },
+          });
+        }
+      }
+
       await transitionOrderStatusInTransaction(tx, {
         sellerId: input.sellerId,
         orderId: order.id,
