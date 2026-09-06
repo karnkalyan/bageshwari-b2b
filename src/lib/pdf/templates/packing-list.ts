@@ -222,16 +222,67 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
 
   y -= headerH;
 
+  // Helper to split text into lines of maxChars without breaking words
+  const wrapItemText = (text: string, maxChars: number = 42): string[] => {
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      if ((cur ? cur + " " + w : w).length <= maxChars) {
+        cur = cur ? cur + " " + w : w;
+      } else {
+        if (cur) lines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines.length > 0 ? lines : [text];
+  };
+
   for (let i = 0; i < data.packages.length; i++) {
     const pkg = data.packages[i];
-    const itemsCount = pkg.items && pkg.items.length > 0 ? pkg.items.length : 1;
-    // Dynamic row height based on item count, minimum 32 pt
-    const rowH = Math.max(32, 16 + itemsCount * 11);
+
+    // Build array of lines for this carton's contents
+    const contentLines: string[] = [];
+    if (pkg.items && pkg.items.length > 0) {
+      pkg.items.forEach((it) => {
+        const cleanName = (it.name || "").replace(/\s*\(Default\)\s*/i, "").trim();
+        const linePrefix = it.sku ? `${it.sku}` : "";
+        const lineSuffix = `${it.quantity} ${it.unit || "PCS"}`;
+        const itemStr = cleanName
+          ? `${linePrefix ? linePrefix + " - " : ""}${cleanName}: ${lineSuffix}`
+          : `${linePrefix}: ${lineSuffix}`;
+
+        const wrapped = wrapItemText(itemStr, 38);
+        contentLines.push(...wrapped);
+      });
+    } else {
+      const fallbackText = pkg.handlingInstructions || "Assorted Spare Parts (Sealed)";
+      contentLines.push(...wrapItemText(fallbackText, 38));
+    }
+
+    const itemLineSpacing = 9.5;
+    // Dynamic row height based strictly on total formatted lines
+    const rowH = Math.max(34, 18 + contentLines.length * itemLineSpacing);
 
     // Ensure we don't collide with the bottom margin or consolidation summary box
-    if (y - rowH < MARGIN + 70) {
+    if (y - rowH < MARGIN + 125) {
       page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       y = PAGE_HEIGHT - MARGIN - 20;
+
+      // Repeat table header on the new page
+      drawBox(page, MARGIN, y - headerH, CONTENT_WIDTH, headerH, {
+        color: COLORS.bgHeader,
+        borderColor: COLORS.primary,
+        borderWidth: 0.75,
+      });
+      drawText(page, "BOX #", colX.box + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+      drawText(page, "CARTON NO", colX.pkgNum + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+      drawText(page, "TYPE & DIMENSIONS", colX.typeDim + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+      drawRightText(page, "GROSS WT", colX.weight + 52, y - 12, bold, { size: 7.5, color: COLORS.primary });
+      drawText(page, "PACKED ITEMS / CONTENTS", colX.contents + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+      drawRightText(page, "STATUS", colX.check - 6, y - 12, bold, { size: 7.5, color: COLORS.primary });
+      y -= headerH;
     }
 
     drawBox(page, MARGIN, y - rowH, CONTENT_WIDTH, rowH, {
@@ -280,32 +331,16 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
       color: COLORS.primary,
     });
 
-    // Items List (Clean line-by-line breakdown)
-    if (pkg.items && pkg.items.length > 0) {
-      pkg.items.forEach((it, itmIdx) => {
-        const itemLineY = textBaselineY - itmIdx * 11;
-        const itemText = it.name ? `${it.sku} - ${it.name}: ${it.quantity} ${it.unit || "PCS"}` : `${it.sku} (${it.quantity} ${it.unit || "PCS"})`;
-        drawText(page, itemText, colX.contents + 4, itemLineY, {
-          size: 6.8,
-          font: regular,
-          color: COLORS.secondary,
-          maxWidth: 148,
-        });
+    // Items List: Render each line with its own distinct Y coordinate (0 overlap guaranteed)
+    contentLines.forEach((lineText, lineIdx) => {
+      const lineY = textBaselineY - lineIdx * itemLineSpacing;
+      drawText(page, lineText, colX.contents + 4, lineY, {
+        size: 6.5,
+        font: regular,
+        color: COLORS.secondary,
+        maxWidth: 165,
       });
-    } else {
-      drawText(
-        page,
-        pkg.handlingInstructions || "Assorted Spare Parts (Sealed)",
-        colX.contents + 4,
-        textBaselineY,
-        {
-          size: 7,
-          font: regular,
-          color: COLORS.secondary,
-          maxWidth: 148,
-        }
-      );
-    }
+    });
 
     // Status: ASCII-safe SEALED (no missing Unicode checkmark box)
     drawRightText(page, "SEALED", colX.check - 6, textBaselineY, bold, {
@@ -317,6 +352,12 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
   }
 
   y -= 12;
+
+  // Ensure enough room for consolidation summary box (48pt) and signature block (60pt)
+  if (y - 48 < MARGIN + 65) {
+    page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    y = PAGE_HEIGHT - MARGIN - 20;
+  }
 
   // 4. Consolidated Summary Box
   drawBox(page, MARGIN, y - 48, CONTENT_WIDTH, 48, {

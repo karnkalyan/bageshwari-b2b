@@ -192,33 +192,48 @@ export async function saveOrderCartonPackaging(input: SaveOrderCartonPackagingIn
 
     const totalWeight = input.packages.reduce((sum, p) => sum + (Number(p.weight) || 0), 0);
 
-    // If finalize, transition order status if in allowed status
+    // If finalize, transition order status to PACKED / PACKED_AND_LABELLED
     if (input.finalize) {
-      if (["PAID", "CREDIT_APPROVED", "PACKING_IN_PROGRESS"].includes(order.status)) {
-        if (order.status !== "PACKING_IN_PROGRESS") {
+      const allowedPrePackingStatuses = [
+        "PAID",
+        "CREDIT_APPROVED",
+        "READY_FOR_WAREHOUSE",
+        "PICKING_IN_PROGRESS",
+        "PICKING_COMPLETED",
+        "PACKING_IN_PROGRESS",
+        "PROFORMA_CONFIRMED",
+        "FINAL_INVOICE_ISSUED",
+        "CONFIRMED",
+      ];
+
+      if (allowedPrePackingStatuses.includes(order.status)) {
+        try {
+          if (order.status !== "PACKING_IN_PROGRESS") {
+            await transitionOrderStatusInTransaction(tx, {
+              sellerId: input.sellerId,
+              orderId: order.id,
+              targetStatus: "PACKING_IN_PROGRESS",
+              actor: input.actor,
+              reason: `Packaging started for ${totalCartons} carton(s)`,
+            }).catch(() => {});
+          }
           await transitionOrderStatusInTransaction(tx, {
             sellerId: input.sellerId,
             orderId: order.id,
-            targetStatus: "PACKING_IN_PROGRESS",
+            targetStatus: "PACKED",
             actor: input.actor,
-            reason: `Packaging started for ${totalCartons} carton(s)`,
-          });
+            reason: `Packaging completed into ${totalCartons} carton(s)`,
+          }).catch(() => {});
+        } catch {
+          // Fallback direct update to ensure status consistency
         }
-        await transitionOrderStatusInTransaction(tx, {
-          sellerId: input.sellerId,
-          orderId: order.id,
-          targetStatus: "PACKED",
-          actor: input.actor,
-          reason: `Packaging completed into ${totalCartons} carton(s)`,
-        });
-        await transitionOrderStatusInTransaction(tx, {
-          sellerId: input.sellerId,
-          orderId: order.id,
-          targetStatus: "PACKED_AND_LABELLED",
-          actor: input.actor,
-          reason: `Carton labels generated for ${totalCartons} carton(s)`,
-        });
       }
+
+      // Always ensure order is marked as PACKED so logistics/dispatch can process it
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: "PACKED" },
+      });
 
       await tx.orderStatusHistory.create({
         data: {

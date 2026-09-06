@@ -129,8 +129,45 @@ export function CartonPackingDialog({
   const [activeCartonIndex, setActiveCartonIndex] = useState(0);
   const [cartons, setCartons] = useState<LocalCarton[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingPackages, setLoadingPackages] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Helper to parse package list into LocalCarton[]
+  const parsePackagesToCartons = (pkgs: any[]): LocalCarton[] => {
+    return pkgs.map((pkg, idx) => {
+      const itemMap: Record<string, number> = {};
+      const rawJson = pkg.itemsJson || pkg.items;
+      if (rawJson) {
+        try {
+          const raw = typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+          if (Array.isArray(raw)) {
+            raw.forEach((it: any) => {
+              const foundItem = orderItems.find(
+                (oi) => oi.id === it.orderItemId || oi.sku === it.sku || oi.id === it.id
+              );
+              const id = foundItem?.id || it.orderItemId || it.id;
+              if (id) {
+                itemMap[id] = Number(it.quantity || 0);
+              }
+            });
+          }
+        } catch {}
+      }
+
+      return {
+        id: pkg.id,
+        packageNumber: pkg.packageNumber || `CTN-${String(idx + 1).padStart(2, "0")}`,
+        packageType: pkg.packageType || "Standard Corrugated Carton",
+        length: pkg.length ? Number(pkg.length) : 35,
+        width: pkg.width ? Number(pkg.width) : 25,
+        height: pkg.height ? Number(pkg.height) : 20,
+        weight: pkg.weight ? Number(pkg.weight) : 5,
+        handlingInstructions: pkg.handlingInstructions || "",
+        items: itemMap,
+      };
+    });
+  };
 
   // Initialize or reset cartons whenever dialog opens
   useEffect(() => {
@@ -139,40 +176,12 @@ export function CartonPackingDialog({
     setError(null);
     setSuccess(null);
 
+    // 1. If existingPackages passed as prop has items, use them immediately
     if (existingPackages && existingPackages.length > 0) {
-      const parsed: LocalCarton[] = existingPackages.map((pkg, idx) => {
-        const itemMap: Record<string, number> = {};
-        if (pkg.itemsJson) {
-          try {
-            const raw = JSON.parse(pkg.itemsJson);
-            if (Array.isArray(raw)) {
-              raw.forEach((it: any) => {
-                const foundItem = orderItems.find((oi) => oi.id === it.orderItemId || oi.sku === it.sku);
-                const id = foundItem?.id || it.orderItemId;
-                if (id) {
-                  itemMap[id] = Number(it.quantity || 0);
-                }
-              });
-            }
-          } catch {}
-        }
-
-        return {
-          id: pkg.id,
-          packageNumber: pkg.packageNumber || `CTN-${String(idx + 1).padStart(2, "0")}`,
-          packageType: pkg.packageType || "Standard Corrugated Carton",
-          length: pkg.length ? Number(pkg.length) : 35,
-          width: pkg.width ? Number(pkg.width) : 25,
-          height: pkg.height ? Number(pkg.height) : 20,
-          weight: pkg.weight ? Number(pkg.weight) : 5,
-          handlingInstructions: pkg.handlingInstructions || "",
-          items: itemMap,
-        };
-      });
-      setCartons(parsed);
+      setCartons(parsePackagesToCartons(existingPackages));
       setActiveCartonIndex(0);
     } else {
-      // Default: 1 initial carton
+      // Temporary fallback: 1 initial carton
       setCartons([
         {
           packageNumber: "CTN-01",
@@ -187,7 +196,32 @@ export function CartonPackingDialog({
       ]);
       setActiveCartonIndex(0);
     }
-  }, [isOpen, existingPackages, orderItems]);
+
+    // 2. Always fetch live packages from the server to get fresh, sealed database records
+    let isSubscribed = true;
+    setLoadingPackages(true);
+
+    fetch(`/api/orders/${orderId}/packages`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!isSubscribed) return;
+        if (json?.success && json?.data?.packages && json.data.packages.length > 0) {
+          const freshCartons = parsePackagesToCartons(json.data.packages);
+          setCartons(freshCartons);
+          setActiveCartonIndex(0);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch remote packages:", err);
+      })
+      .finally(() => {
+        if (isSubscribed) setLoadingPackages(false);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [open, orderId, existingPackages, orderItems]);
 
   // Compute total ordered units vs. packed units across all cartons
   const totalOrderUnits = orderItems.reduce((sum, it) => sum + it.approvedQuantity, 0);
@@ -413,6 +447,12 @@ export function CartonPackingDialog({
                 <Badge className="bg-purple-500/30 text-purple-200 border-purple-400/40 text-xs font-mono">
                   {orderNumber}
                 </Badge>
+                {loadingPackages && (
+                  <span className="flex items-center gap-1 text-[11px] text-purple-200 font-medium">
+                    <Loader2 className="h-3 w-3 animate-spin text-purple-300" />
+                    Loading saved cartons...
+                  </span>
+                )}
               </div>
               <DialogDescription className="text-xs text-purple-200 mt-1">
                 Dealer: {dealerName} {dealerCity && `(${dealerCity})`} • Total Order Units:{" "}
