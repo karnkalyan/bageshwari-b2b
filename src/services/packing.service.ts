@@ -152,9 +152,7 @@ export async function saveOrderCartonPackaging(input: SaveOrderCartonPackagingIn
 
     for (let i = 0; i < totalCartons; i++) {
       const ctn = input.packages[i];
-      const packageNumber =
-        ctn.packageNumber?.trim() ||
-        `${order.orderNumber.replace(/^[A-Za-z]+-?/, "CTN-")}-${String(i + 1).padStart(2, "0")}`;
+      const packageNumber = await nextDocumentNumber(tx, input.sellerId, "PACKAGE", "PKG");
 
       const weightDec = new Prisma.Decimal(Number(ctn.weight) || 0.1);
       const lengthDec = ctn.length ? new Prisma.Decimal(Number(ctn.length)) : null;
