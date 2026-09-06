@@ -12,6 +12,7 @@ import {
   FileCheck2,
   Building2,
   CheckCircle2,
+  XCircle,
   Loader2,
   AlertCircle,
   ShieldCheck,
@@ -19,8 +20,6 @@ import {
   Send,
   Clock,
   FileText,
-  Percent,
-  Sparkles,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -64,21 +63,55 @@ export function DealerOrderActions({
   const [dealerRemarks, setDealerRemarks] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
+  const [rejectRemarks, setRejectRemarks] = useState("");
 
-  const isAwaitingPaymentOrConfirmation = [
+  const isConfirmationStage = [
     "WAITING_FOR_DEALER_CONFIRMATION",
     "DEALER_CHANGE_REQUESTED",
-    "FINAL_ORDER_CONFIRMED",
-    "PROFORMA_INVOICE_GENERATED",
   ].includes(orderStatus);
 
-  if (!isAwaitingPaymentOrConfirmation) return null;
+  const isFinalConfirmedStage = orderStatus === "FINAL_ORDER_CONFIRMED";
+  const isProformaStage = orderStatus === "PROFORMA_INVOICE_GENERATED" || orderStatus === "PROFORMA_INVOICE_CONFIRMED";
 
-  const usedCredit = Math.max(0, creditLimit - availableCredit);
-  const creditUsagePercent = creditLimit > 0 ? Math.min(100, Math.round((usedCredit / creditLimit) * 100)) : 0;
-  const isCreditSufficient = availableCredit >= grandTotal;
+  if (!isConfirmationStage && !isFinalConfirmedStage && !isProformaStage) {
+    return null;
+  }
 
-  const handleConfirmOrder = async (e: React.FormEvent) => {
+  // 1. Dealer Order Confirmation / Rejection (NO PAYMENT AT THIS STAGE)
+  const handleDealerDecision = async (decision: "CONFIRM" | "REJECT") => {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/orders/${orderId}/dealer-confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: decision,
+          decision: decision === "CONFIRM" ? "CONFIRMED" : "REJECTED",
+          remarks:
+            decision === "CONFIRM"
+              ? dealerRemarks.trim() || "Order confirmed by dealer. Awaiting Proforma Invoice."
+              : rejectRemarks.trim() || "Dealer requested adjustments.",
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.message || json?.error?.message || "Failed to update order status.");
+      }
+
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Submission failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 2. Dealer Payment Submission (AFTER PROFORMA INVOICE IS ISSUED)
+  const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
@@ -88,9 +121,10 @@ export function DealerOrderActions({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "SUBMIT_PAYMENT",
           method,
           transactionRef: transactionRef.trim() || undefined,
-          remarks: dealerRemarks.trim() || `Dealer confirmed order & payment terms via ${method}`,
+          remarks: dealerRemarks.trim() || `Dealer submitted payment terms via ${method}`,
         }),
       });
 
@@ -107,6 +141,140 @@ export function DealerOrderActions({
     }
   };
 
+  const isCreditSufficient = availableCredit >= grandTotal;
+
+  // STAGE 1: Dealer Order Confirmation / Revision Review (NO PAYMENT)
+  if (isConfirmationStage) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-blue-50/50 via-white to-amber-50/30 rounded-xl border border-blue-200 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-blue-600" />
+              <h2 className="text-base font-bold text-[#0b2d55]">Review & Confirm Sales Order</h2>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Accounts has reviewed your order lines and prices. Please review below and confirm to proceed.
+              Official Proforma Invoice will be issued by Accounts after your confirmation.
+            </p>
+          </div>
+
+          <div className="text-right bg-white p-3 rounded-lg border shadow-2xs">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+              Payable Order Total
+            </span>
+            <div className="text-lg font-black text-[#0b2d55]">
+              {formatCurrency(grandTotal)}
+            </div>
+          </div>
+        </div>
+
+        {latestRevisionRemarks && (
+          <div className="p-3.5 bg-amber-50 rounded-lg border border-amber-200 text-xs space-y-1">
+            <div className="font-bold text-amber-900">Accountant Review Notes:</div>
+            <div className="text-amber-800">{latestRevisionRemarks}</div>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-xs flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Change Request Drawer/Form */}
+        {isRejectOpen && (
+          <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 space-y-3">
+            <Label className="text-xs font-bold text-amber-950">Specify Desired Changes or Reason for Rejection:</Label>
+            <Input
+              placeholder="e.g. Please revise quantity for SW-CLUTCH-01 to 10 pcs, or recheck dealer price."
+              value={rejectRemarks}
+              onChange={(e) => setRejectRemarks(e.target.value)}
+              className="text-xs bg-white"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={submitting}
+                onClick={() => handleDealerDecision("REJECT")}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-8"
+              >
+                {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
+                Send Change Request to Accounts
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsRejectOpen(false)}
+                className="text-xs text-slate-600 h-8"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons: Confirm OR Request Changes (NO PAYMENT) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsRejectOpen(!isRejectOpen)}
+            disabled={submitting}
+            className="border-amber-300 text-amber-900 bg-white hover:bg-amber-50 font-semibold text-xs h-10 px-4"
+          >
+            <XCircle className="h-4 w-4 mr-1.5 text-amber-600" />
+            Request Changes / Reject
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() => handleDealerDecision("CONFIRM")}
+            disabled={submitting}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-6 h-10 shadow-sm flex items-center gap-2"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Confirming...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4" /> Confirm Order (Accept Revision)
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // STAGE 2: Order Confirmed, Awaiting Accounts to Generate Proforma Invoice
+  if (isFinalConfirmedStage && !proforma) {
+    return (
+      <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50/40 rounded-xl border border-blue-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+            <Clock className="h-5 w-5 text-blue-700" />
+          </div>
+          <div>
+            <div className="font-bold text-sm text-[#0b2d55]">Order Confirmed — Proforma Invoice in Preparation</div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              You have confirmed order #{orderNumber}. Accounts is currently issuing your official Proforma Invoice.
+              Once generated, you will be able to review the document and submit your payment / settlement reference here.
+            </p>
+          </div>
+        </div>
+        <Badge className="bg-blue-600 text-white text-xs px-3 py-1 font-semibold shrink-0 self-start sm:self-center">
+          Awaiting Proforma Invoice
+        </Badge>
+      </div>
+    );
+  }
+
+  // STAGE 3: Proforma Invoice Issued — Dealer Submits Payment / Settlement
   return (
     <div className="p-6 bg-gradient-to-br from-emerald-50 via-white to-blue-50/20 rounded-xl border border-emerald-200 shadow-sm space-y-6">
       {/* Header with Title & Proforma Status */}
@@ -115,15 +283,12 @@ export function DealerOrderActions({
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-emerald-600" />
             <h2 className="text-base font-bold text-[#0b2d55]">
-              {orderStatus === "WAITING_FOR_DEALER_CONFIRMATION"
-                ? "Review & Confirm Order Revision"
-                : "Submit Settlement Terms & Payment Reference"}
+              Proforma Invoice Ready — Submit Settlement & Payment
             </h2>
           </div>
           <p className="text-xs text-slate-600 mt-0.5">
-            {proforma
-              ? `Proforma Invoice #${proforma.proformaNumber} generated. Select your settlement terms to release this order to warehouse fulfillment.`
-              : "Review revised quantities & select your settlement preference for Accounts review."}
+            Proforma Invoice #{proforma?.proformaNumber || orderNumber} has been issued by Accounts.
+            Please submit your settlement method or payment reference below to release this order to warehouse fulfillment.
           </p>
         </div>
 
@@ -144,7 +309,7 @@ export function DealerOrderActions({
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-indigo-700" />
             <span className="font-bold text-indigo-950">
-              Proforma Invoice #{proforma.proformaNumber} is ready for review.
+              Proforma Invoice #{proforma.proformaNumber} is ready for download & verification.
             </span>
           </div>
           <a
@@ -188,13 +353,6 @@ export function DealerOrderActions({
         </div>
       </div>
 
-      {latestRevisionRemarks && (
-        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs space-y-1">
-          <div className="font-bold text-amber-900">Accountant Review Notes:</div>
-          <div className="text-amber-800">{latestRevisionRemarks}</div>
-        </div>
-      )}
-
       {error && (
         <div className="p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-xs flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -202,18 +360,18 @@ export function DealerOrderActions({
         </div>
       )}
 
-      {hasSubmittedPayment && orderStatus !== "WAITING_FOR_DEALER_CONFIRMATION" ? (
+      {hasSubmittedPayment ? (
         <div className="p-4 bg-emerald-100/70 rounded-xl border border-emerald-300 text-xs space-y-1">
           <div className="flex items-center gap-2 font-bold text-emerald-950">
             <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-            <span>Payment Terms Submitted & Awaiting Verification</span>
+            <span>Payment Terms Submitted & Awaiting Accounts Verification</span>
           </div>
           <p className="text-emerald-800 text-[11px]">
-            Your payment terms have been recorded. Once Accounts verifies the transaction, the order will automatically release to the warehouse for pick list generation.
+            Your settlement details have been recorded. Once Accounts verifies the transaction, the order will release to warehouse for pick list generation.
           </p>
         </div>
       ) : (
-        <form onSubmit={handleConfirmOrder} className="space-y-4 text-xs">
+        <form onSubmit={handleSubmitPayment} className="space-y-4 text-xs">
           {/* Payment Method Selector */}
           <div className="space-y-2">
             <Label className="text-xs font-bold text-slate-800">Select Settlement Method</Label>
@@ -300,7 +458,7 @@ export function DealerOrderActions({
                   <Building2 className="h-4 w-4 text-cyan-600" />
                   <span>Bank Transfer</span>
                 </div>
-                <div className="text-[10px] text-slate-500 font-normal mt-1">NIC Asia / Nabil</div>
+                <div className="text-[10px] text-slate-500 font-normal mt-1">NIC Asia / Nabil Bank</div>
               </button>
             </div>
           </div>
@@ -326,9 +484,9 @@ export function DealerOrderActions({
               />
             </div>
             <div>
-              <Label className="text-[11px] text-slate-600">Confirmation Remarks / Instructions</Label>
+              <Label className="text-[11px] text-slate-600">Settlement Remarks / Instructions</Label>
               <Input
-                placeholder="e.g. Terms agreed, proceed for warehouse release."
+                placeholder="e.g. Voucher deposited, proceed for warehouse release."
                 value={dealerRemarks}
                 onChange={(e) => setDealerRemarks(e.target.value)}
                 className="h-8 text-xs bg-white"
@@ -348,7 +506,7 @@ export function DealerOrderActions({
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-1.5" /> Submit Payment Terms to Accounts
+                  <Send className="h-4 w-4 mr-1.5" /> Submit Payment Details to Accounts
                 </>
               )}
             </Button>

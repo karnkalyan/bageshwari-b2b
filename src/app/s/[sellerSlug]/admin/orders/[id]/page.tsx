@@ -276,6 +276,32 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
     "CANCELLED",
   ].includes(order.status);
 
+  const isSentToWarehouse = [
+    "READY_FOR_WAREHOUSE",
+    "PICK_LIST_GENERATED",
+    "PICKING_IN_PROGRESS",
+    "PARTIALLY_PICKED",
+    "PICKING_COMPLETED",
+    "PICKING_EXCEPTION",
+    "PICK_LIST_COMPLETED",
+    "FINAL_INVOICE_ISSUED",
+    "PAYMENT_PENDING",
+    "PARTIALLY_PAID",
+    "PAID",
+    "CREDIT_PENDING",
+    "CREDIT_APPROVED",
+    "PAYMENT_ON_HOLD",
+    "PAYMENT_OVERDUE",
+    "PACKING_IN_PROGRESS",
+    "PACKED",
+    "PACKED_AND_LABELLED",
+    "SHIPPED",
+    "IN_TRANSIT",
+    "PARTIALLY_DELIVERED",
+    "DELIVERED",
+    "COMPLETED",
+  ].includes(order.status);
+
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-7 p-4 md:p-7">
       {/* Navigation */}
@@ -461,8 +487,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Sales Order: Only active once order review is completed and order is confirmed */}
-            {isOrderConfirmed ? (
+            {/* Sales Order: Active only after released to warehouse */}
+            {isSentToWarehouse ? (
               <a
                 href={`/api/orders/${order.id}/documents/sales-order`}
                 target="_blank"
@@ -474,13 +500,9 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             ) : (
               <span
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed"
-                title={
-                  order.status === "DRAFT"
-                    ? "Sales Order PDF available after submission & confirmation"
-                    : "Sales Order PDF available after order review is completed & confirmed"
-                }
+                title="Sales Order PDF is available after order is released to warehouse for fulfillment."
               >
-                <FileText className="h-3.5 w-3.5" /> Sales Order ({order.status === "DRAFT" ? "Draft" : "Review Pending"})
+                <FileText className="h-3.5 w-3.5" /> Sales Order (Pending Warehouse Release)
               </span>
             )}
 

@@ -4,15 +4,19 @@ import { apiError, apiSuccess } from "@/lib/api-response";
 import { dealerConfirmOrder } from "@/services/order-workflow.service";
 
 const dealerConfirmSchema = z.object({
-  method: z.enum([
-    "CREDIT",
-    "CHEQUE",
-    "CASH",
-    "ONLINE",
-    "BANK_TRANSFER",
-    "MOBILE_PAYMENT",
-    "OTHER",
-  ]),
+  action: z.enum(["CONFIRM", "REJECT", "SUBMIT_PAYMENT"]).optional(),
+  decision: z.enum(["CONFIRMED", "REJECTED"]).optional(),
+  method: z
+    .enum([
+      "CREDIT",
+      "CHEQUE",
+      "CASH",
+      "ONLINE",
+      "BANK_TRANSFER",
+      "MOBILE_PAYMENT",
+      "OTHER",
+    ])
+    .optional(),
   transactionRef: z.string().trim().max(100).optional(),
   remarks: z.string().trim().max(1000).optional(),
 });

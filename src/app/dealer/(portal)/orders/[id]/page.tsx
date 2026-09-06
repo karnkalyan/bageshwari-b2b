@@ -64,13 +64,30 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
   const finalInvoice = order.finalInvoices[0];
   const shipment = order.shipments[0];
   const latestRevision = order.revisions[0];
-  const isOrderConfirmed = ![
-    "DRAFT",
-    "PENDING_ACCOUNTS_REVIEW",
-    "ACCOUNTS_REVIEW_IN_PROGRESS",
-    "WAITING_FOR_DEALER_CONFIRMATION",
-    "DEALER_CHANGE_REQUESTED",
-    "CANCELLED",
+  const isSentToWarehouse = [
+    "READY_FOR_WAREHOUSE",
+    "PICK_LIST_GENERATED",
+    "PICKING_IN_PROGRESS",
+    "PARTIALLY_PICKED",
+    "PICKING_COMPLETED",
+    "PICKING_EXCEPTION",
+    "PICK_LIST_COMPLETED",
+    "FINAL_INVOICE_ISSUED",
+    "PAYMENT_PENDING",
+    "PARTIALLY_PAID",
+    "PAID",
+    "CREDIT_PENDING",
+    "CREDIT_APPROVED",
+    "PAYMENT_ON_HOLD",
+    "PAYMENT_OVERDUE",
+    "PACKING_IN_PROGRESS",
+    "PACKED",
+    "PACKED_AND_LABELLED",
+    "SHIPPED",
+    "IN_TRANSIT",
+    "PARTIALLY_DELIVERED",
+    "DELIVERED",
+    "COMPLETED",
   ].includes(order.status);
 
   const workflowSteps = [
@@ -114,8 +131,8 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
 
         {/* Quick PDF Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Sales Order: Only downloadable after review is completed and order confirmed */}
-          {isOrderConfirmed ? (
+          {/* Sales Order: Only downloadable after released to warehouse */}
+          {isSentToWarehouse ? (
             <a
               href={`/api/orders/${order.id}/documents/sales-order?download=1`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
@@ -125,9 +142,9 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
           ) : (
             <span
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-              title="Sales Order PDF will be available once the order review is completed and confirmed."
+              title="Sales Order PDF will be available after the order is released to warehouse for fulfillment."
             >
-              <Download className="h-3.5 w-3.5" /> Sales Order ({isDraft ? "Draft" : "Review Pending"})
+              <Download className="h-3.5 w-3.5" /> Sales Order (Pending Warehouse Release)
             </span>
           )}
 

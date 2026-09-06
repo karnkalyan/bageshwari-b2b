@@ -62,19 +62,36 @@ export async function GET(
     "package-labels",
   ].includes(kind);
 
-  const unconfirmedOrderStatuses = [
-    "DRAFT",
-    "PENDING_ACCOUNTS_REVIEW",
-    "ACCOUNTS_REVIEW_IN_PROGRESS",
-    "WAITING_FOR_DEALER_CONFIRMATION",
-    "DEALER_CHANGE_REQUESTED",
-    "CANCELLED",
-  ];
+  const isSentToWarehouse = [
+    "READY_FOR_WAREHOUSE",
+    "PICK_LIST_GENERATED",
+    "PICKING_IN_PROGRESS",
+    "PARTIALLY_PICKED",
+    "PICKING_COMPLETED",
+    "PICKING_EXCEPTION",
+    "PICK_LIST_COMPLETED",
+    "FINAL_INVOICE_ISSUED",
+    "PAYMENT_PENDING",
+    "PARTIALLY_PAID",
+    "PAID",
+    "CREDIT_PENDING",
+    "CREDIT_APPROVED",
+    "PAYMENT_ON_HOLD",
+    "PAYMENT_OVERDUE",
+    "PACKING_IN_PROGRESS",
+    "PACKED",
+    "PACKED_AND_LABELLED",
+    "SHIPPED",
+    "IN_TRANSIT",
+    "PARTIALLY_DELIVERED",
+    "DELIVERED",
+    "COMPLETED",
+  ].includes(allowed.status);
 
-  if (kind === "sales-order" && unconfirmedOrderStatuses.includes(allowed.status)) {
+  if (kind === "sales-order" && !isSentToWarehouse) {
     return apiError(
-      "ORDER_NOT_CONFIRMED",
-      "Sales Order document is available only after order review is completed and order is confirmed.",
+      "ORDER_NOT_RELEASED_TO_WAREHOUSE",
+      "Sales Order document is available only after the order is released to warehouse for fulfillment.",
       403
     );
   }

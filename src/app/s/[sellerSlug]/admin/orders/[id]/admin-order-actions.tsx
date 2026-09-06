@@ -91,8 +91,6 @@ export function AdminOrderActions({
   const canConfirmPayment =
     canPayRole &&
     [
-      "WAITING_FOR_DEALER_CONFIRMATION",
-      "FINAL_ORDER_CONFIRMED",
       "PROFORMA_INVOICE_GENERATED",
       "PROFORMA_INVOICE_CONFIRMED",
     ].includes(order.status);

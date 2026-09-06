@@ -319,11 +319,19 @@ export async function executeOrderWorkflowAction(input: {
 export async function dealerConfirmOrder(input: {
   sellerId: string;
   orderId: string;
-  method: PaymentMethod | "CREDIT" | "CHEQUE" | "CASH" | "ONLINE" | "BANK_TRANSFER" | "MOBILE_PAYMENT" | "OTHER";
+  action?: "CONFIRM" | "REJECT" | "SUBMIT_PAYMENT";
+  decision?: "CONFIRMED" | "REJECTED";
+  method?: PaymentMethod | "CREDIT" | "CHEQUE" | "CASH" | "ONLINE" | "BANK_TRANSFER" | "MOBILE_PAYMENT" | "OTHER";
   transactionRef?: string;
   remarks?: string;
   actor: TransitionActor;
 }) {
+  let actionType: "CONFIRM" | "REJECT" | "SUBMIT_PAYMENT" = input.action || "CONFIRM";
+  if (input.decision === "REJECTED") actionType = "REJECT";
+  if (input.action === "SUBMIT_PAYMENT" || (input.method && !input.decision && input.action !== "CONFIRM")) {
+    actionType = "SUBMIT_PAYMENT";
+  }
+
   const updatedOrder = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findFirst({
       where: { id: input.orderId, sellerId: input.sellerId },
@@ -338,7 +346,92 @@ export async function dealerConfirmOrder(input: {
 
     const latestRevision = order.revisions[0];
 
-    // Record Dealer Confirmation
+    // CASE 1: Dealer Rejects / Requests Changes
+    if (actionType === "REJECT") {
+      await tx.dealerConfirmation.create({
+        data: {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          dealerId: order.dealerId,
+          revisionId: latestRevision?.id || null,
+          decision: "REJECTED",
+          remarks: input.remarks || "Dealer requested changes / rejected revised order.",
+          confirmedById: input.actor.userId,
+          confirmedAt: new Date(),
+        },
+      });
+
+      if (latestRevision && latestRevision.status === "SENT_TO_DEALER") {
+        await tx.orderRevision.update({
+          where: { id: latestRevision.id },
+          data: {
+            status: "DEALER_REJECTED",
+            dealerRespondedAt: new Date(),
+          },
+        });
+      }
+
+      await transitionOrderStatusInTransaction(tx, {
+        sellerId: input.sellerId,
+        orderId: order.id,
+        targetStatus: "DEALER_CHANGE_REQUESTED",
+        actor: input.actor,
+        reason: input.remarks || "Dealer requested changes on order revision.",
+      });
+
+      return tx.order.findUnique({
+        where: { id: order.id },
+        include: {
+          confirmations: true,
+          payments: true,
+          revisions: true,
+          dealer: true,
+          seller: { select: { slug: true } },
+        },
+      });
+    }
+
+    // CASE 2: Dealer Submits Payment Details after Proforma Invoice
+    if (actionType === "SUBMIT_PAYMENT") {
+      const selectedMethod = (input.method || "ONLINE") as PaymentMethod;
+      const paymentNumber = await nextDocumentNumber(tx, input.sellerId, "PAYMENT_RECEIPT", "REC");
+      await tx.payment.create({
+        data: {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          paymentNumber,
+          method: selectedMethod,
+          status: "PENDING",
+          amount: order.grandTotal,
+          transactionRef: input.transactionRef || undefined,
+          remarks: input.remarks || `Dealer submitted settlement terms: ${selectedMethod}`,
+          recordedById: input.actor.userId,
+        },
+      });
+
+      if (order.status === "PROFORMA_INVOICE_GENERATED") {
+        await transitionOrderStatusInTransaction(tx, {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          targetStatus: "PROFORMA_INVOICE_CONFIRMED",
+          actor: input.actor,
+          reason: `Dealer submitted payment reference (${selectedMethod}${input.transactionRef ? `, Ref: ${input.transactionRef}` : ""}). Ready for Accounts payment verification.`,
+        });
+      }
+
+      return tx.order.findUnique({
+        where: { id: order.id },
+        include: {
+          confirmations: true,
+          payments: true,
+          revisions: true,
+          dealer: true,
+          seller: { select: { slug: true } },
+        },
+      });
+    }
+
+    // CASE 3: Dealer Confirms Order / Revision (NO PAYMENT AT THIS STAGE)
     await tx.dealerConfirmation.create({
       data: {
         sellerId: input.sellerId,
@@ -346,13 +439,12 @@ export async function dealerConfirmOrder(input: {
         dealerId: order.dealerId,
         revisionId: latestRevision?.id || null,
         decision: "CONFIRMED",
-        remarks: input.remarks || `Confirmed by dealer with payment preference: ${input.method}`,
+        remarks: input.remarks || "Order confirmed by dealer. Awaiting Proforma Invoice from Accounts.",
         confirmedById: input.actor.userId,
         confirmedAt: new Date(),
       },
     });
 
-    // If there was a pending revision, update its status
     if (latestRevision && latestRevision.status === "SENT_TO_DEALER") {
       await tx.orderRevision.update({
         where: { id: latestRevision.id },
@@ -363,30 +455,14 @@ export async function dealerConfirmOrder(input: {
       });
     }
 
-    // Record Pending Payment Intent
-    const paymentNumber = await nextDocumentNumber(tx, input.sellerId, "PAYMENT_RECEIPT", "REC");
-    await tx.payment.create({
-      data: {
-        sellerId: input.sellerId,
-        orderId: order.id,
-        paymentNumber,
-        method: input.method as PaymentMethod,
-        status: "PENDING",
-        amount: order.grandTotal,
-        transactionRef: input.transactionRef || undefined,
-        remarks: input.remarks || `Dealer selected ${input.method} on order confirmation`,
-        recordedById: input.actor.userId,
-      },
-    });
-
-    // Transition Order to FINAL_ORDER_CONFIRMED
+    // Transition Order to FINAL_ORDER_CONFIRMED without payment
     if (["WAITING_FOR_DEALER_CONFIRMATION", "DEALER_CHANGE_REQUESTED", "PENDING_ACCOUNTS_REVIEW", "ACCOUNTS_REVIEW_IN_PROGRESS"].includes(order.status)) {
       await transitionOrderStatusInTransaction(tx, {
         sellerId: input.sellerId,
         orderId: order.id,
         targetStatus: "FINAL_ORDER_CONFIRMED",
         actor: input.actor,
-        reason: `Dealer accepted order revision (Payment terms: ${input.method}${input.transactionRef ? `, Ref: ${input.transactionRef}` : ""}). Ready for Accounts payment verification.`,
+        reason: "Dealer accepted and confirmed order. Ready for Accounts to generate Proforma Invoice.",
       });
     }
 
@@ -404,15 +480,36 @@ export async function dealerConfirmOrder(input: {
 
   if (updatedOrder) {
     const sellerSlug = updatedOrder.seller?.slug || "bageshwari";
-    // Notify Accounts team & Admins
-    await sendWorkflowNotification({
-      sellerId: input.sellerId,
-      targetRoles: ["ACCOUNTANT", "ACCOUNTS_MANAGER", "ADMIN", "SUPER_ADMIN", "SALES_MANAGER"],
-      title: `Order Re-Confirmed: ${updatedOrder.orderNumber}`,
-      message: `${updatedOrder.dealer.tradingName || updatedOrder.dealer.legalName} accepted revised order ${updatedOrder.orderNumber} (Settlement: ${input.method}). Ready for payment verification & Proforma.`,
-      linkUrl: `/s/${sellerSlug}/admin/orders/${updatedOrder.id}`,
-      excludeUserId: input.actor.userId,
-    });
+    const dealerName = updatedOrder.dealer.tradingName || updatedOrder.dealer.legalName;
+
+    if (actionType === "REJECT") {
+      await sendWorkflowNotification({
+        sellerId: input.sellerId,
+        targetRoles: ["ACCOUNTANT", "ACCOUNTS_MANAGER", "ADMIN", "SUPER_ADMIN", "SALES_MANAGER"],
+        title: `Changes Requested: ${updatedOrder.orderNumber}`,
+        message: `${dealerName} requested changes on order ${updatedOrder.orderNumber}: ${input.remarks || "Please review items."}`,
+        linkUrl: `/s/${sellerSlug}/admin/orders/${updatedOrder.id}`,
+        excludeUserId: input.actor.userId,
+      });
+    } else if (actionType === "SUBMIT_PAYMENT") {
+      await sendWorkflowNotification({
+        sellerId: input.sellerId,
+        targetRoles: ["ACCOUNTANT", "ACCOUNTS_MANAGER", "ADMIN", "SUPER_ADMIN", "SALES_MANAGER"],
+        title: `Payment Details Submitted: ${updatedOrder.orderNumber}`,
+        message: `${dealerName} submitted payment details for ${updatedOrder.orderNumber} via ${input.method || "online"} (Ref: ${input.transactionRef || "N/A"}). Ready for verification & warehouse release.`,
+        linkUrl: `/s/${sellerSlug}/admin/orders/${updatedOrder.id}`,
+        excludeUserId: input.actor.userId,
+      });
+    } else {
+      await sendWorkflowNotification({
+        sellerId: input.sellerId,
+        targetRoles: ["ACCOUNTANT", "ACCOUNTS_MANAGER", "ADMIN", "SUPER_ADMIN", "SALES_MANAGER"],
+        title: `Order Confirmed: ${updatedOrder.orderNumber}`,
+        message: `${dealerName} confirmed order ${updatedOrder.orderNumber}. Ready for Accounts to generate Proforma Invoice.`,
+        linkUrl: `/s/${sellerSlug}/admin/orders/${updatedOrder.id}`,
+        excludeUserId: input.actor.userId,
+      });
+    }
   }
 
   return updatedOrder;
