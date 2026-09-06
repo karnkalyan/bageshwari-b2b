@@ -12,6 +12,8 @@ import { revalidatePath } from "next/cache";
 import { resolveDealerPrice } from "@/services/pricing.service";
 import { addItemToDealerCart, getDealerCartItemCount } from "@/services/cart.service";
 import { DealerCardAddToCart } from "@/components/cart/dealer-card-add-to-cart";
+import { DealerLiveSearch } from "@/components/search/dealer-live-search";
+import { buildProductSearchFilter } from "@/lib/search-utils";
 
 interface DealerProductsProps {
   params: Promise<{ sellerSlug: string }>;
@@ -26,18 +28,13 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
 
   const search = query.search || "";
 
+  const searchFilter = buildProductSearchFilter(search);
   const where: any = {
     sellerId: ctx.sellerId,
     status: "ACTIVE",
     publishStatus: "PUBLISHED",
+    ...(searchFilter ? searchFilter : {}),
   };
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search } },
-      { sku: { contains: search } },
-    ];
-  }
 
   const [products, dealer, cartItemCount] = await Promise.all([
     prisma.product.findMany({
@@ -104,24 +101,39 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
 
       <Card>
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <form action={`/s/${sellerSlug}/dealer/products`} method="GET" className="w-full sm:w-96">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                name="search"
-                defaultValue={search}
-                placeholder="Search SKU or product name..."
-                className="pl-9 h-9 text-xs"
-              />
-            </div>
-          </form>
+          <DealerLiveSearch
+            placeholder="Search SKU, bearing number, or name (e.g. bearing 11949 10)..."
+            className="w-full sm:w-96"
+          />
           <div className="text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-md font-semibold border border-emerald-200">
             Dealer Unlocked Pricing Active ({dealer?.tradingName || "Authorized Dealer"})
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {products.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs space-y-3">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-400">
+            <Search className="h-6 w-6" />
+          </div>
+          <h2 className="text-lg font-bold text-[#092f5c]">No products found</h2>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {search
+              ? `No products matching "${search}". Try searching with individual keywords like "bearing", part number "11949", or brand name.`
+              : "No active products are currently available in the catalogue."}
+          </p>
+          {search && (
+            <div className="pt-2">
+              <Link href={`/s/${sellerSlug}/dealer/products`}>
+                <Button variant="outline" size="sm" className="text-xs">
+                  Clear Search
+                </Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {products.map((p) => {
           const variant = p.variants[0];
           const mrp = variant ? Number(variant.mrp) : 0;
@@ -169,6 +181,7 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
           );
         })}
       </div>
+      )}
     </div>
   );
 }

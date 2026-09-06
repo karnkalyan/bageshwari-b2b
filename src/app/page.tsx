@@ -18,6 +18,7 @@ import { BusinessStats } from "@/app/s/[sellerSlug]/_components/business-stats";
 import { PublicFooter } from "@/app/s/[sellerSlug]/_components/public-footer";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { buildProductSearchFilter } from "@/lib/search-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -158,10 +159,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       filterWhere.category = { slug: activeCategorySlug };
     }
     if (activeSearch) {
-      filterWhere.OR = [
-        { name: { contains: activeSearch } },
-        { sku: { contains: activeSearch } },
-      ];
+      const searchFilter = buildProductSearchFilter(activeSearch);
+      if (searchFilter) {
+        Object.assign(filterWhere, searchFilter);
+      }
     }
 
     const [filteredItems, matchedCat] = await Promise.all([

@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { buildProductSearchFilter } from "@/lib/search-utils";
 
 export type CatalogueFilters = {
   search?: string;
@@ -49,14 +50,13 @@ export class ProductRepository {
   }
 
   async listPublic(sellerId: string, filters: CatalogueFilters) {
+    const searchFilter = buildProductSearchFilter(filters.search);
     const where: Prisma.ProductWhereInput = {
       sellerId,
       status: "ACTIVE",
       publishStatus: "PUBLISHED",
       deletedAt: null,
-      ...(filters.search
-        ? { OR: [{ name: { contains: filters.search } }, { sku: { contains: filters.search } }] }
-        : {}),
+      ...(searchFilter ? searchFilter : {}),
       ...(filters.category ? { category: { slug: filters.category } } : {}),
       ...(filters.brand ? { brand: { slug: filters.brand } } : {}),
     };

@@ -17,6 +17,7 @@ import { Search, Lock, ShoppingCart, Eye, Package, Filter, ChevronRight, CheckCi
 import { formatCurrency } from "@/lib/utils";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { ProductFilters } from "@/components/products/product-filters";
+import { buildProductSearchFilter } from "@/lib/search-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -33,14 +34,10 @@ interface ProductsPageProps {
 
 export default async function ProductsPage({ params, searchParams }: ProductsPageProps) {
   const { sellerSlug } = await params;
-  const query = await searchParams;
+  const { category: categorySlug, brand: brandSlug, search, sort = "newest", page = "1" } = await searchParams;
   const session = await auth();
 
-  const search = query.search || "";
-  const categorySlug = query.category || "";
-  const brandSlug = query.brand || "";
-  const sort = query.sort || "newest";
-  const currentPage = parseInt(query.page || "1", 10);
+  const currentPage = parseInt(page, 10);
   const pageSize = 16;
 
   const isDealer = Boolean(session?.dealerId);
@@ -52,19 +49,13 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
 
   if (!seller) notFound();
 
+  const searchFilter = buildProductSearchFilter(search);
   const where: any = {
     sellerId: seller.id,
     status: "ACTIVE",
     publishStatus: "PUBLISHED",
+    ...(searchFilter ? searchFilter : {}),
   };
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search } },
-      { sku: { contains: search } },
-      { description: { contains: search } },
-    ];
-  }
 
   if (categorySlug) {
     where.category = { slug: categorySlug };

@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getTenantContext } from "@/lib/tenant";
@@ -8,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   FileText, ShieldCheck, Truck, ArrowLeft, Download, ExternalLink,
-  CheckCircle2, Clock, PackageCheck, AlertCircle, Phone, MapPin, Receipt, History
+  CheckCircle2, Clock, PackageCheck, AlertCircle, Phone, MapPin, Receipt, History, ShoppingCart
 } from "lucide-react";
 import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
 import { DealerOrderActions } from "./dealer-order-actions";
@@ -59,13 +60,37 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
 
   if (!order) notFound();
 
+  async function placeOrderAction() {
+    "use server";
+    const actionCtx = await getTenantContext("bageshwari", "/dealer/login");
+    if (!actionCtx.dealerId) redirect("/dealer/login");
+
+    await executeOrderWorkflowAction({
+      sellerId: actionCtx.sellerId,
+      orderId: order!.id,
+      targetStatus: "PENDING_ACCOUNTS_REVIEW",
+      actor: {
+        userId: actionCtx.userId,
+        permissions: actionCtx.permissions,
+        roles: actionCtx.roles,
+      },
+      reason: "Sales order placed by dealer from order details page",
+    });
+
+    revalidatePath(`/dealer/orders/${order!.id}`);
+    revalidatePath("/dealer/orders");
+    revalidatePath("/dealer/cart");
+    revalidatePath("/dealer/dashboard");
+  }
+
+  const isDraft = order.status === "DRAFT";
   const proforma = order.proformaInvoices[0];
   const finalInvoice = order.finalInvoices[0];
   const shipment = order.shipments[0];
   const latestRevision = order.revisions[0];
 
   const workflowSteps = [
-    { title: "Order Placed", done: true },
+    { title: "Order Placed", done: !isDraft },
     { title: "Accounts Review", done: !["DRAFT", "PENDING_ACCOUNTS_REVIEW"].includes(order.status) },
     { title: "Payment & Proforma", done: !["DRAFT", "PENDING_ACCOUNTS_REVIEW", "WAITING_FOR_DEALER_CONFIRMATION"].includes(order.status) },
     { title: "Warehouse Picking", done: ["PICK_LIST_COMPLETED", "FINAL_INVOICE_ISSUED", "PAID", "PACKED", "PACKED_AND_LABELLED", "SHIPPED", "COMPLETED"].includes(order.status) },
@@ -87,12 +112,19 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-[#092f5c]">{order.orderNumber}</h1>
-            <Badge variant="outline" className={`text-xs px-2.5 py-0.5 font-bold ${ORDER_STATUS_COLORS[order.status] || ""}`}>
-              {ORDER_STATUS_LABELS[order.status] || order.status}
+            <Badge
+              variant="outline"
+              className={`text-xs px-2.5 py-0.5 font-bold ${
+                isDraft
+                  ? "bg-amber-50 text-amber-800 border-amber-300"
+                  : ORDER_STATUS_COLORS[order.status] || ""
+              }`}
+            >
+              {isDraft ? "Draft Order" : ORDER_STATUS_LABELS[order.status] || order.status}
             </Badge>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Submitted on {formatDate(order.createdAt)} • Source: {order.source}
+            {isDraft ? "Draft created on" : "Submitted on"} {formatDate(order.createdAt)} • Source: {order.source}
           </p>
         </div>
 
@@ -171,6 +203,37 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
           ))}
         </div>
       </div>
+
+      {/* Draft Order Action Banner with Place Order Button */}
+      {isDraft && (
+        <div className="p-6 bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-50/50 rounded-xl border-2 border-amber-300 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-amber-600 text-white font-bold text-xs">Ready to Submit</Badge>
+              <h2 className="text-base font-black text-[#0b2d55]">Draft Sales Order</h2>
+            </div>
+            <p className="text-xs text-slate-600 max-w-xl">
+              This order is currently in <strong>Draft</strong> status. Review your products and pricing, then click <strong>Place Order</strong> to submit this sales order directly to the fulfillment pipeline.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <Link href="/dealer/cart">
+              <Button variant="outline" size="sm" className="text-xs border-amber-300 bg-white hover:bg-amber-50 font-semibold">
+                <ShoppingCart className="h-3.5 w-3.5 mr-1.5" /> Edit in Cart
+              </Button>
+            </Link>
+            <form action={placeOrderAction}>
+              <Button
+                type="submit"
+                className="bg-red-600 hover:bg-red-700 text-white font-black text-xs px-6 h-11 shadow-md flex items-center gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Place Order (Submit Sales Order)
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Dealer Confirmation & Payment Terms Widget */}
       <DealerOrderActions

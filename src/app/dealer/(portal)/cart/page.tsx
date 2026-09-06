@@ -172,25 +172,44 @@ export default async function DealerCartPage() {
                     </div>
 
                     {/* Quantity Update Controls */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <form action={updateQuantityAction}>
                         <input type="hidden" name="itemId" value={item.id} />
                         <input type="hidden" name="quantity" value={Math.max(1, qty - 1)} />
                         <button
                           type="submit"
                           disabled={qty <= 1}
-                          className="h-8 w-8 rounded border border-slate-200 bg-slate-50 font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                          className="h-8 w-7 rounded border border-slate-200 bg-slate-50 font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition"
+                          aria-label="Decrease quantity"
                         >
                           -
                         </button>
                       </form>
-                      <span className="w-9 text-center font-bold text-xs">{qty}</span>
+
+                      <form action={updateQuantityAction} className="inline-block">
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <input
+                          type="number"
+                          name="quantity"
+                          defaultValue={qty}
+                          min={1}
+                          step={1}
+                          onBlur={(e) => {
+                            if (e.target.value && Number(e.target.value) !== qty) {
+                              e.target.form?.requestSubmit();
+                            }
+                          }}
+                          className="h-8 w-14 text-center font-bold text-xs border border-slate-200 rounded px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </form>
+
                       <form action={updateQuantityAction}>
                         <input type="hidden" name="itemId" value={item.id} />
                         <input type="hidden" name="quantity" value={qty + 1} />
                         <button
                           type="submit"
-                          className="h-8 w-8 rounded border border-slate-200 bg-slate-50 font-bold text-slate-600 hover:bg-slate-100"
+                          className="h-8 w-7 rounded border border-slate-200 bg-slate-50 font-bold text-slate-600 hover:bg-slate-100 transition"
+                          aria-label="Increase quantity"
                         >
                           +
                         </button>
@@ -249,15 +268,18 @@ export default async function DealerCartPage() {
 
             <form action={submitDraft} className="pt-2">
               <input type="hidden" name="orderId" value={draft.id} />
-              <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 font-extrabold h-12 text-sm shadow-md">
-                <CheckCircle2 className="mr-2 h-4 w-4" /> Submit for Accounts Review
+              <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 font-extrabold h-12 text-sm shadow-md flex flex-col items-center justify-center leading-tight py-2">
+                <div className="flex items-center">
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Place Order
+                </div>
+                <span className="text-[10px] font-normal text-white/85">Submit Sales Order</span>
               </Button>
             </form>
 
             <div className="border-t pt-3 space-y-2 text-[11px] text-slate-500">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span>Submitted orders are immediately routed to accounts for confirmation.</span>
+                <span>Placed orders are immediately submitted for confirmation and fulfillment.</span>
               </div>
             </div>
           </CardContent>

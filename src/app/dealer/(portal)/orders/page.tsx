@@ -59,33 +59,50 @@ export default async function DealerOrdersPage() {
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
           <div className="divide-y divide-slate-100">
-            {orders.map((order) => (
-              <Link
-                key={order.id}
-                href={`/dealer/orders/${order.id}`}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-slate-50/70 transition gap-3"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <strong className="text-sm font-bold text-[#092f5c]">{order.orderNumber}</strong>
-                    <Badge variant="outline" className={`text-[10px] ${ORDER_STATUS_COLORS[order.status] || ""}`}>
-                      {ORDER_STATUS_LABELS[order.status] || order.status}
-                    </Badge>
+            {orders.map((order) => {
+              const isDraft = order.status === "DRAFT";
+              return (
+                <Link
+                  key={order.id}
+                  href={`/dealer/orders/${order.id}`}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-slate-50/70 transition gap-3"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <strong className="text-sm font-bold text-[#092f5c]">{order.orderNumber}</strong>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] ${
+                          isDraft
+                            ? "bg-amber-50 text-amber-800 border-amber-300 font-bold"
+                            : ORDER_STATUS_COLORS[order.status] || ""
+                        }`}
+                      >
+                        {isDraft ? "Draft Order" : ORDER_STATUS_LABELS[order.status] || order.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {isDraft ? "Draft created on" : "Placed on"} {formatDate(order.createdAt)}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500">Placed on {formatDate(order.createdAt)}</div>
-                </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0">
-                  <div className="text-left sm:text-right">
-                    <strong className="text-sm font-bold text-slate-900 block tabular-nums">
-                      {formatCurrency(Number(order.grandTotal))}
-                    </strong>
-                    <span className="text-[10px] text-slate-400">13% VAT included</span>
+                  <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0">
+                    {isDraft && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-md shadow-2xs">
+                        Place Order <ArrowRight className="h-3 w-3" />
+                      </span>
+                    )}
+                    <div className="text-left sm:text-right">
+                      <strong className="text-sm font-bold text-slate-900 block tabular-nums">
+                        {formatCurrency(Number(order.grandTotal))}
+                      </strong>
+                      <span className="text-[10px] text-slate-400">13% VAT included</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
                   </div>
-                  <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

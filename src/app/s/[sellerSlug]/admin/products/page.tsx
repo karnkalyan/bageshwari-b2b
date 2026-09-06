@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { ProductsTableClient, type SerializedProduct } from "./products-table-client";
 import { Pagination } from "@/components/ui/pagination";
+import { buildProductSearchFilter } from "@/lib/search-utils";
 
 interface AdminProductsProps {
   params: Promise<{ sellerSlug: string }>;
@@ -20,14 +21,11 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
   const currentPage = parseInt(query.page || "1", 10);
   const pageSize = 20;
 
-  const where: any = { sellerId: ctx.sellerId };
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search } },
-      { sku: { contains: search } },
-    ];
-  }
+  const searchFilter = buildProductSearchFilter(search);
+  const where: any = {
+    sellerId: ctx.sellerId,
+    ...(searchFilter ? searchFilter : {}),
+  };
 
   const [products, totalCount, companyRows, categoryRows] = await Promise.all([
     prisma.product.findMany({

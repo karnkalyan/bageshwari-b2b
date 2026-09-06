@@ -900,7 +900,7 @@ export function SalesOrderCreator({
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
-                      <Send className="h-4 w-4" /> Submit for Accounts Review
+                      <Send className="h-4 w-4" /> Place Order (Submit Sales Order)
                     </>
                   )}
                 </Button>

@@ -147,9 +147,14 @@ export default async function DealerDashboardPage({ params }: DealerDashboardPro
             <CardTitle className="text-base font-semibold">My Recent Orders</CardTitle>
             <CardDescription className="text-xs">Real-time status updates from accounts & warehouse</CardDescription>
           </div>
-          <Link href={`/s/${sellerSlug}/dealer/products`}>
-            <Button variant="outline" size="sm" className="text-xs">Order More</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/dealer/orders">
+              <Button variant="ghost" size="sm" className="text-xs">View All</Button>
+            </Link>
+            <Link href={`/s/${sellerSlug}/dealer/products`}>
+              <Button variant="outline" size="sm" className="text-xs">Order More</Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {recentOrders.length === 0 ? (
@@ -163,23 +168,46 @@ export default async function DealerDashboardPage({ params }: DealerDashboardPro
             </div>
           ) : (
             <div className="divide-y text-xs">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{order.orderNumber}</span>
-                      <Badge variant="outline" className={`text-[10px] ${ORDER_STATUS_COLORS[order.status] || ""}`}>
-                        {ORDER_STATUS_LABELS[order.status] || order.status}
-                      </Badge>
+              {recentOrders.map((order) => {
+                const isDraft = order.status === "DRAFT";
+                return (
+                  <Link
+                    key={order.id}
+                    href={`/dealer/orders/${order.id}`}
+                    className="group p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors cursor-pointer"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {order.orderNumber}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${
+                            isDraft
+                              ? "bg-amber-50 text-amber-800 border-amber-300 font-bold"
+                              : ORDER_STATUS_COLORS[order.status] || ""
+                          }`}
+                        >
+                          {isDraft ? "Draft Order" : ORDER_STATUS_LABELS[order.status] || order.status}
+                        </Badge>
+                      </div>
+                      <div className="text-slate-500">
+                        {isDraft ? "Draft created on" : "Placed on"} {formatDate(order.createdAt)}
+                      </div>
                     </div>
-                    <div className="text-slate-500">Placed on {formatDate(order.createdAt)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-slate-900">{formatCurrency(Number(order.grandTotal))}</div>
-                    <div className="text-[10px] text-slate-400">VAT Included</div>
-                  </div>
-                </div>
-              ))}
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="font-bold text-slate-900 tabular-nums">
+                          {formatCurrency(Number(order.grandTotal))}
+                        </div>
+                        <div className="text-[10px] text-slate-400">VAT Included</div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </CardContent>

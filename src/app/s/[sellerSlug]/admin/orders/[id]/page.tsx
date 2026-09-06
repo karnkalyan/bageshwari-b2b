@@ -351,11 +351,11 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
               userPermissions={ctx.permissions}
             />
 
-            {/* DRAFT -> Submit for Accounts Review */}
+            {/* DRAFT -> Submit Sales Order */}
             {order.status === "DRAFT" && (isSales || isPrivileged) && (
               <form action={advanceWorkflowAction}>
                 <input type="hidden" name="nextStatus" value="PENDING_ACCOUNTS_REVIEW" />
-                <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">Submit for Accounts Review</Button>
+                <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">Submit Sales Order</Button>
               </form>
             )}
 
