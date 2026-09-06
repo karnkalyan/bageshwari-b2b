@@ -33,7 +33,7 @@ export default async function DealerOrdersPage() {
               <Plus className="h-4 w-4" /> Create Sales Order
             </Button>
           </Link>
-          <Link href="/products">
+          <Link href="/dealer/products">
             <Button variant="outline" size="sm" className="text-xs h-9">
               <ShoppingCart className="h-3.5 w-3.5 mr-1 text-red-600" /> Browse Catalogue
             </Button>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { ShoppingCart, Trash2, ArrowRight, Package, ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
 import { revalidatePath } from "next/cache";
+import { CartItemQuantity } from "@/components/cart/cart-item-quantity";
 
 export default async function DealerCartPage() {
   const ctx = await getTenantContext("bageshwari", "/dealer/login");
@@ -92,9 +93,9 @@ export default async function DealerCartPage() {
             Browse our catalogue with your unlocked dealer pricing and add items to build your draft order.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/products">
+            <Link href="/dealer/products">
               <Button className="bg-red-600 hover:bg-red-700 font-bold">
-                Browse Products Catalogue <ArrowRight className="ml-2 h-4 w-4" />
+                Browse Dealer Catalogue <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
             <Link href="/dealer/dashboard">
@@ -121,7 +122,7 @@ export default async function DealerCartPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/products">
+          <Link href="/dealer/products">
             <Button variant="outline" size="sm" className="text-xs">
               <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Add More Products
             </Button>
@@ -172,49 +173,11 @@ export default async function DealerCartPage() {
                     </div>
 
                     {/* Quantity Update Controls */}
-                    <div className="flex items-center gap-1">
-                      <form action={updateQuantityAction}>
-                        <input type="hidden" name="itemId" value={item.id} />
-                        <input type="hidden" name="quantity" value={Math.max(1, qty - 1)} />
-                        <button
-                          type="submit"
-                          disabled={qty <= 1}
-                          className="h-8 w-7 rounded border border-slate-200 bg-slate-50 font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition"
-                          aria-label="Decrease quantity"
-                        >
-                          -
-                        </button>
-                      </form>
-
-                      <form action={updateQuantityAction} className="inline-block">
-                        <input type="hidden" name="itemId" value={item.id} />
-                        <input
-                          type="number"
-                          name="quantity"
-                          defaultValue={qty}
-                          min={1}
-                          step={1}
-                          onBlur={(e) => {
-                            if (e.target.value && Number(e.target.value) !== qty) {
-                              e.target.form?.requestSubmit();
-                            }
-                          }}
-                          className="h-8 w-14 text-center font-bold text-xs border border-slate-200 rounded px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </form>
-
-                      <form action={updateQuantityAction}>
-                        <input type="hidden" name="itemId" value={item.id} />
-                        <input type="hidden" name="quantity" value={qty + 1} />
-                        <button
-                          type="submit"
-                          className="h-8 w-7 rounded border border-slate-200 bg-slate-50 font-bold text-slate-600 hover:bg-slate-100 transition"
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </form>
-                    </div>
+                    <CartItemQuantity
+                      itemId={item.id}
+                      initialQuantity={qty}
+                      updateAction={updateQuantityAction}
+                    />
 
                     <div className="text-right min-w-24">
                       <div className="font-extrabold text-sm text-[#092f5c]">{formatCurrency(lineTotal)}</div>
