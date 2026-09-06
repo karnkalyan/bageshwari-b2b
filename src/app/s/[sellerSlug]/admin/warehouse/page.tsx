@@ -198,25 +198,25 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
     if (!pickListId || !assignedUserId) return;
 
     try {
-      await prisma.pickList.update({
+      const updatedPl = await prisma.pickList.update({
         where: { id: pickListId, sellerId: actionCtx.sellerId },
         data: {
           assignedToId: assignedUserId,
           pickerId: assignedUserId,
           status: "ASSIGNED",
         },
-      });
-
-      const user = await prisma.user.findUnique({
-        where: { id: assignedUserId },
-        select: { name: true, email: true },
+        include: {
+          order: { select: { orderNumber: true } },
+        },
       });
 
       await sendWorkflowNotification({
         sellerId: actionCtx.sellerId,
-        title: "Pick List Assigned to You",
-        message: `You have been assigned to fulfill Pick List ${pickListId}.`,
-        targetRoles: ["WAREHOUSE_USER", "WAREHOUSE_PICKER"],
+        targetUserIds: [assignedUserId],
+        title: `Pick List Assigned to You: ${updatedPl.pickListNumber}`,
+        message: `You have been assigned to fulfill Pick List ${updatedPl.pickListNumber} for order ${updatedPl.order?.orderNumber}.`,
+        linkUrl: `/s/${sellerSlug}/admin/warehouse`,
+        excludeUserId: actionCtx.userId,
       });
     } catch (err) {
       console.warn("Assign picker action failed:", err);
@@ -324,7 +324,7 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
       </div>
 
       {/* Ready Orders Queue (Awaiting Picking / Assignment) */}
-      {isManager && readyOrders.length > 0 && (
+      {(isManager || isWarehouseUser) && readyOrders.length > 0 && (
         <div className="glass-card overflow-hidden border-l-4 border-l-purple-500">
           <div className="p-4 border-b border-border font-bold text-sm bg-muted/40 text-foreground flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -440,14 +440,35 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                       </td>
                       <td className="px-4 py-3.5">
                         {pl.assignedTo ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-foreground">
-                              {pl.assignedTo.name || pl.assignedTo.email}
-                            </span>
-                            {isAssignedToCurrent && (
-                              <Badge variant="outline" className="text-[9px] bg-teal-500/10 text-teal-500 border-teal-500/20">
-                                You
-                              </Badge>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-foreground">
+                                {pl.assignedTo.name || pl.assignedTo.email}
+                              </span>
+                              {isAssignedToCurrent && (
+                                <Badge variant="outline" className="text-[9px] bg-teal-500/10 text-teal-500 border-teal-500/20">
+                                  You
+                                </Badge>
+                              )}
+                            </div>
+                            {isManager && pl.status !== "COMPLETED" && warehouseStaff.length > 0 && (
+                              <form action={assignPickerAction} className="flex items-center gap-1 pt-0.5">
+                                <input type="hidden" name="pickListId" value={pl.id} />
+                                <select
+                                  name="assignedUserId"
+                                  defaultValue={pl.assignedTo.id}
+                                  className="h-6 text-[11px] border border-border rounded px-1.5 bg-card text-foreground font-medium outline-none"
+                                >
+                                  {warehouseStaff.map((ws) => (
+                                    <option key={ws.user.id} value={ws.user.id}>
+                                      {ws.user.name || ws.user.email}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button type="submit" size="sm" variant="outline" className="h-6 text-[10px] px-1.5 border-purple-300 text-purple-700 font-bold">
+                                  Change
+                                </Button>
+                              </form>
                             )}
                           </div>
                         ) : isManager && warehouseStaff.length > 0 ? (

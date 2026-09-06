@@ -136,7 +136,29 @@ export async function executeOrderWorkflowAction(input: {
 
           if (defaultWarehouse) {
             const isCompleted = input.targetStatus === "PICK_LIST_COMPLETED" || input.targetStatus === "FINAL_INVOICE_ISSUED";
-            const assignedPickerId = input.assignedWarehouseUserId || (isCompleted ? input.actor.userId : null);
+            let assignedPickerId = input.assignedWarehouseUserId || (isCompleted ? input.actor.userId : null);
+
+            // Auto-assign fallback to active warehouse staff if not specified
+            if (!assignedPickerId && !isCompleted) {
+              const warehouseStaffUser = await tx.userRole.findFirst({
+                where: {
+                  sellerId: input.sellerId,
+                  role: {
+                    code: {
+                      in: [
+                        "WAREHOUSE_USER",
+                        "WAREHOUSE_PICKER",
+                        "WAREHOUSE_MANAGER",
+                        "PACKING_USER",
+                      ],
+                    },
+                  },
+                },
+              });
+              if (warehouseStaffUser) {
+                assignedPickerId = warehouseStaffUser.userId;
+              }
+            }
 
             await tx.pickList.create({
               data: {
@@ -166,11 +188,23 @@ export async function executeOrderWorkflowAction(input: {
               include: { items: true, exceptions: true },
             });
           }
-        } else if (pickList.status !== "COMPLETED" && (input.targetStatus === "PICK_LIST_COMPLETED" || input.targetStatus === "FINAL_INVOICE_ISSUED")) {
-          await tx.pickList.update({
-            where: { id: pickList.id },
-            data: { status: "COMPLETED", completedAt: new Date(), completedById: input.actor.userId },
-          });
+        } else {
+          if (input.assignedWarehouseUserId) {
+            await tx.pickList.update({
+              where: { id: pickList.id },
+              data: {
+                assignedToId: input.assignedWarehouseUserId,
+                pickerId: input.assignedWarehouseUserId,
+                status: "ASSIGNED",
+              },
+            });
+          }
+          if (pickList.status !== "COMPLETED" && (input.targetStatus === "PICK_LIST_COMPLETED" || input.targetStatus === "FINAL_INVOICE_ISSUED")) {
+            await tx.pickList.update({
+              where: { id: pickList.id },
+              data: { status: "COMPLETED", completedAt: new Date(), completedById: input.actor.userId },
+            });
+          }
         }
       }
 
@@ -787,6 +821,30 @@ export async function confirmPaymentAndAdvancePipeline(input: {
       }
 
       if (defaultWarehouse) {
+        let assignedPickerId = input.assignedWarehouseUserId;
+
+        // Auto-assign fallback to active warehouse staff if not specified
+        if (!assignedPickerId) {
+          const warehouseStaffUser = await tx.userRole.findFirst({
+            where: {
+              sellerId: input.sellerId,
+              role: {
+                code: {
+                  in: [
+                    "WAREHOUSE_USER",
+                    "WAREHOUSE_PICKER",
+                    "WAREHOUSE_MANAGER",
+                    "PACKING_USER",
+                  ],
+                },
+              },
+            },
+          });
+          if (warehouseStaffUser) {
+            assignedPickerId = warehouseStaffUser.userId;
+          }
+        }
+
         const existingPickList = await tx.pickList.findFirst({ where: { orderId: order.id } });
         if (!existingPickList) {
           const number = await nextDocumentNumber(tx, input.sellerId, "PICK_LIST", "PL");
@@ -796,9 +854,9 @@ export async function confirmPaymentAndAdvancePipeline(input: {
               orderId: order.id,
               warehouseId: defaultWarehouse.id,
               pickListNumber: number,
-              status: input.assignedWarehouseUserId ? "ASSIGNED" : "GENERATED",
-              assignedToId: input.assignedWarehouseUserId || null,
-              pickerId: input.assignedWarehouseUserId || null,
+              status: assignedPickerId ? "ASSIGNED" : "GENERATED",
+              assignedToId: assignedPickerId || null,
+              pickerId: assignedPickerId || null,
               notes: "Generated upon payment confirmation for warehouse fulfillment",
               items: {
                 create: order.items
@@ -814,13 +872,13 @@ export async function confirmPaymentAndAdvancePipeline(input: {
               },
             },
           });
-        } else if (input.assignedWarehouseUserId) {
+        } else if (assignedPickerId) {
           await tx.pickList.update({
             where: { id: existingPickList.id },
             data: {
               status: "ASSIGNED",
-              assignedToId: input.assignedWarehouseUserId,
-              pickerId: input.assignedWarehouseUserId,
+              assignedToId: assignedPickerId,
+              pickerId: assignedPickerId,
             },
           });
         }
@@ -898,4 +956,138 @@ export async function confirmPaymentAndAdvancePipeline(input: {
       typeof value === "object" && value !== null && "d" in value ? Number(value) : value
     )
   );
+}
+
+/**
+ * 3. Accounts / Manager: Assign or Re-assign Warehouse User
+ * Accounts or Warehouse Manager can assign or change the assigned warehouse picker
+ * for an order until packing confirmation/completion.
+ */
+export async function assignOrderWarehouseUser(input: {
+  sellerId: string;
+  orderId: string;
+  assignedWarehouseUserId: string;
+  actor: TransitionActor;
+  notes?: string;
+}) {
+  const result = await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findFirst({
+      where: { id: input.orderId, sellerId: input.sellerId },
+      include: {
+        packages: true,
+        pickLists: { orderBy: { createdAt: "desc" }, take: 1, include: { items: true } },
+        dealer: { select: { legalName: true, tradingName: true } },
+        seller: { select: { slug: true } },
+      },
+    });
+
+    if (!order) throw new Error("ORDER_NOT_FOUND: Order could not be located.");
+
+    const lockedStatuses: OrderStatus[] = [
+      "PACKED",
+      "PACKED_AND_LABELLED",
+      "SHIPPED",
+      "IN_TRANSIT",
+      "PARTIALLY_DELIVERED",
+      "DELIVERED",
+      "COMPLETED",
+      "CANCELLED",
+    ];
+
+    if (lockedStatuses.includes(order.status) || order.packages.length > 0) {
+      throw new Error("CANNOT_REASSIGN: Packing is already confirmed or completed for this order.");
+    }
+
+    const assignedUser = await tx.user.findFirst({
+      where: { id: input.assignedWarehouseUserId },
+      select: { id: true, name: true, email: true },
+    });
+    if (!assignedUser) throw new Error("ASSIGNED_USER_NOT_FOUND: Selected warehouse user does not exist.");
+
+    let defaultWarehouse = await tx.warehouse.findFirst({
+      where: { sellerId: input.sellerId, isActive: true },
+      select: { id: true },
+    });
+    if (!defaultWarehouse) {
+      defaultWarehouse = await tx.warehouse.create({
+        data: {
+          sellerId: input.sellerId,
+          code: "WH-MAIN",
+          name: "Main Central Warehouse",
+          isActive: true,
+        },
+        select: { id: true },
+      });
+    }
+
+    let pickList = order.pickLists[0];
+    if (!pickList) {
+      const number = await nextDocumentNumber(tx, input.sellerId, "PICK_LIST", "PL");
+      const orderItems = await tx.orderItem.findMany({
+        where: { orderId: order.id, status: { not: "REMOVED" } },
+      });
+
+      pickList = await tx.pickList.create({
+        data: {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          warehouseId: defaultWarehouse.id,
+          pickListNumber: number,
+          status: "ASSIGNED",
+          assignedToId: assignedUser.id,
+          pickerId: assignedUser.id,
+          notes: input.notes || `Assigned to ${assignedUser.name || assignedUser.email} by Accounts`,
+          items: {
+            create: orderItems.map((item) => ({
+              sellerId: input.sellerId,
+              productId: item.productId,
+              variantId: item.variantId,
+              sku: item.sku,
+              approvedQuantity: item.approvedQuantity ?? item.originalQuantity,
+              pickedQuantity: 0,
+            })),
+          },
+        },
+        include: { items: true },
+      });
+    } else {
+      await tx.pickList.update({
+        where: { id: pickList.id },
+        data: {
+          assignedToId: assignedUser.id,
+          pickerId: assignedUser.id,
+          status: "ASSIGNED",
+          notes: input.notes
+            ? `${pickList.notes ? pickList.notes + " | " : ""}${input.notes}`
+            : pickList.notes,
+        },
+      });
+    }
+
+    // Log the assignment action in OrderStatusHistory
+    await tx.orderStatusHistory.create({
+      data: {
+        sellerId: input.sellerId,
+        orderId: order.id,
+        fromStatus: order.status,
+        toStatus: order.status,
+        changedById: input.actor.userId,
+        remarks: `Warehouse fulfillment assigned to ${assignedUser.name || assignedUser.email} by Accounts.`,
+      },
+    });
+
+    return { order, assignedUser, pickList };
+  });
+
+  const sellerSlug = result.order.seller?.slug || "bageshwari";
+  await sendWorkflowNotification({
+    sellerId: input.sellerId,
+    targetUserIds: [result.assignedUser.id],
+    title: `Order Assigned for Warehouse Fulfillment: ${result.order.orderNumber}`,
+    message: `You have been assigned to fulfill Pick List ${result.pickList.pickListNumber} for order ${result.order.orderNumber} (${result.order.dealer.tradingName || result.order.dealer.legalName}).`,
+    linkUrl: `/s/${sellerSlug}/admin/warehouse`,
+    excludeUserId: input.actor.userId,
+  });
+
+  return result;
 }

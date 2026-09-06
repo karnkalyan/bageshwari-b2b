@@ -317,21 +317,25 @@ export function PaymentConfirmationDialog({
             {/* Optional Warehouse Staff Selection */}
             {warehouseStaff && warehouseStaff.length > 0 && (
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-800">
-                  Assign Warehouse User for Picking (Optional)
+                <Label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                  <span>Assign Warehouse User for Fulfillment</span>
+                  <span className="text-[10px] text-purple-700 font-normal">Can be changed anytime prior to packing</span>
                 </Label>
                 <select
                   value={assignedWarehouseUserId}
                   onChange={(e) => setAssignedWarehouseUserId(e.target.value)}
-                  className="w-full h-8 text-xs border rounded-lg px-2 bg-white text-slate-900 border-slate-300 font-semibold"
+                  className="w-full h-9 text-xs border rounded-lg px-2.5 bg-white text-slate-900 border-purple-300 font-semibold focus:ring-1 focus:ring-purple-500"
                 >
-                  <option value="">Auto-assign / Central Warehouse</option>
+                  <option value="">⚡ Auto-assign to active Warehouse User</option>
                   {warehouseStaff.map((ws) => (
                     <option key={ws.id} value={ws.id}>
                       {ws.name || ws.email} (Warehouse)
                     </option>
                   ))}
                 </select>
+                <p className="text-[11px] text-slate-500">
+                  Accounts user can also change or re-assign this order to another warehouse staff anytime before packing confirmation.
+                </p>
               </div>
             )}
 

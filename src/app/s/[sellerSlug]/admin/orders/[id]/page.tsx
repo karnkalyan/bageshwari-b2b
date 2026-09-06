@@ -12,8 +12,9 @@ import {
   PackageCheck, Printer, Tag, History, Edit3, UserCheck
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
-import { advanceWorkflowAction } from "./actions";
+import { advanceWorkflowAction, assignWarehouseUserAction } from "./actions";
 import { AdminOrderActions } from "./admin-order-actions";
+import { OrderWarehouseAssignment } from "@/components/admin/order-warehouse-assignment";
 
 interface OrderDetailsProps {
   params: Promise<{ sellerSlug: string; id: string }>;
@@ -245,6 +246,27 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
   const pickList = order.pickLists[0];
   const finalInvoice = order.finalInvoices[0];
 
+  const uniqueWarehouseStaff = Array.from(
+    new Map(
+      warehouseStaff
+        .filter((ws) => ws.user)
+        .map((ws) => [ws.user.id, { id: ws.user.id, name: ws.user.name, email: ws.user.email }])
+    ).values()
+  );
+
+  const isWarehouseLocked = [
+    "PACKED",
+    "PACKED_AND_LABELLED",
+    "SHIPPED",
+    "IN_TRANSIT",
+    "PARTIALLY_DELIVERED",
+    "DELIVERED",
+    "COMPLETED",
+    "CANCELLED",
+  ].includes(order.status) || order.packages.length > 0;
+
+  const canAssignWarehouse = isAccounts || isWarehouse || isPrivileged;
+
   const hasConfirmedPayment = order.payments.some((p) => p.status === "CONFIRMED");
   const hasApprovedCredit = order.creditApprovals.some((ca) => ca.status === "APPROVED");
   const hasPendingPayment = order.payments.some((p) => p.status === "PENDING");
@@ -374,11 +396,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
               sellerSlug={sellerSlug}
               userRoles={ctx.roles}
               userPermissions={ctx.permissions}
-              warehouseStaff={warehouseStaff.map((ws) => ({
-                id: ws.user.id,
-                name: ws.user.name,
-                email: ws.user.email,
-              }))}
+              warehouseStaff={uniqueWarehouseStaff}
             />
 
             {/* DRAFT -> Submit Sales Order */}
@@ -453,6 +471,24 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                   Release & Send to Warehouse
                 </Button>
               </form>
+            )}
+
+            {/* Warehouse Assignment Quick Widget (Can be assigned/changed anytime until packing completion) */}
+            {isSentToWarehouse && (
+              <OrderWarehouseAssignment
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                sellerSlug={sellerSlug}
+                assignedUser={pickList?.assignedTo || null}
+                pickListNumber={pickList?.pickListNumber || null}
+                pickListStatus={pickList?.status || null}
+                orderStatus={order.status}
+                isLocked={isWarehouseLocked}
+                canAssign={canAssignWarehouse}
+                warehouseStaff={uniqueWarehouseStaff}
+                variant="header-compact"
+                action={assignWarehouseUserAction}
+              />
             )}
 
             {/* READY_FOR_WAREHOUSE -> Complete Pick List */}
@@ -817,47 +853,67 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                         Pick list generation and warehouse operations are locked until payment or dealer credit is confirmed by accounts.
                       </p>
                     </div>
-                  ) : pickList ? (
-                    <div className="space-y-4 text-xs">
-                      <div className="flex items-center justify-between border-b pb-3">
-                        <div>
-                          <div className="font-bold text-base text-slate-900">{pickList.pickListNumber}</div>
-                          <div className="text-slate-500">
-                            Created on {formatDateTime(pickList.createdAt)}
-                            {pickList.assignedTo && ` • Assigned to: ${pickList.assignedTo.name || pickList.assignedTo.email}`}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-teal-700 bg-teal-50 border-teal-200">{pickList.status}</Badge>
-                          <a
-                            href={`/api/orders/${order.id}/documents/pick-list`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 hover:bg-teal-800 text-white"
-                          >
-                            <Printer className="h-3.5 w-3.5" /> Print Pick List (PDF)
-                          </a>
-                        </div>
-                      </div>
-                      <div className="divide-y border rounded-lg overflow-hidden">
-                        {pickList.items.map((pi) => (
-                          <div key={pi.id} className="p-3 flex justify-between">
-                            <div>
-                              <span className="font-bold text-slate-900">{pi.sku}</span>
-                              <span className="text-slate-500 ml-2">(Loc: {pi.rackLocation || "R-01"} / {pi.binLocation || "B-01"})</span>
-                            </div>
-                            <span className="font-semibold text-teal-800">{pi.pickedQuantity} / {pi.approvedQuantity} units picked</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   ) : (
-                    <div className="py-8 text-center text-xs text-slate-500 space-y-1">
-                      <Warehouse className="h-8 w-8 mx-auto text-slate-300 mb-1" />
-                      <div className="font-semibold text-slate-700">Pick List Pending</div>
-                      <p className="text-[11px] text-slate-400">
-                        Pick list will be generated upon releasing order to the warehouse.
-                      </p>
+                    <div className="space-y-4 text-xs">
+                      {/* Interactive Warehouse Assignment & Re-assignment Card */}
+                      <OrderWarehouseAssignment
+                        orderId={order.id}
+                        orderNumber={order.orderNumber}
+                        sellerSlug={sellerSlug}
+                        assignedUser={pickList?.assignedTo || null}
+                        pickListNumber={pickList?.pickListNumber || null}
+                        pickListStatus={pickList?.status || "READY_FOR_WAREHOUSE"}
+                        orderStatus={order.status}
+                        isLocked={isWarehouseLocked}
+                        canAssign={canAssignWarehouse}
+                        warehouseStaff={uniqueWarehouseStaff}
+                        variant="card"
+                        action={assignWarehouseUserAction}
+                      />
+
+                      {pickList ? (
+                        <>
+                          <div className="flex items-center justify-between border-b pb-3 pt-2">
+                            <div>
+                              <div className="font-bold text-base text-slate-900">{pickList.pickListNumber} Pick Sheet</div>
+                              <div className="text-slate-500">
+                                Created on {formatDateTime(pickList.createdAt)}
+                                {pickList.assignedTo && ` • Assigned to: ${pickList.assignedTo.name || pickList.assignedTo.email}`}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-teal-700 bg-teal-50 border-teal-200">{pickList.status}</Badge>
+                              <a
+                                href={`/api/orders/${order.id}/documents/pick-list`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 hover:bg-teal-800 text-white"
+                              >
+                                <Printer className="h-3.5 w-3.5" /> Print Pick List (PDF)
+                              </a>
+                            </div>
+                          </div>
+                          <div className="divide-y border rounded-lg overflow-hidden">
+                            {pickList.items.map((pi) => (
+                              <div key={pi.id} className="p-3 flex justify-between">
+                                <div>
+                                  <span className="font-bold text-slate-900">{pi.sku}</span>
+                                  <span className="text-slate-500 ml-2">(Loc: {pi.rackLocation || "R-01"} / {pi.binLocation || "B-01"})</span>
+                                </div>
+                                <span className="font-semibold text-teal-800">{pi.pickedQuantity} / {pi.approvedQuantity} units picked</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="py-6 text-center text-xs text-slate-500 space-y-1">
+                          <Warehouse className="h-8 w-8 mx-auto text-slate-300 mb-1" />
+                          <div className="font-semibold text-slate-700">Pick List Generating</div>
+                          <p className="text-[11px] text-slate-400">
+                            Assign a warehouse staff member above to generate the pick list immediately.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
