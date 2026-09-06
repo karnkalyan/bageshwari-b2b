@@ -261,8 +261,15 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
           grandTotal: Number(proforma.grandTotal),
           status: proforma.status,
         } : null}
-        latestRevisionRemarks={latestRevision?.generalRemarks}
-        hasSubmittedPayment={order.payments.length > 0}
+        hasSubmittedPayment={order.payments.some((p) => p.status === "PENDING" || p.status === "CONFIRMED")}
+        pendingPayment={order.payments.find((p) => p.status === "PENDING") ? {
+          paymentNumber: order.payments.find((p) => p.status === "PENDING")!.paymentNumber,
+          method: order.payments.find((p) => p.status === "PENDING")!.method,
+          amount: Number(order.payments.find((p) => p.status === "PENDING")!.amount),
+          transactionRef: order.payments.find((p) => p.status === "PENDING")!.transactionRef,
+          createdAt: order.payments.find((p) => p.status === "PENDING")!.createdAt.toISOString(),
+        } : null}
+        rejectedPaymentRemarks={order.payments.find((p) => p.status === "REJECTED" && !order.payments.some(op => op.status === "PENDING" || op.status === "CONFIRMED"))?.remarks}
       />
 
       {/* Main Grid: Left Items + Right Order Summary */}

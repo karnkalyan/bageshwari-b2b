@@ -357,6 +357,16 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                   discountAmount: it.discountAmount,
                   accountsRemarks: it.accountsRemarks,
                 })),
+                payments: order.payments.map((p) => ({
+                  id: p.id,
+                  paymentNumber: p.paymentNumber,
+                  method: p.method,
+                  status: p.status,
+                  amount: p.amount,
+                  transactionRef: p.transactionRef,
+                  remarks: p.remarks,
+                  createdAt: p.createdAt,
+                })),
               }}
               sellerSlug={sellerSlug}
               userRoles={ctx.roles}
@@ -412,7 +422,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             )}
 
             {/* PROFORMA_INVOICE_CONFIRMED -> Send to Warehouse & Select Assigned Warehouse User (Only after payment is confirmed) */}
-            {(order.status === "PROFORMA_INVOICE_CONFIRMED" || (order.status === "PROFORMA_INVOICE_GENERATED" && isPaymentConfirmed)) && (isAccounts || isPrivileged) && (
+            {order.status === "PROFORMA_INVOICE_CONFIRMED" && isPaymentConfirmed && (isAccounts || isPrivileged) && (
               <form action={advanceWorkflowAction} className="flex items-center gap-1.5">
                 <input type="hidden" name="orderId" value={order.id} />
                 <input type="hidden" name="sellerSlug" value={sellerSlug} />

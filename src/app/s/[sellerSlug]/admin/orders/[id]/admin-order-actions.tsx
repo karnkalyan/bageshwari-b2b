@@ -4,9 +4,9 @@ import * as React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Calculator, CreditCard } from "lucide-react";
+import { Calculator, CreditCard, ShieldCheck, Clock } from "lucide-react";
 import { OrderRevisionDialog, type RevisionItemState } from "@/components/admin/order-revision-dialog";
-import { PaymentConfirmationDialog } from "@/components/admin/payment-confirmation-dialog";
+import { PaymentConfirmationDialog, type SubmittedPaymentInfo } from "@/components/admin/payment-confirmation-dialog";
 
 export interface AdminOrderActionItem {
   id: string;
@@ -18,6 +18,17 @@ export interface AdminOrderActionItem {
   dealerPrice: number;
   discountAmount?: number | null;
   accountsRemarks?: string | null;
+}
+
+export interface AdminOrderActionPayment {
+  id: string;
+  paymentNumber: string;
+  method: string;
+  status: string;
+  amount: number;
+  transactionRef?: string | null;
+  remarks?: string | null;
+  createdAt: string | Date;
 }
 
 export interface AdminOrderActionsProps {
@@ -35,6 +46,7 @@ export interface AdminOrderActionsProps {
       } | null;
     };
     items: AdminOrderActionItem[];
+    payments?: AdminOrderActionPayment[];
   };
   sellerSlug: string;
   userRoles?: string[];
@@ -63,21 +75,29 @@ export function AdminOrderActions({
     accountsRemarks: it.accountsRemarks || "",
   }));
 
-  // Role & Permission Checks
+  // Payments & Roles checks
+  const pendingPayment = order.payments?.find((p) => p.status === "PENDING") || null;
+  const isPaymentConfirmed = order.payments?.some((p) => p.status === "CONFIRMED") || false;
+
   const isPrivileged = userRoles.some((r) =>
     ["SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN", "STAFF"].includes(r)
   );
+
+  const isAccounts =
+    isPrivileged ||
+    userRoles.some((r) => ["ACCOUNTANT", "ACCOUNTS_MANAGER", "FINANCE"].includes(r)) ||
+    userPermissions.includes("payment.record") ||
+    userPermissions.includes("order.confirm");
+
+  const isSales =
+    userRoles.some((r) => ["SALES_REP", "SALES_MANAGER"].includes(r)) ||
+    userPermissions.includes("order.create");
 
   const canReviseRole =
     isPrivileged ||
     userRoles.some((r) => ["ACCOUNTANT", "ACCOUNTS_MANAGER", "FINANCE"].includes(r)) ||
     userPermissions.includes("order.revise") ||
     userPermissions.includes("order.review");
-
-  const canPayRole =
-    isPrivileged ||
-    userRoles.some((r) => ["ACCOUNTANT", "ACCOUNTS_MANAGER", "FINANCE"].includes(r)) ||
-    userPermissions.includes("payment.record");
 
   const canRevise =
     canReviseRole &&
@@ -88,12 +108,10 @@ export function AdminOrderActions({
       "DEALER_CHANGE_REQUESTED",
     ].includes(order.status);
 
-  const canConfirmPayment =
-    canPayRole &&
-    [
-      "PROFORMA_INVOICE_GENERATED",
-      "PROFORMA_INVOICE_CONFIRMED",
-    ].includes(order.status);
+  const isProformaStage = [
+    "PROFORMA_INVOICE_GENERATED",
+    "PROFORMA_INVOICE_CONFIRMED",
+  ].includes(order.status);
 
   const availableCredit = Number(order.dealer.creditProfile?.availableCredit ?? 500000);
 
@@ -111,14 +129,35 @@ export function AdminOrderActions({
           </Button>
         )}
 
-        {/* Payment Confirmation & Direct Warehouse Release */}
-        {canConfirmPayment && (
+        {/* 1. If Dealer (or Sales) has submitted payment -> Accountant verifies & approves */}
+        {isProformaStage && pendingPayment && isAccounts && (
           <Button
             size="sm"
             onClick={() => setIsPaymentOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm ring-2 ring-emerald-400/40"
           >
-            <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Confirm Payment & Release to Warehouse
+            <ShieldCheck className="h-4 w-4 mr-1.5 text-white" />
+            Verify & Approve Payment ({pendingPayment.paymentNumber})
+          </Button>
+        )}
+
+        {/* 2. If Dealer submitted payment and Sales views it */}
+        {isProformaStage && pendingPayment && isSales && !isAccounts && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+            <Clock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <span>Payment Details Submitted ({pendingPayment.paymentNumber}) • Awaiting Accounts Verification</span>
+          </div>
+        )}
+
+        {/* 3. If NO payment submitted yet and order is in Proforma stage */}
+        {isProformaStage && !pendingPayment && !isPaymentConfirmed && (
+          <Button
+            size="sm"
+            onClick={() => setIsPaymentOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs"
+          >
+            <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+            {isSales && !isAccounts ? "Record Payment (On Behalf of Dealer)" : "Record & Confirm Payment"}
           </Button>
         )}
       </div>
@@ -139,6 +178,8 @@ export function AdminOrderActions({
         dealerName={order.dealer.tradingName || order.dealer.legalName}
         dealerCode={order.dealer.code}
         availableCredit={availableCredit}
+        pendingPayment={pendingPayment}
+        isSales={isSales && !isAccounts}
         isOpen={isPaymentOpen}
         onClose={() => setIsPaymentOpen(false)}
         onSuccess={() => router.refresh()}

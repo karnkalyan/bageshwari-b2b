@@ -41,6 +41,14 @@ export interface DealerOrderActionsProps {
   } | null;
   latestRevisionRemarks?: string | null;
   hasSubmittedPayment?: boolean;
+  pendingPayment?: {
+    paymentNumber: string;
+    method: string;
+    amount: number;
+    transactionRef?: string | null;
+    createdAt: string | Date;
+  } | null;
+  rejectedPaymentRemarks?: string | null;
 }
 
 type PaymentOption = "CREDIT" | "ONLINE" | "CHEQUE" | "CASH" | "BANK_TRANSFER";
@@ -56,6 +64,8 @@ export function DealerOrderActions({
   proforma,
   latestRevisionRemarks,
   hasSubmittedPayment = false,
+  pendingPayment = null,
+  rejectedPaymentRemarks = null,
 }: DealerOrderActionsProps) {
   const router = useRouter();
   const [method, setMethod] = useState<PaymentOption>("CREDIT");
@@ -361,17 +371,56 @@ export function DealerOrderActions({
       )}
 
       {hasSubmittedPayment ? (
-        <div className="p-4 bg-emerald-100/70 rounded-xl border border-emerald-300 text-xs space-y-1">
-          <div className="flex items-center gap-2 font-bold text-emerald-950">
-            <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-            <span>Payment Terms Submitted & Awaiting Accounts Verification</span>
+        <div className="p-4 bg-emerald-50/80 rounded-xl border border-emerald-300 text-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+            <div className="flex items-center gap-2 font-bold text-emerald-950">
+              <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+              <span>Payment Details Submitted & Awaiting Accounts Verification</span>
+            </div>
+            {pendingPayment?.paymentNumber && (
+              <Badge variant="outline" className="bg-white text-emerald-800 border-emerald-300 font-mono text-[10px]">
+                {pendingPayment.paymentNumber}
+              </Badge>
+            )}
           </div>
+
+          {pendingPayment && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-white p-3 rounded-lg border border-emerald-100">
+              <div>
+                <span className="text-slate-400 block text-[10px]">Method</span>
+                <span className="font-bold text-slate-800">{pendingPayment.method}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Amount</span>
+                <span className="font-bold text-emerald-700">{formatCurrency(pendingPayment.amount)}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Reference / Trace</span>
+                <span className="font-mono font-bold text-slate-800">{pendingPayment.transactionRef || "N/A"}</span>
+              </div>
+            </div>
+          )}
+
           <p className="text-emerald-800 text-[11px]">
-            Your settlement details have been recorded. Once Accounts verifies the transaction, the order will release to warehouse for pick list generation.
+            Your payment reference is under verification by Accounts. Once verified in bank/cash, your order will automatically advance to warehouse picking & packaging.
           </p>
         </div>
       ) : (
-        <form onSubmit={handleSubmitPayment} className="space-y-4 text-xs">
+        <div className="space-y-4">
+          {rejectedPaymentRemarks && (
+            <div className="p-3.5 bg-red-50 text-red-900 rounded-xl border border-red-200 text-xs space-y-1">
+              <div className="font-bold flex items-center gap-1.5 text-red-800">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                Previous Payment Reference Not Approved by Accounts
+              </div>
+              <p className="text-red-700 text-[11px]">{rejectedPaymentRemarks}</p>
+              <p className="text-[11px] font-semibold text-red-800 pt-0.5">
+                Please re-check your payment deposit and enter valid transaction details below:
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmitPayment} className="space-y-4 text-xs">
           {/* Payment Method Selector */}
           <div className="space-y-2">
             <Label className="text-xs font-bold text-slate-800">Select Settlement Method</Label>
@@ -512,6 +561,7 @@ export function DealerOrderActions({
             </Button>
           </div>
         </form>
+        </div>
       )}
     </div>
   );

@@ -521,12 +521,15 @@ export async function dealerConfirmOrder(input: {
 export async function confirmPaymentAndAdvancePipeline(input: {
   sellerId: string;
   orderId: string;
-  method: PaymentMethod | "CREDIT" | "CHEQUE" | "CASH" | "ONLINE" | "BANK_TRANSFER" | "MOBILE_PAYMENT" | "OTHER";
+  action?: "APPROVE" | "REJECT" | "RECORD_ON_BEHALF";
+  method?: PaymentMethod | "CREDIT" | "CHEQUE" | "CASH" | "ONLINE" | "BANK_TRANSFER" | "MOBILE_PAYMENT" | "OTHER";
   amount?: number;
   transactionRef?: string;
   remarks?: string;
   actor: TransitionActor;
 }) {
+  const actionType: "APPROVE" | "REJECT" | "RECORD_ON_BEHALF" = input.action || "APPROVE";
+
   const updatedOrder = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findFirst({
       where: { id: input.orderId, sellerId: input.sellerId },
@@ -547,15 +550,96 @@ export async function confirmPaymentAndAdvancePipeline(input: {
       orderBy: { createdAt: "desc" },
     });
 
+    // CASE 1: Accounts Rejects Dealer's Submitted Payment Reference
+    if (actionType === "REJECT") {
+      if (existingPendingPayment) {
+        await tx.payment.update({
+          where: { id: existingPendingPayment.id },
+          data: {
+            status: "REJECTED",
+            remarks: input.remarks || "Payment rejected by Accounts: Verification failed.",
+            verifiedById: input.actor.userId,
+            verifiedAt: new Date(),
+          },
+        });
+      }
+
+      // Revert Order from PROFORMA_INVOICE_CONFIRMED back to PROFORMA_INVOICE_GENERATED
+      if (order.status === "PROFORMA_INVOICE_CONFIRMED") {
+        await transitionOrderStatusInTransaction(tx, {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          targetStatus: "PROFORMA_INVOICE_GENERATED",
+          actor: input.actor,
+          reason: input.remarks || "Payment reference rejected by Accounts. Reverted for re-submission.",
+        });
+      }
+
+      return tx.order.findUnique({
+        where: { id: order.id },
+        include: {
+          proformaInvoices: true,
+          payments: true,
+          creditApprovals: true,
+          dealer: true,
+          seller: { select: { slug: true } },
+        },
+      });
+    }
+
+    // CASE 2: Salesperson (or staff) Records Payment on Behalf of Dealer
+    if (actionType === "RECORD_ON_BEHALF") {
+      const selectedMethod = (input.method || "ONLINE") as PaymentMethod;
+      const paymentNumber = await nextDocumentNumber(tx, input.sellerId, "PAYMENT_RECEIPT", "REC");
+      await tx.payment.create({
+        data: {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          paymentNumber,
+          method: selectedMethod,
+          status: "PENDING",
+          amount: new Prisma.Decimal(amount),
+          transactionRef: input.transactionRef || undefined,
+          remarks: input.remarks || `Recorded by Sales on behalf of dealer: ${selectedMethod}`,
+          recordedById: input.actor.userId,
+        },
+      });
+
+      if (order.status === "PROFORMA_INVOICE_GENERATED") {
+        await transitionOrderStatusInTransaction(tx, {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          targetStatus: "PROFORMA_INVOICE_CONFIRMED",
+          actor: input.actor,
+          reason: `Sales recorded payment details on behalf of dealer (${selectedMethod}${input.transactionRef ? `, Ref: ${input.transactionRef}` : ""}). Ready for Accounts payment verification.`,
+        });
+      }
+
+      return tx.order.findUnique({
+        where: { id: order.id },
+        include: {
+          proformaInvoices: true,
+          payments: true,
+          creditApprovals: true,
+          dealer: true,
+          seller: { select: { slug: true } },
+        },
+      });
+    }
+
+    // CASE 3: Accounts Approves / Confirms Payment & Releases to Warehouse
+    const selectedMethod = (input.method || existingPendingPayment?.method || "ONLINE") as PaymentMethod;
+    const finalTransactionRef = input.transactionRef || existingPendingPayment?.transactionRef || `${selectedMethod}-PAYMENT`;
+
     if (existingPendingPayment) {
       await tx.payment.update({
         where: { id: existingPendingPayment.id },
         data: {
-          method: input.method as PaymentMethod,
+          method: selectedMethod,
           status: "CONFIRMED",
           amount: new Prisma.Decimal(amount),
-          transactionRef: input.transactionRef || existingPendingPayment.transactionRef || `${input.method}-PAYMENT`,
-          remarks: input.remarks || `Payment verified by Accounts: ${input.method}`,
+          transactionRef: finalTransactionRef,
+          remarks: input.remarks || `Payment verified by Accounts: ${selectedMethod}`,
           verifiedById: input.actor.userId,
           verifiedAt: new Date(),
         },
@@ -567,11 +651,11 @@ export async function confirmPaymentAndAdvancePipeline(input: {
           sellerId: input.sellerId,
           orderId: order.id,
           paymentNumber,
-          method: input.method as PaymentMethod,
+          method: selectedMethod,
           status: "CONFIRMED",
           amount: new Prisma.Decimal(amount),
-          transactionRef: input.transactionRef || `${input.method}-PAYMENT`,
-          remarks: input.remarks || `Payment verified by Accounts: ${input.method}`,
+          transactionRef: finalTransactionRef,
+          remarks: input.remarks || `Payment verified by Accounts: ${selectedMethod}`,
           recordedById: input.actor.userId,
           verifiedById: input.actor.userId,
           verifiedAt: new Date(),
@@ -580,7 +664,7 @@ export async function confirmPaymentAndAdvancePipeline(input: {
     }
 
     // 2. If Credit, record or update Credit Approval
-    if (input.method === "CREDIT") {
+    if (selectedMethod === "CREDIT") {
       const creditProfile = order.dealer.creditProfile;
       const existingCreditApproval = await tx.creditApproval.findFirst({
         where: { orderId: order.id },
@@ -647,7 +731,7 @@ export async function confirmPaymentAndAdvancePipeline(input: {
             taxTotal: order.taxTotal,
             freightTotal: order.freightTotal,
             grandTotal: order.grandTotal,
-            paymentTerms: `Confirmed via ${input.method}${input.transactionRef ? ` (Ref: ${input.transactionRef})` : ""}`,
+            paymentTerms: `Confirmed via ${selectedMethod}${finalTransactionRef ? ` (Ref: ${finalTransactionRef})` : ""}`,
             generatedById: input.actor.userId,
             remarks: input.remarks || "Proforma Invoice confirmed upon payment verification.",
             items: {
@@ -723,25 +807,47 @@ export async function confirmPaymentAndAdvancePipeline(input: {
 
   if (updatedOrder) {
     const sellerSlug = updatedOrder.seller?.slug || "bageshwari";
-    // 1. Notify Warehouse team for picking
-    await sendWorkflowNotification({
-      sellerId: input.sellerId,
-      targetRoles: ["WAREHOUSE_MANAGER", "WAREHOUSE_USER", "WAREHOUSE_PICKER", "ADMIN"],
-      title: `Order Ready for Warehouse: ${updatedOrder.orderNumber}`,
-      message: `Order ${updatedOrder.orderNumber} for ${updatedOrder.dealer.legalName} released to warehouse. Pick list ready for fulfillment.`,
-      linkUrl: `/s/${sellerSlug}/admin/warehouse`,
-      excludeUserId: input.actor.userId,
-    });
 
-    // 2. Notify Dealer
-    await sendWorkflowNotification({
-      sellerId: input.sellerId,
-      targetDealerId: updatedOrder.dealerId,
-      title: `Payment Confirmed: ${updatedOrder.orderNumber}`,
-      message: `Your payment was verified by Accounts. Proforma invoice confirmed and order released to warehouse fulfillment.`,
-      linkUrl: `/dealer/orders/${updatedOrder.id}`,
-      excludeUserId: input.actor.userId,
-    });
+    if (actionType === "REJECT") {
+      // 1. Notify Dealer of Rejection
+      await sendWorkflowNotification({
+        sellerId: input.sellerId,
+        targetDealerId: updatedOrder.dealerId,
+        title: `Payment Reference Rejected: ${updatedOrder.orderNumber}`,
+        message: `Accounts was unable to verify your payment reference for order ${updatedOrder.orderNumber}. Reason: ${input.remarks || "Payment not received in bank account"}. Please re-submit valid payment details.`,
+        linkUrl: `/dealer/orders/${updatedOrder.id}`,
+        excludeUserId: input.actor.userId,
+      });
+    } else if (actionType === "RECORD_ON_BEHALF") {
+      // 2. Notify Accounts that Sales submitted payment on behalf of dealer
+      await sendWorkflowNotification({
+        sellerId: input.sellerId,
+        targetRoles: ["ACCOUNTANT", "ACCOUNTS_MANAGER", "ADMIN", "SUPER_ADMIN"],
+        title: `Payment Details Submitted by Sales: ${updatedOrder.orderNumber}`,
+        message: `Sales recorded payment details for ${updatedOrder.dealer.legalName} (${input.method || "ONLINE"}, Ref: ${input.transactionRef || "N/A"}). Ready for Accounts verification.`,
+        linkUrl: `/s/${sellerSlug}/admin/orders/${updatedOrder.id}`,
+        excludeUserId: input.actor.userId,
+      });
+    } else {
+      // 3. Normal Approval: Notify Warehouse team for picking & Dealer
+      await sendWorkflowNotification({
+        sellerId: input.sellerId,
+        targetRoles: ["WAREHOUSE_MANAGER", "WAREHOUSE_USER", "WAREHOUSE_PICKER", "ADMIN"],
+        title: `Order Ready for Warehouse: ${updatedOrder.orderNumber}`,
+        message: `Order ${updatedOrder.orderNumber} for ${updatedOrder.dealer.legalName} released to warehouse. Pick list ready for fulfillment.`,
+        linkUrl: `/s/${sellerSlug}/admin/warehouse`,
+        excludeUserId: input.actor.userId,
+      });
+
+      await sendWorkflowNotification({
+        sellerId: input.sellerId,
+        targetDealerId: updatedOrder.dealerId,
+        title: `Payment Confirmed: ${updatedOrder.orderNumber}`,
+        message: `Your payment was verified by Accounts. Proforma invoice confirmed and order released to warehouse fulfillment.`,
+        linkUrl: `/dealer/orders/${updatedOrder.id}`,
+        excludeUserId: input.actor.userId,
+      });
+    }
   }
 
   // Serialize Prisma Decimals to Numbers for clean Client Component / API Response handling

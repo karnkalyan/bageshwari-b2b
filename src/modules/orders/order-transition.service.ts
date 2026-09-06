@@ -29,7 +29,7 @@ const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
   ],
   FINAL_ORDER_CONFIRMED: ["PROFORMA_INVOICE_GENERATED", "CANCELLED"],
   PROFORMA_INVOICE_GENERATED: ["PROFORMA_INVOICE_CONFIRMED", "CANCELLED"],
-  PROFORMA_INVOICE_CONFIRMED: ["READY_FOR_WAREHOUSE", "CANCELLED"],
+  PROFORMA_INVOICE_CONFIRMED: ["READY_FOR_WAREHOUSE", "PROFORMA_INVOICE_GENERATED", "CANCELLED"],
   READY_FOR_WAREHOUSE: [
     "PICK_LIST_GENERATED",
     "PICKING_IN_PROGRESS",
@@ -331,7 +331,7 @@ function assertBusinessPrerequisites(
   order: OrderWithWorkflow,
   target: OrderStatus,
 ) {
-  if (target === "PROFORMA_INVOICE_GENERATED" && !["FINAL_ORDER_CONFIRMED", "PENDING_ACCOUNTS_REVIEW", "WAITING_FOR_DEALER_CONFIRMATION"].includes(order.status)) {
+  if (target === "PROFORMA_INVOICE_GENERATED" && !["FINAL_ORDER_CONFIRMED", "PENDING_ACCOUNTS_REVIEW", "WAITING_FOR_DEALER_CONFIRMATION", "PROFORMA_INVOICE_CONFIRMED"].includes(order.status)) {
     throw new OrderTransitionError("Order confirmation is required.", "FINAL_CONFIRMATION_REQUIRED");
   }
   if (target === "PROFORMA_INVOICE_CONFIRMED" && !order.proformaInvoices[0]) {
