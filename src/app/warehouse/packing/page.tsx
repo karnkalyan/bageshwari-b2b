@@ -1,1 +1,5 @@
-export default function PackingPage() { return <section className="p-6"><div className="admin-card p-6"><h2 className="text-lg font-black text-[#092f5c]">Packing queue</h2><p className="mt-2 text-sm text-slate-500">Orders appear here after confirmed payment or approved credit.</p></div></section>; }
+import Page from "@/app/s/[sellerSlug]/admin/warehouse/page";
+
+export default function WarehousePackingPage() {
+  return Page({ params: Promise.resolve({ sellerSlug: "bageshwari" }) });
+}

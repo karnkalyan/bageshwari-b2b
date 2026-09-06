@@ -46,6 +46,9 @@ export default async function DispatchPortalPage({ params, searchParams }: Dispa
       "DISPATCH_USER",
       "LOGISTICS_MANAGER",
       "WAREHOUSE_MANAGER",
+      "WAREHOUSE_USER",
+      "WAREHOUSE_PICKER",
+      "PACKING_USER",
       "ACCOUNTANT",
       "ACCOUNTS_MANAGER",
       "SALES_MANAGER"

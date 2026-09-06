@@ -59,6 +59,18 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
     "PACKING_USER"
   );
 
+  const canAssignPicker = hasRole(
+    ctx,
+    "SUPER_ADMIN",
+    "PLATFORM_ADMIN",
+    "SELLER_OWNER",
+    "ADMIN",
+    "STAFF",
+    "ACCOUNTANT",
+    "ACCOUNTS_MANAGER",
+    "WAREHOUSE_MANAGER"
+  );
+
   const isAuthorized =
     isManager ||
     isWarehouseUser ||
@@ -334,8 +346,8 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
         </div>
       </div>
 
-      {/* Ready Orders Queue (Awaiting Picking / Assignment) */}
-      {(isManager || isWarehouseUser) && readyOrders.length > 0 && (
+      {/* Ready Orders Queue (Awaiting Picking / Assignment - Only for Admins, Accounts, and Warehouse Managers) */}
+      {canAssignPicker && readyOrders.length > 0 && (
         <div className="glass-card overflow-hidden border-l-4 border-l-purple-500">
           <div className="p-4 border-b border-border font-bold text-sm bg-muted/40 text-foreground flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -486,7 +498,7 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                                 </Badge>
                               )}
                             </div>
-                            {isManager && pl.status !== "COMPLETED" && warehouseStaff.length > 0 && (
+                            {canAssignPicker && pl.status !== "COMPLETED" && warehouseStaff.length > 0 && (
                               <form action={assignPickerAction} className="flex items-center gap-1 pt-0.5">
                                 <input type="hidden" name="pickListId" value={pl.id} />
                                 <select
@@ -506,7 +518,7 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                               </form>
                             )}
                           </div>
-                        ) : isManager && warehouseStaff.length > 0 ? (
+                        ) : canAssignPicker && warehouseStaff.length > 0 ? (
                           <form action={assignPickerAction} className="flex items-center gap-1">
                             <input type="hidden" name="pickListId" value={pl.id} />
                             <select
@@ -642,12 +654,14 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                             </form>
                           )}
 
-                          {/* 6. View Order Details */}
-                          <Link href={`/admin/orders/${pl.orderId}`}>
-                            <Button size="sm" variant="outline" className="h-7 text-xs px-2 border-border">
-                              Order
-                            </Button>
-                          </Link>
+                          {/* 6. View Order Details (Only for Managers / Accounts / Admins) */}
+                          {canAssignPicker && (
+                            <Link href={`/admin/orders/${pl.orderId}`}>
+                              <Button size="sm" variant="outline" className="h-7 text-xs px-2 border-border">
+                                Order
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

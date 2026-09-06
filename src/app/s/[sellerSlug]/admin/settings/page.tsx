@@ -90,6 +90,22 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
     defaultCreditPeriodDays: companyRaw?.defaultCreditPeriodDays ? Number(companyRaw.defaultCreditPeriodDays) : 30,
     maxCreditLimit: companyRaw?.maxCreditLimit ? Number(companyRaw.maxCreditLimit) : 5000000,
     creditTermsPolicy: companyRaw?.creditTermsPolicy || "Standard 30-Day Net B2B Commercial Credit Facility subject to approved limit and periodic account reconciliation.",
+    themeConfig: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          return JSON.parse(companyRaw.socialLinksJson);
+        } catch {}
+      }
+      return {
+        primaryColor: "#0b2d55",
+        accentColor: "#d97706",
+        themeMode: "light",
+        headerStyle: "dark",
+        brandTagline: "Authorized B2B Tractor Parts & Agricultural Machinery Distributor",
+        cardRadius: "rounded-xl",
+        tableDensity: "standard",
+      };
+    })(),
   };
 
   const serializedCategories: SerializedCategoryTax[] = categoriesRaw.map((c) => ({

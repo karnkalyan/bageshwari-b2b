@@ -31,6 +31,17 @@ const updateSettingsSchema = z.object({
   defaultCreditPeriodDays: z.coerce.number().int().min(0).max(365).optional(),
   maxCreditLimit: z.coerce.number().min(0).optional(),
   creditTermsPolicy: z.string().trim().max(2000).optional().nullable(),
+  themeConfig: z
+    .object({
+      primaryColor: z.string().optional(),
+      accentColor: z.string().optional(),
+      themeMode: z.enum(["light", "dark", "system"]).optional(),
+      headerStyle: z.string().optional(),
+      brandTagline: z.string().optional(),
+      cardRadius: z.string().optional(),
+      tableDensity: z.string().optional(),
+    })
+    .optional(),
   categories: z.array(
     z.object({
       id: z.string(),
@@ -166,6 +177,7 @@ export async function PUT(request: Request) {
             ...(companyData.defaultCreditPeriodDays !== undefined ? { defaultCreditPeriodDays: companyData.defaultCreditPeriodDays } : {}),
             ...(companyData.maxCreditLimit !== undefined ? { maxCreditLimit: new Prisma.Decimal(companyData.maxCreditLimit) } : {}),
             ...(companyData.creditTermsPolicy !== undefined ? { creditTermsPolicy: companyData.creditTermsPolicy } : {}),
+            ...(companyData.themeConfig !== undefined ? { socialLinksJson: JSON.stringify(companyData.themeConfig) } : {}),
           },
           create: {
             id: "bageshwari-tractors",
@@ -192,6 +204,7 @@ export async function PUT(request: Request) {
             defaultCreditPeriodDays: companyData.defaultCreditPeriodDays ?? 30,
             maxCreditLimit: new Prisma.Decimal(companyData.maxCreditLimit ?? 5000000),
             creditTermsPolicy: companyData.creditTermsPolicy || null,
+            socialLinksJson: companyData.themeConfig ? JSON.stringify(companyData.themeConfig) : null,
           },
         });
       } catch {

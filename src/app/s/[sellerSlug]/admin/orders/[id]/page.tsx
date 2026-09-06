@@ -86,6 +86,15 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
   const isDispatch = isPrivileged || hasRole(ctx, "DISPATCH_USER", "LOGISTICS_MANAGER") || hasPermission(ctx, "shipment.dispatch");
   const isSales = isPrivileged || hasRole(ctx, "SALES_REP", "SALES_MANAGER") || hasPermission(ctx, "order.submit");
 
+  // A regular warehouse picker should not view commercial order details (pricing, margins, accounting notes, revisions)
+  const isCommercialUser = isPrivileged || isAccounts || isSales || isDispatch || hasRole(ctx, "WAREHOUSE_MANAGER");
+  if (!isCommercialUser && hasRole(ctx, "WAREHOUSE_USER", "WAREHOUSE_PICKER", "PACKING_USER")) {
+    redirect(`/s/${sellerSlug}/admin/warehouse`);
+  }
+
+  // Only warehouse staff or admin can pack cartons — NOT accounts
+  const canPackCartons = isPrivileged || hasRole(ctx, "WAREHOUSE_MANAGER", "WAREHOUSE_USER", "WAREHOUSE_PICKER", "PACKING_USER");
+
   // Convert raw Prisma objects with Decimal / complex types into pure serializable JSON primitives
   const order = {
     id: rawOrder.id,
@@ -513,7 +522,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             )}
 
             {/* Interactive Carton Packaging Console Trigger */}
-            {isSentToWarehouse && (isWarehouse || isPrivileged || isAccounts) && (
+            {isSentToWarehouse && canPackCartons && (
               <CartonPackingDialog
                 orderId={order.id}
                 orderNumber={order.orderNumber}
@@ -1016,7 +1025,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           {/* Interactive Carton Packing Console */}
-                          {(isWarehouse || isPrivileged || isAccounts) && (
+                          {canPackCartons && (
                             <CartonPackingDialog
                               orderId={order.id}
                               orderNumber={order.orderNumber}
@@ -1077,7 +1086,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                               Specify how many cartons this order has, carton dimensions (Length × Width × Height), gross weight, and which items are packed into each carton.
                             </p>
                           </div>
-                          {(isWarehouse || isPrivileged || isAccounts) && (
+                          {canPackCartons && (
                             <CartonPackingDialog
                               orderId={order.id}
                               orderNumber={order.orderNumber}

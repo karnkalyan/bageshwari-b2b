@@ -199,10 +199,10 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
   // 3. Package Manifest Table
   const colX = {
     box: MARGIN,
-    pkgNum: MARGIN + 60,
-    typeDim: MARGIN + 160,
-    weight: MARGIN + 280,
-    contents: MARGIN + 350,
+    pkgNum: MARGIN + 52,
+    typeDim: MARGIN + 110,
+    weight: MARGIN + 255,
+    contents: MARGIN + 315,
     check: MARGIN + CONTENT_WIDTH,
   };
 
@@ -213,20 +213,23 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
     borderWidth: 0.75,
   });
 
-  drawText(page, "BOX #", colX.box + 6, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawText(page, "CARTON NUMBER", colX.pkgNum + 6, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawText(page, "TYPE & DIMENSIONS", colX.typeDim + 6, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawRightText(page, "GROSS WT", colX.weight + 45, y - 12, bold, { size: 7.5, color: COLORS.primary });
-  drawText(page, "PACKED ITEMS / CONTENTS", colX.contents + 6, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "BOX #", colX.box + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "CARTON NO", colX.pkgNum + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "TYPE & DIMENSIONS", colX.typeDim + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
+  drawRightText(page, "GROSS WT", colX.weight + 52, y - 12, bold, { size: 7.5, color: COLORS.primary });
+  drawText(page, "PACKED ITEMS / CONTENTS", colX.contents + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
   drawRightText(page, "STATUS", colX.check - 6, y - 12, bold, { size: 7.5, color: COLORS.primary });
 
   y -= headerH;
 
   for (let i = 0; i < data.packages.length; i++) {
     const pkg = data.packages[i];
-    const rowH = 26;
+    const itemsCount = pkg.items && pkg.items.length > 0 ? pkg.items.length : 1;
+    // Dynamic row height based on item count, minimum 32 pt
+    const rowH = Math.max(32, 16 + itemsCount * 11);
 
-    if (y - rowH < MARGIN + 90) {
+    // Ensure we don't collide with the bottom margin or consolidation summary box
+    if (y - rowH < MARGIN + 70) {
       page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       y = PAGE_HEIGHT - MARGIN - 20;
     }
@@ -238,40 +241,75 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
     });
 
     const dimStr = pkg.length && pkg.width && pkg.height
-      ? `${pkg.length}×${pkg.width}×${pkg.height} cm`
-      : "Standard Box";
+      ? `${pkg.length} x ${pkg.width} x ${pkg.height} cm`
+      : "Standard Dimensions";
 
-    const itemsSummary = pkg.items && pkg.items.length > 0
-      ? pkg.items.map((it) => `${it.sku} (${it.quantity} ${it.unit || "PCS"})`).join(", ")
-      : pkg.handlingInstructions || "Assorted Spare Parts (Sealed)";
+    const textBaselineY = y - 14;
 
-    drawText(page, `Box ${pkg.boxIndex || i + 1} of ${data.totalCartons}`, colX.box + 6, y - 16, {
+    // Box Index
+    drawText(page, `Box ${pkg.boxIndex || i + 1}/${data.totalCartons}`, colX.box + 4, textBaselineY, {
       size: 7.5,
       font: bold,
       color: COLORS.primary,
     });
-    drawText(page, pkg.packageNumber, colX.pkgNum + 6, y - 16, {
+
+    // Carton Number
+    drawText(page, pkg.packageNumber, colX.pkgNum + 4, textBaselineY, {
       size: 7.5,
       font: bold,
       color: COLORS.black,
     });
-    drawText(page, `${pkg.packageType || "Carton"} (${dimStr})`, colX.typeDim + 6, y - 16, {
+
+    // Box Type (Line 1) & Dimensions (Line 2)
+    drawText(page, pkg.packageType || "Standard Corrugated Carton", colX.typeDim + 4, textBaselineY, {
+      size: 7.5,
+      font: bold,
+      color: COLORS.primary,
+      maxWidth: 138,
+    });
+    drawText(page, dimStr, colX.typeDim + 4, textBaselineY - 11, {
       size: 7,
       font: regular,
       color: COLORS.secondary,
+      maxWidth: 138,
     });
-    drawRightText(page, `${Number(pkg.weight).toFixed(2)} KG`, colX.weight + 45, y - 16, bold, {
+
+    // Gross Weight (Right-aligned inside weight column)
+    drawRightText(page, `${Number(pkg.weight).toFixed(2)} KG`, colX.weight + 52, textBaselineY, bold, {
       size: 7.5,
       color: COLORS.primary,
     });
-    drawText(page, itemsSummary, colX.contents + 6, y - 16, {
-      size: 7,
-      font: regular,
-      color: COLORS.secondary,
-      maxWidth: 130,
-    });
-    drawRightText(page, "[✓] SEALED", colX.check - 6, y - 16, bold, {
-      size: 7,
+
+    // Items List (Clean line-by-line breakdown)
+    if (pkg.items && pkg.items.length > 0) {
+      pkg.items.forEach((it, itmIdx) => {
+        const itemLineY = textBaselineY - itmIdx * 11;
+        const itemText = it.name ? `${it.sku} - ${it.name}: ${it.quantity} ${it.unit || "PCS"}` : `${it.sku} (${it.quantity} ${it.unit || "PCS"})`;
+        drawText(page, itemText, colX.contents + 4, itemLineY, {
+          size: 6.8,
+          font: regular,
+          color: COLORS.secondary,
+          maxWidth: 148,
+        });
+      });
+    } else {
+      drawText(
+        page,
+        pkg.handlingInstructions || "Assorted Spare Parts (Sealed)",
+        colX.contents + 4,
+        textBaselineY,
+        {
+          size: 7,
+          font: regular,
+          color: COLORS.secondary,
+          maxWidth: 148,
+        }
+      );
+    }
+
+    // Status: ASCII-safe SEALED (no missing Unicode checkmark box)
+    drawRightText(page, "SEALED", colX.check - 6, textBaselineY, bold, {
+      size: 7.5,
       color: COLORS.success,
     });
 

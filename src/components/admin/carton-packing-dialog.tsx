@@ -433,7 +433,7 @@ export function CartonPackingDialog({
               </div>
               <div className="h-6 w-px bg-white/20" />
               <div>
-                <span className="text-[10px] text-purple-300 block font-semibold uppercase">Packing Status</span>
+                <span className="text-[10px] text-purple-300 block font-semibold uppercase">Total Items</span>
                 <span
                   className={`font-bold ${
                     totalPackedUnits === totalOrderUnits
@@ -567,22 +567,45 @@ export function CartonPackingDialog({
 
               {/* Carton Dimensions & Weight Row */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-muted/30 p-3 rounded-lg border">
-                {/* Box Type */}
+                {/* Box Type with Presets & Manual Custom Input */}
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Carton / Box Type
-                  </Label>
-                  <select
-                    value={currentCarton.packageType}
-                    onChange={(e) => handleActiveCartonFieldChange("packageType", e.target.value)}
-                    className="w-full h-8 text-xs border rounded-md px-2 bg-card text-foreground font-medium outline-none"
-                  >
-                    {PACKAGE_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Carton / Box Type
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isPreset = PACKAGE_TYPE_OPTIONS.includes(currentCarton.packageType);
+                        handleActiveCartonFieldChange("packageType", isPreset ? "" : PACKAGE_TYPE_OPTIONS[0]);
+                      }}
+                      className="text-[10px] text-purple-600 hover:underline font-semibold"
+                    >
+                      {PACKAGE_TYPE_OPTIONS.includes(currentCarton.packageType) ? "Custom Name" : "Presets"}
+                    </button>
+                  </div>
+                  {PACKAGE_TYPE_OPTIONS.includes(currentCarton.packageType) ? (
+                    <select
+                      value={currentCarton.packageType}
+                      onChange={(e) => handleActiveCartonFieldChange("packageType", e.target.value)}
+                      className="w-full h-8 text-xs border rounded-md px-2 bg-card text-foreground font-medium outline-none"
+                    >
+                      {PACKAGE_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      type="text"
+                      value={currentCarton.packageType}
+                      onChange={(e) => handleActiveCartonFieldChange("packageType", e.target.value)}
+                      placeholder="e.g. Wooden Crate 50KG, Poly Bag..."
+                      className="h-8 text-xs"
+                      autoFocus
+                    />
+                  )}
                 </div>
 
                 {/* Dimensions (L x W x H) */}
