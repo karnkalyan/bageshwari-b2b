@@ -26,6 +26,7 @@ import { revalidatePath } from "next/cache";
 import { Pagination } from "@/components/ui/pagination";
 import { sendWorkflowNotification } from "@/services/notification.service";
 import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
+import { CartonPackingDialog } from "@/components/admin/carton-packing-dialog";
 
 interface WarehousePageProps {
   params: Promise<{ sellerSlug: string }>;
@@ -94,7 +95,17 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
         order: {
           include: {
             dealer: { select: { tradingName: true, legalName: true } },
-            packages: { select: { id: true, packageNumber: true } },
+            items: {
+              select: {
+                id: true,
+                sku: true,
+                productName: true,
+                originalQuantity: true,
+                approvedQuantity: true,
+                product: { select: { unitCode: true } },
+              },
+            },
+            packages: true,
             shipments: { select: { id: true, challanNumber: true } },
           },
         },
@@ -427,6 +438,30 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                   const canComplete =
                     pl.status !== "COMPLETED" && (isManager || isAssignedToCurrent);
 
+                  const packingItems = (pl.order?.items || []).map((it) => ({
+                    id: it.id,
+                    sku: it.sku,
+                    productName: it.productName,
+                    approvedQuantity:
+                      it.approvedQuantity !== null
+                        ? Number(it.approvedQuantity)
+                        : Number(it.originalQuantity),
+                    unitCode: it.product?.unitCode || "PCS",
+                  }));
+
+                  const existingPackages = (pl.order?.packages || []).map((pkg) => ({
+                    id: pkg.id,
+                    packageNumber: pkg.packageNumber,
+                    packageType: pkg.packageType,
+                    length: pkg.length !== null ? Number(pkg.length) : null,
+                    width: pkg.width !== null ? Number(pkg.width) : null,
+                    height: pkg.height !== null ? Number(pkg.height) : null,
+                    weight: pkg.weight !== null ? Number(pkg.weight) : null,
+                    status: pkg.status,
+                    handlingInstructions: pkg.handlingInstructions,
+                    itemsJson: pkg.itemsJson,
+                  }));
+
                   return (
                     <tr key={pl.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3.5 font-mono font-bold text-foreground">
@@ -500,7 +535,16 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                         )}
                       </td>
                       <td className="px-4 py-3.5 text-center font-bold text-foreground">
-                        {pl.items.length} item(s)
+                        <div>{pl.items.length} item(s)</div>
+                        {existingPackages.length > 0 ? (
+                          <div className="text-[10px] text-purple-600 font-semibold mt-0.5">
+                            📦 {existingPackages.length} carton(s)
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-muted-foreground font-normal mt-0.5">
+                            0 cartons
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <Badge
@@ -517,6 +561,28 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          {/* 0. Interactive Carton Packing Console Trigger */}
+                          {pl.order && (
+                            <CartonPackingDialog
+                              orderId={pl.order.id}
+                              orderNumber={pl.order.orderNumber}
+                              sellerSlug={sellerSlug}
+                              dealerName={pl.order.dealer?.tradingName || pl.order.dealer?.legalName || "Dealer"}
+                              orderItems={packingItems}
+                              existingPackages={existingPackages}
+                              trigger={
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center gap-1 shadow-2xs"
+                                  title="Manage Carton Sizes, Items allocation, Gross Weights & Packing List"
+                                >
+                                  <Package className="h-3 w-3" />
+                                  {existingPackages.length > 0 ? `Cartons (${existingPackages.length})` : "Pack Cartons"}
+                                </Button>
+                              }
+                            />
+                          )}
+
                           {/* 1. Printable Pick Sheet */}
                           <a
                             href={`/api/orders/${pl.orderId}/documents/pick-list`}

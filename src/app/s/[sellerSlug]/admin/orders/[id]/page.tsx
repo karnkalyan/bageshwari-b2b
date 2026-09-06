@@ -9,12 +9,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ArrowLeft, CheckCircle2, FileText, Warehouse, Truck, Clock, ShieldCheck,
   AlertTriangle, Receipt, CreditCard, ChevronRight, XCircle, Download, ExternalLink,
-  PackageCheck, Printer, Tag, History, Edit3, UserCheck
+  PackageCheck, Package, Printer, Tag, History, Edit3, UserCheck
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
 import { advanceWorkflowAction, assignWarehouseUserAction } from "./actions";
 import { AdminOrderActions } from "./admin-order-actions";
 import { OrderWarehouseAssignment } from "@/components/admin/order-warehouse-assignment";
+import { CartonPackingDialog } from "@/components/admin/carton-packing-dialog";
 
 interface OrderDetailsProps {
   params: Promise<{ sellerSlug: string; id: string }>;
@@ -119,6 +120,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
             creditPeriodDays: rawOrder.dealer.creditProfile.creditPeriodDays,
           }
         : null,
+      city: rawOrder.dealer.addresses[0]?.city || null,
     },
     items: rawOrder.items.map((it) => ({
       id: it.id,
@@ -201,6 +203,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
       status: pkg.status,
       barcodeData: pkg.barcodeData,
       handlingInstructions: pkg.handlingInstructions,
+      itemsJson: pkg.itemsJson,
       createdAt: pkg.createdAt,
     })),
     shipments: rawOrder.shipments.map((shp) => ({
@@ -326,6 +329,14 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
     "DELIVERED",
     "COMPLETED",
   ].includes(order.status);
+
+  const orderItemsForPacking = order.items.map((it) => ({
+    id: it.id,
+    sku: it.sku,
+    productName: it.productName,
+    approvedQuantity: it.approvedQuantity ?? it.originalQuantity,
+    unitCode: it.product?.unitCode || "PCS",
+  }));
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-7 p-4 md:p-7">
@@ -499,6 +510,25 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                 <input type="hidden" name="nextStatus" value="PICK_LIST_COMPLETED" />
                 <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white font-bold">Complete Pick List</Button>
               </form>
+            )}
+
+            {/* Interactive Carton Packaging Console Trigger */}
+            {isSentToWarehouse && (isWarehouse || isPrivileged || isAccounts) && (
+              <CartonPackingDialog
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                sellerSlug={sellerSlug}
+                dealerName={order.dealer?.tradingName || order.dealer?.legalName || "Dealer"}
+                dealerCity={order.dealer?.city || null}
+                orderItems={orderItemsForPacking}
+                existingPackages={order.packages}
+                trigger={
+                  <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center gap-1.5 shadow-2xs">
+                    <PackageCheck className="h-4 w-4" />
+                    {order.packages.length > 0 ? `Pack Cartons (${order.packages.length})` : "Pack Cartons"}
+                  </Button>
+                }
+              />
             )}
 
             {/* PICK_LIST_COMPLETED -> Issue Final Tax Invoice */}
@@ -975,28 +1005,54 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center justify-between border-b pb-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-3">
                         <div>
                           <div className="font-bold text-base text-slate-900">Carton Packages & Logistics Manifest</div>
-                          <div className="text-xs text-slate-500">Total Packages: {order.packages.length} Cartons</div>
+                          <div className="text-xs text-slate-500">
+                            {order.packages.length > 0
+                              ? `Total: ${order.packages.length} Cartons • Total Gross Weight: ${order.packages.reduce((s, p) => s + (p.weight || 0), 0)} KG`
+                              : "No cartons configured yet. Create cartons and allocate items below."}
+                          </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
+                          {/* Interactive Carton Packing Console */}
+                          {(isWarehouse || isPrivileged || isAccounts) && (
+                            <CartonPackingDialog
+                              orderId={order.id}
+                              orderNumber={order.orderNumber}
+                              sellerSlug={sellerSlug}
+                              dealerName={order.dealer?.tradingName || order.dealer?.legalName || "Dealer"}
+                              dealerCity={order.dealer?.city || null}
+                              orderItems={orderItemsForPacking}
+                              existingPackages={order.packages}
+                              trigger={
+                                <Button
+                                  size="sm"
+                                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center gap-1.5 shadow-2xs text-xs"
+                                >
+                                  <PackageCheck className="h-3.5 w-3.5" />
+                                  {order.packages.length > 0 ? `Manage Cartons (${order.packages.length})` : "📦 Pack Cartons"}
+                                </Button>
+                              }
+                            />
+                          )}
+
                           <a
                             href={`/api/orders/${order.id}/documents/packing-list`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 hover:bg-teal-800 text-white"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 hover:bg-teal-800 text-white shadow-2xs"
                           >
-                            <PackageCheck className="h-3.5 w-3.5" /> Print Packaging List
+                            <PackageCheck className="h-3.5 w-3.5" /> Packaging List (PDF)
                           </a>
                           {order.packages.length > 0 && (
                             <a
                               href={`/api/orders/${order.id}/documents/package-labels`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white shadow-2xs"
                             >
-                              <Tag className="h-3.5 w-3.5" /> Print Carton Labels (PDF)
+                              <Tag className="h-3.5 w-3.5" /> Carton Labels (PDF)
                             </a>
                           )}
                           {order.shipments.length > 0 && (
@@ -1004,37 +1060,121 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                               href={`/api/orders/${order.id}/documents/dispatch-challan`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs"
                             >
-                              <Truck className="h-3.5 w-3.5" /> Print Challan (PDF)
+                              <Truck className="h-3.5 w-3.5" /> Challan (PDF)
                             </a>
                           )}
                         </div>
                       </div>
 
                       {order.packages.length === 0 ? (
-                        <div className="py-6 text-center text-xs text-slate-500">
-                          No packages packed yet. Generating packaging list will create default carton manifest.
+                        <div className="py-10 text-center text-xs text-slate-500 space-y-3 bg-slate-50 rounded-xl border border-dashed p-6">
+                          <Package className="h-10 w-10 mx-auto text-slate-400" />
+                          <div>
+                            <div className="font-bold text-sm text-slate-700">No Cartons Created Yet</div>
+                            <p className="text-[11px] text-slate-500 mt-1 max-w-md mx-auto">
+                              Specify how many cartons this order has, carton dimensions (Length × Width × Height), gross weight, and which items are packed into each carton.
+                            </p>
+                          </div>
+                          {(isWarehouse || isPrivileged || isAccounts) && (
+                            <CartonPackingDialog
+                              orderId={order.id}
+                              orderNumber={order.orderNumber}
+                              sellerSlug={sellerSlug}
+                              dealerName={order.dealer?.tradingName || order.dealer?.legalName || "Dealer"}
+                              dealerCity={order.dealer?.city || null}
+                              orderItems={orderItemsForPacking}
+                              existingPackages={order.packages}
+                              trigger={
+                                <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white font-bold">
+                                  📦 Create Cartons & Allocate Items Now
+                                </Button>
+                              }
+                            />
+                          )}
                         </div>
                       ) : (
-                        <div className="divide-y border rounded-lg overflow-hidden text-xs">
-                          {order.packages.map((pkg, idx) => (
-                            <div key={pkg.id} className="p-3 flex items-center justify-between">
-                              <div>
-                                <div className="font-bold text-slate-900">{pkg.packageNumber} (Box {idx + 1} of {order.packages.length})</div>
-                                <div className="text-slate-500">
-                                  Weight: {pkg.weight} KG • Type: {pkg.packageType}
-                                  {pkg.length && ` • Dim: ${pkg.length}×${pkg.width}×${pkg.height} cm`}
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {order.packages.map((pkg, idx) => {
+                              let packedItemsList: any[] = [];
+                              if (pkg.itemsJson) {
+                                try {
+                                  const parsed = JSON.parse(pkg.itemsJson);
+                                  if (Array.isArray(parsed)) packedItemsList = parsed;
+                                } catch {}
+                              }
+
+                              return (
+                                <div key={pkg.id} className="p-4 rounded-xl border bg-card text-card-foreground shadow-2xs space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-sm text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                          {pkg.packageNumber}
+                                        </span>
+                                        <span className="text-xs text-slate-500 font-medium">
+                                          Box {idx + 1} of {order.packages.length}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-slate-700 font-semibold mt-1">
+                                        {pkg.packageType || "Standard Corrugated Carton"}
+                                      </div>
+                                    </div>
+                                    <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200 text-[10px]">
+                                      {pkg.status}
+                                    </Badge>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <div>
+                                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Dimensions</span>
+                                      <span className="font-semibold text-slate-800">
+                                        {pkg.length ? `${pkg.length} × ${pkg.width} × ${pkg.height} cm` : "Not specified"}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Gross Weight</span>
+                                      <span className="font-semibold text-slate-800">
+                                        {pkg.weight} KG
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {pkg.handlingInstructions && (
+                                    <div className="text-[11px] text-amber-800 bg-amber-50/80 px-2 py-1 rounded border border-amber-200 font-medium">
+                                      ⚠️ {pkg.handlingInstructions}
+                                    </div>
+                                  )}
+
+                                  {/* Item Contents Breakdown */}
+                                  <div>
+                                    <div className="text-[10px] font-bold uppercase text-slate-500 mb-1.5 flex items-center justify-between">
+                                      <span>Items in this carton ({packedItemsList.reduce((s: number, it: any) => s + (Number(it.quantity) || 0), 0)} PCS)</span>
+                                    </div>
+                                    {packedItemsList.length > 0 ? (
+                                      <div className="space-y-1">
+                                        {packedItemsList.map((it: any, iIdx: number) => (
+                                          <div key={iIdx} className="text-xs flex items-center justify-between py-1 px-2 rounded bg-slate-50 border border-slate-100">
+                                            <div className="truncate max-w-[200px]">
+                                              <span className="font-bold text-slate-900 font-mono mr-1.5">{it.sku}</span>
+                                              <span className="text-slate-600 text-[11px]">{it.productName}</span>
+                                            </div>
+                                            <span className="font-bold text-purple-700 bg-white px-2 py-0.5 rounded border border-purple-100 shadow-2xs text-[11px]">
+                                              {it.quantity} {it.unitCode || "PCS"}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-slate-400 italic">No specific item allocation recorded</div>
+                                    )}
+                                  </div>
                                 </div>
-                                {pkg.handlingInstructions && (
-                                  <div className="text-[11px] text-amber-700 font-medium mt-0.5">{pkg.handlingInstructions}</div>
-                                )}
-                              </div>
-                              <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200">
-                                {pkg.status}
-                              </Badge>
-                            </div>
-                          ))}
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </>

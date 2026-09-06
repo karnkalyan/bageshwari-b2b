@@ -239,8 +239,83 @@ export async function generateOrderPdf(
     });
   }
 
-  // 4. DELIVERY CHALLAN / PACKING LIST
-  if (kind === "dispatch-challan" || kind === "packing-list") {
+  // 4. PACKING LIST (CARTON MANIFEST & CONTENTS)
+  if (kind === "packing-list") {
+    const shipment = order.shipments[0];
+    const pickList = order.pickLists[0];
+    const totalWeight = orderPackages.reduce((sum, p) => sum + Number(p.weight || 0), 0);
+    const totalCartons = orderPackages.length;
+
+    const packages = orderPackages.map((pkg, idx) => {
+      let parsedItems: { sku: string; name: string; quantity: number; unit?: string }[] = [];
+      if (pkg.itemsJson) {
+        try {
+          const raw = JSON.parse(pkg.itemsJson);
+          if (Array.isArray(raw)) {
+            parsedItems = raw.map((it: any) => ({
+              sku: it.sku || "",
+              name: it.productName || it.name || "",
+              quantity: Number(it.quantity || 0),
+              unit: it.unitCode || it.unit || "PCS",
+            }));
+          }
+        } catch {}
+      }
+
+      return {
+        packageNumber: pkg.packageNumber || `PKG-${order.orderNumber.slice(-5)}-0${idx + 1}`,
+        boxIndex: idx + 1,
+        totalBoxes: totalCartons || 1,
+        packageType: pkg.packageType || "Standard Corrugated Carton",
+        weight: Number(pkg.weight || 0),
+        length: pkg.length ? Number(pkg.length) : null,
+        width: pkg.width ? Number(pkg.width) : null,
+        height: pkg.height ? Number(pkg.height) : null,
+        handlingInstructions: pkg.handlingInstructions,
+        items: parsedItems,
+      };
+    });
+
+    return renderPackingListPdf({
+      packingListNumber: `PL-${order.orderNumber.replace(/^[A-Za-z]+-?/, "")}`,
+      orderNumber: order.orderNumber,
+      shipmentNumber: shipment?.shipmentNumber || null,
+      challanNumber: shipment?.challanNumber || null,
+      invoiceNumber: order.finalInvoices[0]?.invoiceNumber || null,
+      packingDate: orderPackages[0]?.packingDate || new Date(),
+      company,
+      dealer,
+      packages:
+        packages.length > 0
+          ? packages
+          : [
+              {
+                packageNumber: `PKG-${order.orderNumber.slice(-5)}-01`,
+                boxIndex: 1,
+                totalBoxes: 1,
+                packageType: "Standard Corrugated Carton",
+                weight: 0,
+                items: order.items.map((it) => ({
+                  sku: it.sku,
+                  name: it.productName,
+                  quantity: Number(it.approvedQuantity ?? it.originalQuantity),
+                  unit: "PCS",
+                })),
+              },
+            ],
+      totalCartons: totalCartons || 1,
+      totalWeight,
+      warehouseName: companyRaw?.warehouseName || (company.city ? `${company.city} Central Warehouse` : "Warehouse"),
+      packedByName: (pickList?.assignedTo?.name || pickList?.assignedTo?.email || "Warehouse Lead Specialist"),
+      transporterName: shipment?.transporter || shipment?.transportCompany?.name || "",
+      driverName: shipment?.driverName || shipment?.driver?.name,
+      vehicleNumber: shipment?.vehicleNumber || shipment?.vehicle?.vehicleNumber,
+      notes: order.dealerNotes,
+    });
+  }
+
+  // 5. DELIVERY CHALLAN
+  if (kind === "dispatch-challan") {
     const shipment = order.shipments[0];
     const challanNumber = shipment?.challanNumber || `CHL-${order.orderNumber.replace(/^[A-Za-z]+-?/, "")}`;
     const dispatchDate = shipment?.dispatchDate || new Date();
