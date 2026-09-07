@@ -59,7 +59,21 @@ export async function createPackage(input: {
         reason: "Packing started",
       });
     else if (order.status !== "PACKING_IN_PROGRESS") throw new Error("ORDER_NOT_READY_FOR_PACKING");
-    const packageNumber = await nextDocumentNumber(tx, input.sellerId, "PACKAGE", "PKG");
+    let packageNumber = await nextDocumentNumber(tx, input.sellerId, "PACKAGE", "PKG");
+    let createAttempt = 1;
+    while (true) {
+      const existing = await tx.package.findUnique({
+        where: {
+          sellerId_packageNumber: {
+            sellerId: input.sellerId,
+            packageNumber,
+          },
+        },
+      });
+      if (!existing) break;
+      createAttempt++;
+      packageNumber = `${packageNumber}-${createAttempt}`;
+    }
     const packed = await tx.package.create({
       data: {
         sellerId: input.sellerId,
@@ -152,7 +166,30 @@ export async function saveOrderCartonPackaging(input: SaveOrderCartonPackagingIn
 
     for (let i = 0; i < totalCartons; i++) {
       const ctn = input.packages[i];
-      const packageNumber = await nextDocumentNumber(tx, input.sellerId, "PACKAGE", "PKG");
+      let desiredName = ctn.packageNumber?.trim();
+      if (!desiredName || desiredName.startsWith("CTN-") || desiredName.startsWith("Box")) {
+        desiredName = `${order.orderNumber}-CTN-${String(i + 1).padStart(2, "0")}`;
+      } else if (!desiredName.includes(order.orderNumber)) {
+        desiredName = `${order.orderNumber}-${desiredName}`;
+      }
+
+      // Ensure 100% collision-free package number guaranteed to satisfy @@unique([sellerId, packageNumber])
+      let packageNumber = desiredName;
+      let attempt = 1;
+      while (true) {
+        const existing = await tx.package.findUnique({
+          where: {
+            sellerId_packageNumber: {
+              sellerId: input.sellerId,
+              packageNumber,
+            },
+          },
+        });
+        if (!existing) break;
+        attempt++;
+        packageNumber = `${desiredName}-${attempt}`;
+      }
+
 
       const weightDec = new Prisma.Decimal(Number(ctn.weight) || 0.1);
       const lengthDec = ctn.length ? new Prisma.Decimal(Number(ctn.length)) : null;

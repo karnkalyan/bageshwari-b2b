@@ -10,7 +10,9 @@ import { sendWorkflowNotification } from "@/services/notification.service";
 
 export type ReviseOrderItemInput = {
   orderItemId: string;
+  quantity?: number;
   revisedQuantity?: number;
+  unitPrice?: number;
   revisedPrice?: number;
   discountAmount?: number;
   accountsRemarks?: string;
@@ -50,9 +52,13 @@ export async function reviseOrderBulk(input: ReviseOrderBulkInput) {
       if (!existingItem) continue;
 
       const previousQuantity = Number(existingItem.approvedQuantity ?? existingItem.originalQuantity);
-      const revisedQuantity = itemInput.revisedQuantity !== undefined ? itemInput.revisedQuantity : previousQuantity;
+      const inputQty = itemInput.revisedQuantity !== undefined ? itemInput.revisedQuantity : itemInput.quantity;
+      const revisedQuantity = inputQty !== undefined ? Number(inputQty) : previousQuantity;
+
       const previousPrice = existingItem.dealerPrice;
-      const revisedPrice = itemInput.revisedPrice !== undefined ? new Prisma.Decimal(itemInput.revisedPrice) : previousPrice;
+      const inputPrice = itemInput.revisedPrice !== undefined ? itemInput.revisedPrice : itemInput.unitPrice;
+      const revisedPrice = inputPrice !== undefined ? new Prisma.Decimal(inputPrice) : previousPrice;
+
       const discount = itemInput.discountAmount !== undefined ? new Prisma.Decimal(itemInput.discountAmount) : existingItem.discountAmount;
 
       const lineSubtotal = Number(revisedPrice) * revisedQuantity - Number(discount);

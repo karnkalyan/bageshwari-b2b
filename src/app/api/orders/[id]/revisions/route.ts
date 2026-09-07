@@ -9,8 +9,10 @@ const bulkRevisionSchema = z.object({
   items: z.array(
     z.object({
       orderItemId: z.string().min(1),
-      quantity: z.coerce.number().min(0),
+      quantity: z.coerce.number().min(0).optional(),
+      revisedQuantity: z.coerce.number().min(0).optional(),
       unitPrice: z.coerce.number().min(0).optional(),
+      revisedPrice: z.coerce.number().min(0).optional(),
       discountAmount: z.coerce.number().min(0).optional(),
       accountsRemarks: z.string().trim().max(1000).optional(),
     })

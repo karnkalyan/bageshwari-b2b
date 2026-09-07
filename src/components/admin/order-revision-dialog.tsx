@@ -122,7 +122,9 @@ export function OrderRevisionDialog({
           items: items.map((it) => ({
             orderItemId: it.orderItemId,
             quantity: it.approvedQuantity,
+            revisedQuantity: it.approvedQuantity,
             unitPrice: it.unitPrice,
+            revisedPrice: it.unitPrice,
             discountAmount: it.discountAmount,
             accountsRemarks: it.accountsRemarks?.trim() || undefined,
           })),
