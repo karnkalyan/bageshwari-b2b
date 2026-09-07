@@ -417,7 +417,7 @@ export async function generateOrderPdf(
     sku: item.sku,
     description: item.productName + (item.variantName ? ` (${item.variantName})` : ""),
     unit: "PCS",
-    quantity: Number(item.originalQuantity),
+    quantity: Number(item.approvedQuantity ?? item.originalQuantity),
     unitPrice: Number(item.dealerPrice),
     discountAmount: Number(item.discountAmount ?? 0),
     lineTotal: Number(item.lineTotal),

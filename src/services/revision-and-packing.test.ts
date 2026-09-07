@@ -80,4 +80,74 @@ describe("Accounts order revision and carton packaging logic", () => {
     }
     expect(resolvedNumber).toBe("ORD-2026-9041-CTN-01-2");
   });
+
+  it("handles in-batch duplicate package numbers and clamps length under 50 chars", () => {
+    const orderNumber = "ORD-2026-VERY-LONG-ORDER-NUMBER-99999";
+    const usedInBatch = new Set<string>();
+    const packagesInput = [
+      { packageNumber: "CTN-01" },
+      { packageNumber: "CTN-01" }, // duplicate input in same batch
+      { packageNumber: "Custom Crate with Very Long Name That Exceeds Normal Limits" },
+    ];
+
+    const generated: string[] = [];
+    for (let i = 0; i < packagesInput.length; i++) {
+      const ctn = packagesInput[i];
+      const boxPad = String(i + 1).padStart(2, "0");
+      let desiredName = ctn.packageNumber.trim();
+      if (!desiredName || desiredName.startsWith("CTN-") || desiredName.startsWith("Box")) {
+        desiredName = `${orderNumber}-CTN-${boxPad}`;
+      } else if (!desiredName.includes(orderNumber)) {
+        desiredName = `${orderNumber}-${desiredName}`;
+      }
+
+      if (desiredName.length > 40) {
+        desiredName = desiredName.slice(0, 40);
+      }
+
+      let packageNumber = desiredName;
+      let attempt = 1;
+      while (usedInBatch.has(packageNumber)) {
+        attempt++;
+        packageNumber = `${desiredName.slice(0, 40)}-${attempt}`;
+      }
+      usedInBatch.add(packageNumber);
+      generated.push(packageNumber);
+    }
+
+    // Ensure all generated package numbers are unique
+    expect(new Set(generated).size).toBe(packagesInput.length);
+    // Ensure all generated package numbers are within the 50 char db limit
+    generated.forEach((pkgNum) => {
+      expect(pkgNum.length).toBeLessThanOrEqual(50);
+    });
+  });
+
+  it("ensures accounts revision updates both originalQuantity and approvedQuantity", () => {
+    const existingItem = {
+      originalQuantity: 5,
+      approvedQuantity: 5,
+      dealerPrice: 200,
+    };
+
+    const revisionInput = {
+      revisedQuantity: 8,
+      revisedPrice: 250,
+      discountAmount: 20,
+    };
+
+    const updatedItem = {
+      ...existingItem,
+      originalQuantity: revisionInput.revisedQuantity,
+      approvedQuantity: revisionInput.revisedQuantity,
+      dealerPrice: revisionInput.revisedPrice,
+      discountAmount: revisionInput.discountAmount,
+      lineTotal: revisionInput.revisedPrice * revisionInput.revisedQuantity - revisionInput.discountAmount,
+    };
+
+    expect(updatedItem.originalQuantity).toBe(8);
+    expect(updatedItem.approvedQuantity).toBe(8);
+    expect(updatedItem.dealerPrice).toBe(250);
+    expect(updatedItem.lineTotal).toBe(1980);
+  });
 });

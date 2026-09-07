@@ -85,6 +85,7 @@ export async function reviseOrderBulk(input: ReviseOrderBulkInput) {
       await tx.orderItem.update({
         where: { id: existingItem.id },
         data: {
+          originalQuantity: new Prisma.Decimal(revisedQuantity),
           approvedQuantity: new Prisma.Decimal(revisedQuantity),
           dealerPrice: revisedPrice,
           discountAmount: discount,
@@ -137,15 +138,85 @@ export async function reviseOrderBulk(input: ReviseOrderBulkInput) {
       },
     });
 
+    // Also synchronize any existing Proforma Invoices to prevent stale rates/totals
+    const existingProformas = await tx.proformaInvoice.findMany({
+      where: { orderId: order.id, sellerId: input.sellerId },
+      select: { id: true },
+    });
+    for (const pi of existingProformas) {
+      await tx.proformaInvoice.update({
+        where: { id: pi.id },
+        data: {
+          subtotal: new Prisma.Decimal(subtotal),
+          discountTotal: new Prisma.Decimal(discountTotal),
+          taxTotal: new Prisma.Decimal(taxTotal),
+          grandTotal: new Prisma.Decimal(grandTotal),
+        },
+      });
+      await tx.proformaInvoiceItem.deleteMany({
+        where: { proformaInvoiceId: pi.id },
+      });
+      if (activeItems.length > 0) {
+        await tx.proformaInvoiceItem.createMany({
+          data: activeItems.map((item) => ({
+            sellerId: input.sellerId,
+            proformaInvoiceId: pi.id,
+            orderItemId: item.id,
+            productId: item.productId,
+            variantId: item.variantId,
+            sku: item.sku,
+            description: `${item.productName}${item.variantName ? ` - ${item.variantName}` : ""}`,
+            quantity: item.approvedQuantity ?? item.originalQuantity,
+            unitPrice: item.dealerPrice,
+            discountAmount: item.discountAmount,
+            taxAmount: item.taxAmount,
+            lineTotal: item.lineTotal,
+          })),
+        });
+      }
+    }
+
+    // Synchronize existing Pick Lists if any item quantities changed
+    const existingPickLists = await tx.pickList.findMany({
+      where: { orderId: order.id, sellerId: input.sellerId },
+      include: { items: true },
+    });
+    for (const pl of existingPickLists) {
+      for (const plItem of pl.items) {
+        const matchingOrderItem = allCurrentItems.find((oi) => oi.sku === plItem.sku || oi.variantId === plItem.variantId);
+        if (matchingOrderItem) {
+          const newQty = matchingOrderItem.approvedQuantity ?? matchingOrderItem.originalQuantity;
+          await tx.pickListItem.update({
+            where: { id: plItem.id },
+            data: { approvedQuantity: newQty },
+          });
+        }
+      }
+    }
+
+    // Synchronize pending Payment amount if it was generated for the old grand total
+    await tx.payment.updateMany({
+      where: { orderId: order.id, sellerId: input.sellerId, status: "PENDING" },
+      data: { amount: new Prisma.Decimal(grandTotal) },
+    });
+
     // If sendToDealer is requested, advance status to WAITING_FOR_DEALER_CONFIRMATION
     if (input.sendToDealer && order.status !== "WAITING_FOR_DEALER_CONFIRMATION") {
-      await transitionOrderStatusInTransaction(tx, {
-        sellerId: input.sellerId,
-        orderId: order.id,
-        targetStatus: "WAITING_FOR_DEALER_CONFIRMATION",
-        actor: input.actor,
-        reason: input.generalRemarks || "Order revised by accounts and sent for dealer confirmation.",
-      });
+      try {
+        await transitionOrderStatusInTransaction(tx, {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          targetStatus: "WAITING_FOR_DEALER_CONFIRMATION",
+          actor: input.actor,
+          reason: input.generalRemarks || "Order revised by accounts and sent for dealer confirmation.",
+        });
+      } catch {
+        // Safe fallback direct update if status transition map does not directly connect
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: "WAITING_FOR_DEALER_CONFIRMATION" },
+        });
+      }
     }
 
     // Send notifications

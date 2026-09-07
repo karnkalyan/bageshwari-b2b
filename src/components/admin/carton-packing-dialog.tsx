@@ -239,18 +239,20 @@ export function CartonPackingDialog({
 
   // Add a new carton
   const handleAddCarton = () => {
-    const nextIdx = cartons.length + 1;
-    const newCarton: LocalCarton = {
-      packageNumber: `CTN-${String(nextIdx).padStart(2, "0")}`,
-      packageType: "Standard Corrugated Carton",
-      length: 35,
-      width: 25,
-      height: 20,
-      weight: 5,
-      handlingInstructions: "",
-      items: {},
-    };
-    setCartons([...cartons, newCarton]);
+    setCartons((prev) => {
+      const nextIdx = prev.length + 1;
+      const newCarton: LocalCarton = {
+        packageNumber: `CTN-${String(nextIdx).padStart(2, "0")}`,
+        packageType: "Standard Corrugated Carton",
+        length: 35,
+        width: 25,
+        height: 20,
+        weight: 5,
+        handlingInstructions: "",
+        items: {},
+      };
+      return [...prev, newCarton];
+    });
     setActiveCartonIndex(cartons.length);
   };
 
@@ -343,6 +345,7 @@ export function CartonPackingDialog({
 
   // Save packaging to backend
   const handleSave = async (finalize: boolean) => {
+    if (submitting) return;
     setSubmitting(true);
     setError(null);
     setSuccess(null);

@@ -70,7 +70,7 @@ export function AdminOrderActions({
     sku: it.sku,
     productName: it.productName,
     unitCode: it.product?.unitCode || "PCS",
-    originalQuantity: Number(it.originalQuantity),
+    originalQuantity: Number(it.approvedQuantity ?? it.originalQuantity),
     approvedQuantity: Number(it.approvedQuantity ?? it.originalQuantity),
     unitPrice: Number(it.dealerPrice),
     discountAmount: Number(it.discountAmount ?? 0),
@@ -104,10 +104,15 @@ export function AdminOrderActions({
   const canRevise =
     canReviseRole &&
     [
+      "DRAFT",
+      "CONFIRMED",
       "PENDING_ACCOUNTS_REVIEW",
       "ACCOUNTS_REVIEW_IN_PROGRESS",
       "WAITING_FOR_DEALER_CONFIRMATION",
       "DEALER_CHANGE_REQUESTED",
+      "FINAL_ORDER_CONFIRMED",
+      "PROFORMA_INVOICE_GENERATED",
+      "PROFORMA_INVOICE_CONFIRMED",
     ].includes(order.status);
 
   const isProformaStage = [

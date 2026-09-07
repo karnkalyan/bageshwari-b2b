@@ -72,27 +72,55 @@ export async function createPackage(input: {
       });
       if (!existing) break;
       createAttempt++;
-      packageNumber = `${packageNumber}-${createAttempt}`;
+      packageNumber = `${packageNumber.slice(0, 40)}-${createAttempt}`;
     }
-    const packed = await tx.package.create({
-      data: {
-        sellerId: input.sellerId,
-        orderId: order.id,
-        packageNumber,
-        packageType: input.packageType,
-        length: input.length,
-        width: input.width,
-        height: input.height,
-        weight: input.weight,
-        status: "LABELLED",
-        packedById: input.actor.userId,
-        packingDate: new Date(),
-        barcodeData: packageNumber,
-        qrCodeData: `${order.orderNumber}:${packageNumber}`,
-        handlingInstructions: input.handlingInstructions,
-        itemsJson: input.items ? JSON.stringify(input.items) : null,
-      },
-    });
+    let packed;
+    try {
+      packed = await tx.package.create({
+        data: {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          packageNumber,
+          packageType: input.packageType,
+          length: input.length,
+          width: input.width,
+          height: input.height,
+          weight: input.weight,
+          status: "LABELLED",
+          packedById: input.actor.userId,
+          packingDate: new Date(),
+          barcodeData: packageNumber,
+          qrCodeData: `${order.orderNumber}:${packageNumber}`,
+          handlingInstructions: input.handlingInstructions,
+          itemsJson: input.items ? JSON.stringify(input.items) : null,
+        },
+      });
+    } catch (createErr: any) {
+      if (createErr?.code === "P2002" || createErr?.message?.includes("Unique constraint")) {
+        packageNumber = `${packageNumber.slice(0, 38)}-${Date.now().toString().slice(-4)}`;
+        packed = await tx.package.create({
+          data: {
+            sellerId: input.sellerId,
+            orderId: order.id,
+            packageNumber,
+            packageType: input.packageType,
+            length: input.length,
+            width: input.width,
+            height: input.height,
+            weight: input.weight,
+            status: "LABELLED",
+            packedById: input.actor.userId,
+            packingDate: new Date(),
+            barcodeData: packageNumber,
+            qrCodeData: `${order.orderNumber}:${packageNumber}`,
+            handlingInstructions: input.handlingInstructions,
+            itemsJson: input.items ? JSON.stringify(input.items) : null,
+          },
+        });
+      } else {
+        throw createErr;
+      }
+    }
     await tx.auditLog.create({
       data: {
         sellerId: input.sellerId,
@@ -163,20 +191,33 @@ export async function saveOrderCartonPackaging(input: SaveOrderCartonPackagingIn
 
     const createdPackages = [];
     const totalCartons = input.packages.length;
+    const usedInBatch = new Set<string>();
 
     for (let i = 0; i < totalCartons; i++) {
       const ctn = input.packages[i];
+      const boxPad = String(i + 1).padStart(2, "0");
       let desiredName = ctn.packageNumber?.trim();
       if (!desiredName || desiredName.startsWith("CTN-") || desiredName.startsWith("Box")) {
-        desiredName = `${order.orderNumber}-CTN-${String(i + 1).padStart(2, "0")}`;
+        desiredName = `${order.orderNumber}-CTN-${boxPad}`;
       } else if (!desiredName.includes(order.orderNumber)) {
         desiredName = `${order.orderNumber}-${desiredName}`;
+      }
+
+      // Max length in DB is VarChar(50), leave room for suffix
+      if (desiredName.length > 40) {
+        desiredName = desiredName.slice(0, 40);
       }
 
       // Ensure 100% collision-free package number guaranteed to satisfy @@unique([sellerId, packageNumber])
       let packageNumber = desiredName;
       let attempt = 1;
       while (true) {
+        if (usedInBatch.has(packageNumber)) {
+          attempt++;
+          packageNumber = `${desiredName.slice(0, 40)}-${attempt}`;
+          continue;
+        }
+
         const existing = await tx.package.findUnique({
           where: {
             sellerId_packageNumber: {
@@ -187,40 +228,77 @@ export async function saveOrderCartonPackaging(input: SaveOrderCartonPackagingIn
         });
         if (!existing) break;
         attempt++;
-        packageNumber = `${desiredName}-${attempt}`;
+        packageNumber = `${desiredName.slice(0, 40)}-${attempt}`;
       }
 
+      usedInBatch.add(packageNumber);
 
       const weightDec = new Prisma.Decimal(Number(ctn.weight) || 0.1);
       const lengthDec = ctn.length ? new Prisma.Decimal(Number(ctn.length)) : null;
       const widthDec = ctn.width ? new Prisma.Decimal(Number(ctn.width)) : null;
       const heightDec = ctn.height ? new Prisma.Decimal(Number(ctn.height)) : null;
 
-      const created = await tx.package.create({
-        data: {
-          sellerId: input.sellerId,
-          orderId: order.id,
-          packageNumber,
-          packageType: ctn.packageType || "Standard Corrugated Carton",
-          length: lengthDec,
-          width: widthDec,
-          height: heightDec,
-          weight: weightDec,
-          status: input.finalize ? "LABELLED" : "CREATED",
-          packedById: input.actor.userId,
-          packingDate: new Date(),
-          barcodeData: `${packageNumber}-${order.orderNumber}`,
-          qrCodeData: JSON.stringify({
-            order: order.orderNumber,
-            pkg: packageNumber,
-            box: i + 1,
-            total: totalCartons,
-            dealer: order.dealer.tradingName || order.dealer.legalName,
-          }),
-          handlingInstructions: ctn.handlingInstructions || null,
-          itemsJson: ctn.items && ctn.items.length > 0 ? JSON.stringify(ctn.items) : null,
-        },
-      });
+      let created;
+      try {
+        created = await tx.package.create({
+          data: {
+            sellerId: input.sellerId,
+            orderId: order.id,
+            packageNumber,
+            packageType: ctn.packageType || "Standard Corrugated Carton",
+            length: lengthDec,
+            width: widthDec,
+            height: heightDec,
+            weight: weightDec,
+            status: input.finalize ? "LABELLED" : "CREATED",
+            packedById: input.actor.userId,
+            packingDate: new Date(),
+            barcodeData: `${packageNumber}-${order.orderNumber}`,
+            qrCodeData: JSON.stringify({
+              order: order.orderNumber,
+              pkg: packageNumber,
+              box: i + 1,
+              total: totalCartons,
+              dealer: order.dealer.tradingName || order.dealer.legalName,
+            }),
+            handlingInstructions: ctn.handlingInstructions || null,
+            itemsJson: ctn.items && ctn.items.length > 0 ? JSON.stringify(ctn.items) : null,
+          },
+        });
+      } catch (createErr: any) {
+        if (createErr?.code === "P2002" || createErr?.message?.includes("Unique constraint")) {
+          const fallbackSuffix = `${Date.now().toString().slice(-4)}${i + 1}`;
+          packageNumber = `${desiredName.slice(0, 38)}-${fallbackSuffix}`;
+          usedInBatch.add(packageNumber);
+          created = await tx.package.create({
+            data: {
+              sellerId: input.sellerId,
+              orderId: order.id,
+              packageNumber,
+              packageType: ctn.packageType || "Standard Corrugated Carton",
+              length: lengthDec,
+              width: widthDec,
+              height: heightDec,
+              weight: weightDec,
+              status: input.finalize ? "LABELLED" : "CREATED",
+              packedById: input.actor.userId,
+              packingDate: new Date(),
+              barcodeData: `${packageNumber}-${order.orderNumber}`,
+              qrCodeData: JSON.stringify({
+                order: order.orderNumber,
+                pkg: packageNumber,
+                box: i + 1,
+                total: totalCartons,
+                dealer: order.dealer.tradingName || order.dealer.legalName,
+              }),
+              handlingInstructions: ctn.handlingInstructions || null,
+              itemsJson: ctn.items && ctn.items.length > 0 ? JSON.stringify(ctn.items) : null,
+            },
+          });
+        } else {
+          throw createErr;
+        }
+      }
 
       createdPackages.push(created);
     }
@@ -239,6 +317,7 @@ export async function saveOrderCartonPackaging(input: SaveOrderCartonPackagingIn
         "PROFORMA_CONFIRMED",
         "FINAL_INVOICE_ISSUED",
         "CONFIRMED",
+        "PACKED",
       ];
 
       if (allowedPrePackingStatuses.includes(order.status)) {
