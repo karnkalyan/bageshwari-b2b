@@ -197,6 +197,7 @@ export function LiveProductSearch({
                   const variant = product.variants?.[0];
                   const mrp = Number(variant?.mrp || 0);
                   const dp = Number(variant?.dealerPrice || mrp);
+                  const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
                   const isSelected = selectedIndex === idx;
 
                   return (
@@ -230,11 +231,14 @@ export function LiveProductSearch({
                       <div className="text-right shrink-0 pl-2">
                         {isDealer ? (
                           <>
-                            <div className="text-[9px] text-slate-400 line-through">
+                            <div className="text-[9px] font-semibold text-slate-500">
                               {formatCurrency(mrp)}
                             </div>
                             <div className="text-xs font-black text-emerald-700">
-                              {formatCurrency(dp)}
+                              {formatCurrency(dealerPriceInclVat)}
+                            </div>
+                            <div className="text-[9px] text-slate-500">
+                              {formatCurrency(dp)} + 13%
                             </div>
                           </>
                         ) : (

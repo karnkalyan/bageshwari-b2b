@@ -114,7 +114,7 @@ export function ProductDetailAddToCart({
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t">
         <Link
           href="/dealer/cart"
-          className="text-red-600 hover:text-red-700 hover:underline font-bold flex items-center gap-1.5"
+          className="text-emerald-700 hover:text-emerald-800 hover:underline font-bold flex items-center gap-1.5"
         >
           <ShoppingCart className="h-4 w-4" />
           <span>View Draft Cart</span>

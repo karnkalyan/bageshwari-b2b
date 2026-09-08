@@ -129,12 +129,14 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
         },
         mrp
       );
-      const discountPercent = mrp > 0 && dp < mrp ? Math.round(((mrp - dp) / mrp) * 100) : 0;
+      const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+      const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
 
       return {
         ...p,
         mrp,
         dealerPrice: dp,
+        dealerPriceInclVat,
         discountPercent,
       };
     });
@@ -292,11 +294,14 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                             <div className="p-2.5 bg-slate-50 rounded-lg space-y-1 border border-slate-200">
                               <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-400">
                                 <span>MRP</span>
-                                <span className="line-through truncate max-w-[120px]">{formatCurrency(product.mrp)}</span>
+                                <span className="truncate max-w-[120px] font-bold text-slate-700">{formatCurrency(product.mrp)}</span>
                               </div>
                               <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs sm:text-sm font-bold text-emerald-700">
                                 <span>Dealer Price</span>
-                                <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(product.dealerPrice)}</span>
+                                <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(product.dealerPriceInclVat)}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-500 text-right">
+                                Current price {formatCurrency(product.dealerPrice)} + 13% VAT
                               </div>
                             </div>
                           ) : (
@@ -331,7 +336,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                               </div>
                             ) : (
                               <Link href="/dealer/login" className="flex-1">
-                                <Button size="sm" className="h-8 w-full bg-red-600 text-xs hover:bg-red-700">
+                                <Button size="sm" className="h-8 w-full bg-emerald-600 text-xs hover:bg-emerald-700">
                                   <ShoppingCart className="h-3 w-3 mr-1" /> Order
                                 </Button>
                               </Link>

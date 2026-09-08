@@ -97,7 +97,7 @@ export function ProductEditModal({
 
   const effectiveVatPercent = normProductTax !== null ? normProductTax : normCatTax !== null ? normCatTax : 13.0;
 
-  const mrpGross = formData.mrp * (1 + effectiveVatPercent / 100);
+  const mrpGross = formData.mrp;
   const dealerGross = formData.dealerPrice * (1 + effectiveVatPercent / 100);
 
   // 1. Handle Direct File Upload
@@ -275,7 +275,7 @@ export function ProductEditModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
-                <Label className="text-[11px] font-semibold text-slate-700">MRP (Net Base)</Label>
+                <Label className="text-[11px] font-semibold text-slate-700">MRP (VAT Included)</Label>
                 <Input
                   type="number"
                   min="0"
@@ -338,7 +338,7 @@ export function ProductEditModal({
                 </div>
                 <div className="flex items-center gap-4 text-[11px]">
                   <span>
-                    MRP Incl. VAT: <strong className="text-emerald-900">{formatCurrency(mrpGross)}</strong>
+                    MRP Current Price: <strong className="text-emerald-900">{formatCurrency(mrpGross)}</strong>
                   </span>
                   <span>
                     Dealer Rate Incl. VAT: <strong className="text-emerald-900">{formatCurrency(dealerGross)}</strong>

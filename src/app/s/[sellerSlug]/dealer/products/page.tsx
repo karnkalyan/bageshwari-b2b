@@ -138,7 +138,8 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
           const variant = p.variants[0];
           const mrp = variant ? Number(variant.mrp) : 0;
           const dp = dealer ? resolveDealerPrice(p.prices, { dealerId: dealer.id, dealerGroupId: dealer.dealerGroupId, pricingGroupId: dealer.pricingGroupId }, mrp) : mrp;
-          const discountPercent = mrp > 0 ? Math.round(((mrp - dp) / mrp) * 100) : 0;
+          const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+          const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
           const stock = p.inventories[0]?.availableQuantity ? Number(p.inventories[0].availableQuantity) : 0;
 
           return (
@@ -156,14 +157,16 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
 
                 <div className="p-3 bg-slate-50 rounded-lg space-y-1.5 border border-slate-200">
                   <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-400">
-                    <span>MRP</span>
-                    <span className="line-through truncate max-w-[120px]">{formatCurrency(mrp)}</span>
+                    <span>MRP (VAT included)</span>
+                    <span className="truncate max-w-[120px] font-bold text-slate-700">{formatCurrency(mrp)}</span>
                   </div>
                   <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs sm:text-sm font-bold text-emerald-700">
                     <span>Dealer Price</span>
-                    <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(dp)}</span>
+                    <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(dealerPriceInclVat)}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 text-right">+ 13% VAT Tax</div>
+                  <div className="text-[10px] text-slate-500 text-right">
+                    Current price {formatCurrency(dp)} + 13% VAT
+                  </div>
                 </div>
 
                 <div className="text-xs text-slate-500 flex justify-between">

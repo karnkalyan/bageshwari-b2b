@@ -8,6 +8,21 @@ import {
 } from "@/modules/orders/order-transition.service";
 import { sendWorkflowNotification } from "@/services/notification.service";
 
+async function nextDocumentNumber(
+  tx: Prisma.TransactionClient,
+  sellerId: string,
+  entityType: string,
+  prefix: string,
+) {
+  const sequence = await tx.numberSequence.upsert({
+    where: { sellerId_entityType: { sellerId, entityType } },
+    update: { lastNumber: { increment: 1 } },
+    create: { sellerId, entityType, prefix, lastNumber: 1, padLength: 5 },
+  });
+
+  return `${sequence.prefix}-${String(sequence.lastNumber).padStart(sequence.padLength, "0")}`;
+}
+
 export type ReviseOrderItemInput = {
   orderItemId: string;
   quantity?: number;
@@ -147,6 +162,9 @@ export async function reviseOrderBulk(input: ReviseOrderBulkInput) {
       await tx.proformaInvoice.update({
         where: { id: pi.id },
         data: {
+          status: input.sendToDealer ? "GENERATED" : undefined,
+          confirmedAt: input.sendToDealer ? null : undefined,
+          confirmedById: input.sendToDealer ? null : undefined,
           subtotal: new Prisma.Decimal(subtotal),
           discountTotal: new Prisma.Decimal(discountTotal),
           taxTotal: new Prisma.Decimal(taxTotal),
@@ -174,6 +192,41 @@ export async function reviseOrderBulk(input: ReviseOrderBulkInput) {
           })),
         });
       }
+    }
+
+    if (input.sendToDealer && existingProformas.length === 0) {
+      const proformaNumber = await nextDocumentNumber(tx, input.sellerId, "PROFORMA", "PI");
+      await tx.proformaInvoice.create({
+        data: {
+          sellerId: input.sellerId,
+          orderId: order.id,
+          proformaNumber,
+          status: "GENERATED",
+          subtotal: new Prisma.Decimal(subtotal),
+          discountTotal: new Prisma.Decimal(discountTotal),
+          taxTotal: new Prisma.Decimal(taxTotal),
+          freightTotal: order.freightTotal,
+          grandTotal: new Prisma.Decimal(grandTotal),
+          paymentTerms: "Standard B2B Terms",
+          generatedById: input.actor.userId,
+          remarks: input.generalRemarks || "Updated Proforma Invoice generated for revised order resend.",
+          items: {
+            create: activeItems.map((item) => ({
+              sellerId: input.sellerId,
+              orderItemId: item.id,
+              productId: item.productId,
+              variantId: item.variantId,
+              sku: item.sku,
+              description: `${item.productName}${item.variantName ? ` - ${item.variantName}` : ""}`,
+              quantity: item.approvedQuantity ?? item.originalQuantity,
+              unitPrice: item.dealerPrice,
+              discountAmount: item.discountAmount,
+              taxAmount: item.taxAmount,
+              lineTotal: item.lineTotal,
+            })),
+          },
+        },
+      });
     }
 
     // Synchronize existing Pick Lists if any item quantities changed

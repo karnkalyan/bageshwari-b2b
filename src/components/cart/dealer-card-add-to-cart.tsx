@@ -104,7 +104,7 @@ export function DealerCardAddToCart({
           className={`flex-1 text-white text-xs h-8 font-bold transition-all ml-auto ${
             justAdded
               ? "bg-emerald-700 hover:bg-emerald-800"
-              : "bg-red-600 hover:bg-red-700"
+              : "bg-emerald-600 hover:bg-emerald-700"
           }`}
         >
           {isPending ? (

@@ -76,8 +76,10 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
       },
       mrp
     );
-    discountPercent = mrp > 0 && dp < mrp ? Math.round(((mrp - dp) / mrp) * 100) : 0;
+    const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+    discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
   }
+  const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
 
   // Server action to add product to dealer draft order cart
   async function handleAddToCart(formData: FormData) {
@@ -168,7 +170,7 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between border-b pb-3">
                   <span className="text-sm font-medium text-slate-600">Maximum Retail Price (MRP)</span>
-                  <span className={`text-xl font-bold ${isDealer ? "text-slate-400 line-through" : "text-slate-900 text-2xl"}`}>
+                  <span className={`text-xl font-bold ${isDealer ? "text-slate-700" : "text-slate-900 text-2xl"}`}>
                     {formatCurrency(mrp)}
                   </span>
                 </div>
@@ -183,9 +185,11 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
                           <div className="text-xs text-emerald-700">Pricing tier unlocked for {dealer?.tradingName}</div>
                         </div>
                       </div>
-                      <span className="text-2xl font-black text-emerald-700">{formatCurrency(dp)}</span>
+                      <span className="text-2xl font-black text-emerald-700">{formatCurrency(dealerPriceInclVat)}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 text-right">+ {Number(product.taxPercent || 13)}% VAT applies at checkout</div>
+                    <div className="text-[11px] text-slate-500 text-right">
+                      Current price {formatCurrency(dp)} + 13% VAT
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-lg text-amber-900 text-sm">
@@ -231,7 +235,7 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
             ) : (
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link href="/dealer/login" className="flex-1">
-                  <Button size="lg" className="h-12 w-full bg-red-600 hover:bg-red-700 font-extrabold">
+                  <Button size="lg" className="h-12 w-full bg-emerald-600 hover:bg-emerald-700 font-extrabold">
                     <ShoppingCart className="h-5 w-5 mr-2" />
                     Dealer Order Login
                   </Button>

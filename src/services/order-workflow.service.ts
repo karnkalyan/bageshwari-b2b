@@ -373,6 +373,7 @@ export async function dealerConfirmOrder(input: {
         dealer: true,
         seller: { select: { slug: true } },
         revisions: { orderBy: { createdAt: "desc" }, take: 1 },
+        proformaInvoices: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
 
@@ -419,6 +420,7 @@ export async function dealerConfirmOrder(input: {
           confirmations: true,
           payments: true,
           revisions: true,
+          proformaInvoices: true,
           dealer: true,
           seller: { select: { slug: true } },
         },
@@ -459,6 +461,7 @@ export async function dealerConfirmOrder(input: {
           confirmations: true,
           payments: true,
           revisions: true,
+          proformaInvoices: true,
           dealer: true,
           seller: { select: { slug: true } },
         },
@@ -490,13 +493,27 @@ export async function dealerConfirmOrder(input: {
     }
 
     // Transition Order to FINAL_ORDER_CONFIRMED without payment
+    let currentStatus: OrderStatus = order.status;
     if (["WAITING_FOR_DEALER_CONFIRMATION", "DEALER_CHANGE_REQUESTED", "PENDING_ACCOUNTS_REVIEW", "ACCOUNTS_REVIEW_IN_PROGRESS"].includes(order.status)) {
       await transitionOrderStatusInTransaction(tx, {
         sellerId: input.sellerId,
         orderId: order.id,
         targetStatus: "FINAL_ORDER_CONFIRMED",
         actor: input.actor,
-        reason: "Dealer accepted and confirmed order. Ready for Accounts to generate Proforma Invoice.",
+        reason: order.proformaInvoices[0]
+          ? "Dealer accepted revised order and proforma. Ready for payment submission."
+          : "Dealer accepted and confirmed order. Ready for Accounts to generate Proforma Invoice.",
+      });
+      currentStatus = "FINAL_ORDER_CONFIRMED";
+    }
+
+    if (currentStatus === "FINAL_ORDER_CONFIRMED" && order.proformaInvoices[0]) {
+      await transitionOrderStatusInTransaction(tx, {
+        sellerId: input.sellerId,
+        orderId: order.id,
+        targetStatus: "PROFORMA_INVOICE_GENERATED",
+        actor: input.actor,
+        reason: "Dealer accepted revised order. Proforma Invoice ready for payment.",
       });
     }
 
@@ -506,6 +523,7 @@ export async function dealerConfirmOrder(input: {
         confirmations: true,
         payments: true,
         revisions: true,
+        proformaInvoices: true,
         dealer: true,
         seller: { select: { slug: true } },
       },
@@ -535,11 +553,14 @@ export async function dealerConfirmOrder(input: {
         excludeUserId: input.actor.userId,
       });
     } else {
+      const hasProforma = Boolean(updatedOrder.proformaInvoices?.length);
       await sendWorkflowNotification({
         sellerId: input.sellerId,
         targetRoles: ["ACCOUNTANT", "ACCOUNTS_MANAGER", "ADMIN", "SUPER_ADMIN", "SALES_MANAGER"],
         title: `Order Confirmed: ${updatedOrder.orderNumber}`,
-        message: `${dealerName} confirmed order ${updatedOrder.orderNumber}. Ready for Accounts to generate Proforma Invoice.`,
+        message: hasProforma
+          ? `${dealerName} accepted revised order ${updatedOrder.orderNumber}. Proforma is ready and awaiting dealer payment details.`
+          : `${dealerName} confirmed order ${updatedOrder.orderNumber}. Ready for Accounts to generate Proforma Invoice.`,
         linkUrl: `/s/${sellerSlug}/admin/orders/${updatedOrder.id}`,
         excludeUserId: input.actor.userId,
       });
