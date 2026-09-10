@@ -13,7 +13,7 @@ import { resolveDealerPrice } from "@/services/pricing.service";
 import { addItemToDealerCart, getDealerCartItemCount } from "@/services/cart.service";
 import { DealerCardAddToCart } from "@/components/cart/dealer-card-add-to-cart";
 import { DealerLiveSearch } from "@/components/search/dealer-live-search";
-import { buildProductSearchFilter } from "@/lib/search-utils";
+import { buildProductSearchFilter, rankProductsBySearchRelevance } from "@/lib/search-utils";
 
 interface DealerProductsProps {
   params: Promise<{ sellerSlug: string }>;
@@ -36,10 +36,10 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
     ...(searchFilter ? searchFilter : {}),
   };
 
-  const [products, dealer, cartItemCount] = await Promise.all([
+  const [rawProducts, dealer, cartItemCount] = await Promise.all([
     prisma.product.findMany({
       where,
-      take: 40,
+      take: search ? 100 : 40,
       include: {
         category: { select: { name: true } },
         brand: { select: { name: true } },
@@ -54,6 +54,8 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
     }),
     getDealerCartItemCount(ctx.sellerId, ctx.dealerId),
   ]);
+
+  const products = search ? rankProductsBySearchRelevance(rawProducts, search) : rawProducts;
 
   // Server Action to add product to dealer draft cart
   async function addToCartAction(formData: FormData) {

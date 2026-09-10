@@ -258,13 +258,15 @@ export function SalesOrderCreator({
 
     const targetVariantId = variant?.id || null;
     const sku = variant ? variant.sku : product.sku;
-    const unitPrice = variant?.price || product.defaultPrice;
+    const unitPrice = variant?.price ?? product.defaultPrice;
     const mrp = variant?.mrp || product.mrp || unitPrice;
-    const name = variant ? `${product.name} (${variant.name})` : product.name;
+    const name = variant && variant.name && variant.name !== "Default" && variant.name !== product.name
+      ? `${product.name} (${variant.name})`
+      : product.name;
 
     setOrderItems((prev) => {
       const existingIdx = prev.findIndex(
-        (it) => it.productId === product.id && it.variantId === targetVariantId
+        (it) => it.productId === product.id && (it.variantId || null) === targetVariantId
       );
 
       if (existingIdx >= 0) {
@@ -297,9 +299,10 @@ export function SalesOrderCreator({
 
   // Decrement or Remove
   const handleQuickDecrement = (productId: string, variantId?: string | null) => {
+    const targetVariantId = variantId || null;
     setOrderItems((prev) => {
       const existingIdx = prev.findIndex(
-        (it) => it.productId === productId && it.variantId === (variantId || null)
+        (it) => it.productId === productId && (it.variantId || null) === targetVariantId
       );
 
       if (existingIdx === -1) return prev;
@@ -314,6 +317,19 @@ export function SalesOrderCreator({
       }
 
       return prev.filter((_, i) => i !== existingIdx);
+    });
+  };
+
+  // Direct Item Quantity Update by Cart Item Index
+  const handleUpdateItemQuantity = (index: number, newQty: number) => {
+    setOrderItems((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      if (newQty <= 0) {
+        return prev.filter((_, i) => i !== index);
+      }
+      return prev.map((item, idx) =>
+        idx === index ? { ...item, quantity: newQty } : item
+      );
     });
   };
 
@@ -792,29 +808,31 @@ export function SalesOrderCreator({
                         <div className="flex items-center border rounded-md overflow-hidden bg-slate-50">
                           <button
                             type="button"
-                            onClick={() => handleQuickDecrement(item.productId, item.variantId)}
-                            className="p-1 hover:bg-slate-200 text-slate-600"
+                            onClick={() => handleUpdateItemQuantity(idx, item.quantity - 1)}
+                            className="p-1 hover:bg-slate-200 text-slate-600 transition"
+                            aria-label="Decrease quantity"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
-                          <span className="px-2 text-xs font-bold text-slate-900">{item.quantity}</span>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              if (!isNaN(val) && val > 0) {
+                                handleUpdateItemQuantity(idx, val);
+                              }
+                            }}
+                            className="w-12 h-6 text-center text-xs font-bold text-slate-900 bg-white border-x border-slate-200 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            aria-label="Item quantity"
+                          />
                           <button
                             type="button"
-                            onClick={() =>
-                              handleQuickAdd(
-                                {
-                                  id: item.productId,
-                                  name: item.productName,
-                                  sku: item.sku,
-                                  unitCode: "PCS",
-                                  defaultPrice: item.unitPrice,
-                                  mrp: item.mrp,
-                                  variants: [],
-                                },
-                                item.variantId || undefined
-                              )
-                            }
-                            className="p-1 hover:bg-slate-200 text-emerald-700"
+                            onClick={() => handleUpdateItemQuantity(idx, item.quantity + 1)}
+                            className="p-1 hover:bg-slate-200 text-emerald-700 transition"
+                            aria-label="Increase quantity"
                           >
                             <Plus className="h-3 w-3" />
                           </button>

@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { buildProductSearchFilter } from "@/lib/search-utils";
+import { buildProductSearchFilter, rankProductsBySearchRelevance } from "@/lib/search-utils";
 
 export type CatalogueFilters = {
   search?: string;
@@ -70,7 +70,8 @@ export class ProductRepository {
       }),
       prisma.product.count({ where }),
     ]);
-    return { items, total };
+    const rankedItems = filters.search ? rankProductsBySearchRelevance(items, filters.search) : items;
+    return { items: rankedItems, total };
   }
 
   async getDealerContext(sellerId: string, dealerId: string) {

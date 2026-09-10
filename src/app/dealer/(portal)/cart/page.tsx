@@ -78,8 +78,9 @@ export default async function DealerCartPage() {
               const qty = Number(item.originalQuantity);
               const dp = Number(item.dealerPrice);
               const mrp = Number(item.mrp);
+              const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
               const lineTotal = Number(item.lineTotal);
-              const discountPercent = mrp > 0 ? Math.round(((mrp - dp) / mrp) * 100) : 0;
+              const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
 
               return (
                 <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition">
@@ -103,8 +104,11 @@ export default async function DealerCartPage() {
 
                   <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
                     <div className="text-left sm:text-right">
-                      <div className="text-xs text-slate-400 line-through">{formatCurrency(mrp)}</div>
-                      <div className="text-sm font-bold text-emerald-700">{formatCurrency(dp)}</div>
+                      <div className="text-xs text-slate-500 font-medium">
+                        MRP: <span className="font-semibold text-slate-700">{formatCurrency(mrp)}</span>
+                      </div>
+                      <div className="text-sm font-bold text-emerald-700">{formatCurrency(dealerPriceInclVat)}</div>
+                      <div className="text-[10px] text-slate-400">Current {formatCurrency(dp)} + 13% VAT</div>
                     </div>
 
                     {/* Quantity Update Controls */}

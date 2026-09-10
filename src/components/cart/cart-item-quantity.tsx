@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { Minus, Plus, Loader2 } from "lucide-react";
 
 interface CartItemQuantityProps {
@@ -16,6 +16,10 @@ export function CartItemQuantity({
 }: CartItemQuantityProps) {
   const [qty, setQty] = useState<string>(String(initialQuantity));
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setQty(String(initialQuantity));
+  }, [initialQuantity]);
 
   const handleUpdate = (newQty: number) => {
     const validQty = Math.max(1, newQty);

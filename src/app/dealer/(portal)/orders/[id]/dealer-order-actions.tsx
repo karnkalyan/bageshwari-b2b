@@ -20,6 +20,9 @@ import {
   Send,
   Clock,
   FileText,
+  FileUp,
+  Upload,
+  Paperclip,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -46,6 +49,7 @@ export interface DealerOrderActionsProps {
     method: string;
     amount: number;
     transactionRef?: string | null;
+    receiptUrl?: string | null;
     createdAt: string | Date;
   } | null;
   rejectedPaymentRemarks?: string | null;
@@ -71,10 +75,55 @@ export function DealerOrderActions({
   const [method, setMethod] = useState<PaymentOption>("CREDIT");
   const [transactionRef, setTransactionRef] = useState("");
   const [dealerRemarks, setDealerRemarks] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState<string>("");
+  const [receiptFileName, setReceiptFileName] = useState<string>("");
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [receiptUploadError, setReceiptUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [rejectRemarks, setRejectRemarks] = useState("");
+
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setReceiptUploadError("Only PDF or image files (JPG, PNG, WebP) are allowed.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setReceiptUploadError("File size exceeds 10MB limit.");
+      return;
+    }
+
+    setReceiptUploadError(null);
+    setIsUploadingReceipt(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("documentType", "PAYMENT_RECEIPT");
+
+      const res = await fetch("/api/dealer-applications/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.url) {
+        throw new Error(json.error || "Failed to upload receipt document.");
+      }
+
+      setReceiptUrl(json.url);
+      setReceiptFileName(file.name);
+    } catch (err) {
+      setReceiptUploadError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
 
   const isConfirmationStage = [
     "WAITING_FOR_DEALER_CONFIRMATION",
@@ -135,6 +184,7 @@ export function DealerOrderActions({
           method,
           transactionRef: transactionRef.trim() || undefined,
           remarks: dealerRemarks.trim() || `Dealer submitted payment terms via ${method}`,
+          receiptUrl: receiptUrl.trim() || undefined,
         }),
       });
 
@@ -401,6 +451,21 @@ export function DealerOrderActions({
             </div>
           )}
 
+          {pendingPayment?.receiptUrl && (
+            <div className="flex justify-between items-center pt-2 border-t border-emerald-200/60 text-xs">
+              <span className="text-slate-500 font-medium">Payment Receipt:</span>
+              <a
+                href={pendingPayment.receiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-emerald-800 hover:text-emerald-950 font-bold underline bg-white px-2.5 py-1 rounded border border-emerald-200 shadow-2xs"
+              >
+                <FileText className="h-3.5 w-3.5 text-emerald-600" />
+                <span>View Attached Receipt Document</span>
+              </a>
+            </div>
+          )}
+
           <p className="text-emerald-800 text-[11px]">
             Your payment reference is under verification by Accounts. Once verified in bank/cash, your order will automatically advance to warehouse picking & packaging.
           </p>
@@ -541,6 +606,83 @@ export function DealerOrderActions({
                 className="h-8 text-xs bg-white"
               />
             </div>
+          </div>
+
+          {/* Upload Receipt / Voucher Document */}
+          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <Label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                <FileUp className="h-4 w-4 text-emerald-600" />
+                <span>Upload Payment Receipt / Deposit Slip (Optional)</span>
+              </Label>
+              <span className="text-[10px] text-slate-400">PDF or Image (PNG, JPG, WebP up to 10MB)</span>
+            </div>
+
+            {receiptUrl ? (
+              <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-950">
+                <div className="flex items-center gap-2 truncate">
+                  <Paperclip className="h-4 w-4 text-emerald-700 shrink-0" />
+                  <span className="font-semibold truncate">{receiptFileName || "Payment Receipt Uploaded"}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <a
+                    href={receiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-700 hover:text-emerald-900 underline font-bold text-xs"
+                  >
+                    Preview
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptUrl("");
+                      setReceiptFileName("");
+                    }}
+                    className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-0.5">
+                <input
+                  type="file"
+                  id="receipt-file-upload"
+                  accept=".pdf,image/png,image/jpeg,image/webp"
+                  onChange={handleReceiptUpload}
+                  disabled={isUploadingReceipt}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="receipt-file-upload"
+                  className={`inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition shadow-2xs ${
+                    isUploadingReceipt
+                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                  }`}
+                >
+                  {isUploadingReceipt ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                      <span>Uploading document...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-3.5 w-3.5 text-emerald-700" />
+                      <span>Choose Receipt / Voucher Document</span>
+                    </>
+                  )}
+                </label>
+                <span className="text-[11px] text-slate-500">
+                  Attach bank voucher, cheque copy, or transaction screenshot
+                </span>
+              </div>
+            )}
+            {receiptUploadError && (
+              <p className="text-[11px] text-red-600 font-semibold">{receiptUploadError}</p>
+            )}
           </div>
 
           <div className="flex justify-end pt-2">

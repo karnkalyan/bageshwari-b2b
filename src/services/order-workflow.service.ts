@@ -358,6 +358,7 @@ export async function dealerConfirmOrder(input: {
   method?: PaymentMethod | "CREDIT" | "CHEQUE" | "CASH" | "ONLINE" | "BANK_TRANSFER" | "MOBILE_PAYMENT" | "OTHER";
   transactionRef?: string;
   remarks?: string;
+  receiptUrl?: string;
   actor: TransitionActor;
 }) {
   let actionType: "CONFIRM" | "REJECT" | "SUBMIT_PAYMENT" = input.action || "CONFIRM";
@@ -381,7 +382,7 @@ export async function dealerConfirmOrder(input: {
 
     const latestRevision = order.revisions[0];
 
-    // CASE 1: Dealer Rejects / Requests Changes
+    // CASE 1: Dealer Requests Changes
     if (actionType === "REJECT") {
       await tx.dealerConfirmation.create({
         data: {
@@ -390,7 +391,7 @@ export async function dealerConfirmOrder(input: {
           dealerId: order.dealerId,
           revisionId: latestRevision?.id || null,
           decision: "REJECTED",
-          remarks: input.remarks || "Dealer requested changes / rejected revised order.",
+          remarks: input.remarks || "Dealer requested revisions / changes on the order.",
           confirmedById: input.actor.userId,
           confirmedAt: new Date(),
         },
@@ -411,7 +412,7 @@ export async function dealerConfirmOrder(input: {
         orderId: order.id,
         targetStatus: "DEALER_CHANGE_REQUESTED",
         actor: input.actor,
-        reason: input.remarks || "Dealer requested changes on order revision.",
+        reason: `Dealer requested changes: ${input.remarks || "Revisions needed."}`,
       });
 
       return tx.order.findUnique({
@@ -440,6 +441,7 @@ export async function dealerConfirmOrder(input: {
           status: "PENDING",
           amount: order.grandTotal,
           transactionRef: input.transactionRef || undefined,
+          receiptUrl: input.receiptUrl || undefined,
           remarks: input.remarks || `Dealer submitted settlement terms: ${selectedMethod}`,
           recordedById: input.actor.userId,
         },

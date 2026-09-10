@@ -19,6 +19,7 @@ const dealerConfirmSchema = z.object({
     .optional(),
   transactionRef: z.string().trim().max(100).optional(),
   remarks: z.string().trim().max(1000).optional(),
+  receiptUrl: z.string().trim().optional(),
 });
 
 export async function POST(
