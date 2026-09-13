@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTenantContext } from "@/lib/tenant";
 import { getDealerCart } from "@/services/cart.service";
+import { getCompanyVatSetting } from "@/services/vat.service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,10 @@ export default async function DealerCartPage() {
   const ctx = await getTenantContext("bageshwari", "/dealer/login");
   if (!ctx.dealerId) redirect("/dealer/login");
 
-  const draft = await getDealerCart(ctx.sellerId, ctx.dealerId);
+  const [draft, companyVat] = await Promise.all([
+    getDealerCart(ctx.sellerId, ctx.dealerId),
+    getCompanyVatSetting(),
+  ]);
 
   if (!draft || !draft.items.length) {
     return (
@@ -78,8 +82,9 @@ export default async function DealerCartPage() {
               const qty = Number(item.originalQuantity);
               const dp = Number(item.dealerPrice);
               const mrp = Number(item.mrp);
-              const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
               const lineTotal = Number(item.lineTotal);
+              const itemVatRate = qty > 0 && item.taxAmount ? Number(((Number(item.taxAmount) / (dp * qty)) * 100).toFixed(1)) : companyVat.defaultVatPercent;
+              const dealerPriceInclVat = qty > 0 ? Number((lineTotal / qty).toFixed(2)) : Number((dp * (1 + itemVatRate / 100)).toFixed(2));
               const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
 
               return (
@@ -108,7 +113,7 @@ export default async function DealerCartPage() {
                         MRP: <span className="font-semibold text-slate-700">{formatCurrency(mrp)}</span>
                       </div>
                       <div className="text-sm font-bold text-emerald-700">{formatCurrency(dealerPriceInclVat)}</div>
-                      <div className="text-[10px] text-slate-400">Current {formatCurrency(dp)} + 13% VAT</div>
+                      <div className="text-[10px] text-slate-400">Current {formatCurrency(dp)} + {itemVatRate}% VAT</div>
                     </div>
 
                     {/* Quantity Update Controls */}
@@ -120,7 +125,7 @@ export default async function DealerCartPage() {
 
                     <div className="text-right min-w-24">
                       <div className="font-extrabold text-sm text-[#092f5c]">{formatCurrency(lineTotal)}</div>
-                      <div className="text-[10px] text-slate-400">incl. 13% VAT</div>
+                      <div className="text-[10px] text-slate-400">incl. {itemVatRate}% VAT</div>
                     </div>
 
                     <form action={removeItemAction}>
@@ -151,7 +156,7 @@ export default async function DealerCartPage() {
                 <span className="font-semibold text-slate-800">{formatCurrency(Number(draft.subtotal))}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Value Added Tax (13% VAT)</span>
+                <span>Value Added Tax ({companyVat.defaultVatPercent}% VAT)</span>
                 <span className="font-semibold text-slate-800">{formatCurrency(Number(draft.taxTotal))}</span>
               </div>
               <div className="flex justify-between text-slate-600">

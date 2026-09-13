@@ -60,6 +60,7 @@ interface ProductEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  globalVatPercent?: number;
 }
 
 export function ProductEditModal({
@@ -67,6 +68,7 @@ export function ProductEditModal({
   isOpen,
   onClose,
   onSuccess,
+  globalVatPercent = 13.0,
 }: ProductEditModalProps) {
   const [formData, setFormData] = useState<ProductEditData | null>(null);
   const [newImageUrl, setNewImageUrl] = useState("");
@@ -95,7 +97,7 @@ export function ProductEditModal({
   const normProductTax = rawProductTax !== null ? (rawProductTax > 0 && rawProductTax <= 1.0 ? rawProductTax * 100 : rawProductTax) : null;
   const normCatTax = rawCatTax !== null ? (rawCatTax > 0 && rawCatTax <= 1.0 ? rawCatTax * 100 : rawCatTax) : null;
 
-  const effectiveVatPercent = normProductTax !== null ? normProductTax : normCatTax !== null ? normCatTax : 13.0;
+  const effectiveVatPercent = normProductTax !== null ? normProductTax : normCatTax !== null ? normCatTax : (globalVatPercent || 13.0);
 
   const mrpGross = formData.mrp;
   const dealerGross = formData.dealerPrice * (1 + effectiveVatPercent / 100);

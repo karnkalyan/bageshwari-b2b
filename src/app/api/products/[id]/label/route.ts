@@ -37,10 +37,11 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const count = parseInt(searchParams.get("count") || "1", 10);
+  const sizeParam = searchParams.get("size") === "standard" ? "standard" : "32x20";
   const isDownload = searchParams.get("download") === "1" || searchParams.get("download") === "true";
   const disposition = isDownload ? "attachment" : "inline";
 
-  const bytes = await generateProductBarcodeLabelPdf(product.id, sellerId, count);
+  const bytes = await generateProductBarcodeLabelPdf(product.id, sellerId, count, sizeParam);
   if (!bytes) {
     return apiError("DOCUMENT_UNAVAILABLE", "Barcode data is unavailable.", 404);
   }

@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { Printer, Edit3, Image as ImageIcon, Percent } from "lucide-react";
+import { Printer, Edit3, Image as ImageIcon, Percent, Layers, Download, Upload } from "lucide-react";
 import { ProductEditModal, type ProductEditData } from "@/components/admin/product-edit-modal";
+import { BulkProductManagerModal } from "@/components/admin/bulk-product-manager-modal";
 
 export interface SerializedProduct {
   id: string;
@@ -38,16 +39,19 @@ interface ProductsTableClientProps {
   products: SerializedProduct[];
   sellerSlug: string;
   globalVatPercent?: number;
+  categories?: Array<{ id: string; name: string }>;
 }
 
 export function ProductsTableClient({
   products,
   sellerSlug,
   globalVatPercent = 13.0,
+  categories = [],
 }: ProductsTableClientProps) {
   const router = useRouter();
   const [selectedProduct, setSelectedProduct] = useState<ProductEditData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
   const handleEditClick = (p: SerializedProduct) => {
     setSelectedProduct({
@@ -75,6 +79,23 @@ export function ProductsTableClient({
 
   return (
     <>
+      <div className="p-3 border-b bg-slate-50/80 flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-xs text-slate-500 font-medium">
+          Showing <span className="font-bold text-slate-800">{products.length}</span> items on this page
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsBulkModalOpen(true)}
+            className="text-xs font-bold gap-1.5 shadow-sm bg-white hover:bg-slate-50 text-slate-800 border-slate-300"
+          >
+            <Layers className="h-3.5 w-3.5 text-primary" />
+            Bulk Import / Export & Templates
+          </Button>
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead className="bg-slate-50 text-slate-500 uppercase border-b text-[10px] font-semibold tracking-wider">
@@ -195,6 +216,15 @@ export function ProductsTableClient({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
+        globalVatPercent={globalVatPercent}
+      />
+
+      <BulkProductManagerModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        sellerSlug={sellerSlug}
+        categories={categories}
+        onImportSuccess={handleModalSuccess}
       />
     </>
   );

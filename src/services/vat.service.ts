@@ -23,6 +23,47 @@ export function normalizeVatRate(rate: number | null | undefined, defaultRate = 
  * 2. Category-level override (ProductCategory.taxPercent)
  * 3. Global Admin Company Setting (CompanyProfile.defaultVatPercent, default: 13.00%)
  */
+export async function getCompanyVatSetting(): Promise<{
+  defaultVatPercent: number;
+  pricesIncludeVat: boolean;
+  companyName: string;
+  tradingName: string;
+  panNumber: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  district: string | null;
+}> {
+  try {
+    const profile = await prisma.companyProfile.findUnique({
+      where: { id: "bageshwari-tractors" },
+    });
+    if (profile) {
+      return {
+        defaultVatPercent: normalizeVatRate(Number(profile.defaultVatPercent), 13.0),
+        pricesIncludeVat: Boolean(profile.pricesIncludeVat),
+        companyName: profile.companyName || "Bageshwari Tractors Pvt. Ltd.",
+        tradingName: profile.tradingName || "Bageshwari Tractor",
+        panNumber: profile.panNumber || profile.vatNumber || null,
+        phone: profile.phone || "+977-81-520123",
+        address: profile.address || "Nepalgunj, Banke",
+        city: profile.city || "Nepalgunj",
+        district: profile.district || "Banke",
+      };
+    }
+  } catch {}
+  return {
+    defaultVatPercent: 13.0,
+    pricesIncludeVat: false,
+    companyName: "Bageshwari Tractors Pvt. Ltd.",
+    tradingName: "Bageshwari Tractor",
+    panNumber: null,
+    phone: "+977-81-520123",
+    address: "Nepalgunj, Banke",
+    city: "Nepalgunj",
+    district: "Banke",
+  };
+}
 export async function resolveProductVat(
   sellerId: string,
   productId: string

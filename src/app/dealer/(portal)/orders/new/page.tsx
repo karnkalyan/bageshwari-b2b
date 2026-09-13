@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { resolveDealerPrice } from "@/services/pricing.service";
+import { getCompanyVatSetting } from "@/services/vat.service";
 import {
   SalesOrderCreator,
   SerializedDealer,
@@ -16,7 +17,7 @@ export default async function DealerNewOrderPage() {
     redirect("/dealer/login");
   }
 
-  const [dealer, products, categories] = await Promise.all([
+  const [dealer, products, categories, companyVat] = await Promise.all([
     prisma.dealer.findUnique({
       where: { id: ctx.dealerId },
       include: {
@@ -42,6 +43,7 @@ export default async function DealerNewOrderPage() {
       select: { name: true },
       orderBy: { displayOrder: "asc" },
     }),
+    getCompanyVatSetting(),
   ]);
 
   if (!dealer) {
@@ -95,20 +97,29 @@ export default async function DealerNewOrderPage() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
+    <div className="mx-auto w-full max-w-[1500px] space-y-4 sm:space-y-6 p-3 sm:p-7">
       <div>
         <Link
           href="/dealer/orders"
-          className="inline-flex items-center text-xs text-slate-500 hover:text-slate-900 font-medium mb-3"
+          className="inline-flex items-center text-xs text-slate-500 hover:text-slate-900 font-medium mb-2"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Orders
         </Link>
-        <div className="section-kicker">Dealer Direct Bulk Order</div>
-        <h1 className="text-2xl font-black text-[#0b2d55]">Create Sales Order</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Quickly select products, customize quantities with your unlocked dealer rates, and submit directly for Accounts review.
-        </p>
+        <div className="section-kicker hidden sm:block">Dealer Direct Bulk Order</div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-[#0b2d55]">Create Sales Order</h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 hidden sm:block">
+              Quickly select products, customize quantities with your unlocked dealer rates, and submit directly for Accounts review.
+            </p>
+          </div>
+          <Link href="/dealer/products" className="sm:hidden">
+            <span className="text-xs font-bold text-primary underline">
+              Switch to Live Product Catalogue
+            </span>
+          </Link>
+        </div>
       </div>
 
       <SalesOrderCreator
@@ -118,6 +129,7 @@ export default async function DealerNewOrderPage() {
         initialDealerId={dealer.id}
         isDealer={true}
         initialCategories={categories.map((c) => c.name)}
+        vatPercent={companyVat.defaultVatPercent}
       />
     </div>
   );

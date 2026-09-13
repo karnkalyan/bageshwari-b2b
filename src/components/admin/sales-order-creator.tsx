@@ -84,6 +84,7 @@ interface SalesOrderCreatorProps {
   initialDealerId?: string;
   isDealer?: boolean;
   initialCategories?: string[];
+  vatPercent?: number;
 }
 
 export function SalesOrderCreator({
@@ -92,7 +93,8 @@ export function SalesOrderCreator({
   products,
   initialDealerId,
   isDealer = false,
-  initialCategories,
+  initialCategories = [],
+  vatPercent = 13.0,
 }: SalesOrderCreatorProps) {
   const router = useRouter();
 
@@ -361,7 +363,7 @@ export function SalesOrderCreator({
   const subtotal = orderItems.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
   const discountTotal = orderItems.reduce((sum, it) => sum + it.discountAmount, 0);
   const netSubtotal = subtotal - discountTotal;
-  const taxTotal = netSubtotal * 0.13;
+  const taxTotal = netSubtotal * (vatPercent / 100);
   const grandTotal = netSubtotal + taxTotal + freightTotal;
   const totalItemUnits = orderItems.reduce((sum, it) => sum + it.quantity, 0);
 
@@ -860,7 +862,7 @@ export function SalesOrderCreator({
                   <span className="font-semibold text-slate-900">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>VAT Tax (13%):</span>
+                  <span>VAT Tax ({vatPercent}%):</span>
                   <span className="font-semibold text-slate-900">{formatCurrency(taxTotal)}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-600 pt-1 border-t">

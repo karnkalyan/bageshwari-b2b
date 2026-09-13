@@ -487,7 +487,8 @@ export async function generatePackageLabelPdf(packageId: string, sellerId: strin
 export async function generateProductBarcodeLabelPdf(
   productIdOrSku: string,
   sellerId: string,
-  count = 1
+  count = 1,
+  stickerSize: "32x20" | "standard" = "32x20"
 ): Promise<Uint8Array | null> {
   const [product, companyRaw] = await Promise.all([
     prisma.product.findFirst({
@@ -534,7 +535,8 @@ export async function generateProductBarcodeLabelPdf(
       categoryName: product.category?.name,
       brandName: product.brand?.name,
       unitCode: product.unitCode,
-      companyName: companyRaw?.companyName || companyRaw?.tradingName || "",
+      companyName: companyRaw?.companyName || companyRaw?.tradingName || "BAGESHWARI TRACTOR, NEPALGUNJ",
+      stickerSize,
     },
     count
   );

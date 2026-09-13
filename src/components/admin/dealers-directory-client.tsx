@@ -32,6 +32,7 @@ import {
   type DealerGroupOption,
   type PricingGroupOption,
 } from "./dealer-application-review-dialog";
+import { DealerCreditModal } from "./dealer-credit-modal";
 
 export interface SerializedDealer {
   id: string;
@@ -80,6 +81,7 @@ export function DealersDirectoryClient({
 }: DealersDirectoryClientProps) {
   const [selectedApp, setSelectedApp] = useState<SerializedDealerApplication | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [creditModalDealer, setCreditModalDealer] = useState<SerializedDealer | null>(null);
   const [dealerSearchQuery, setDealerSearchQuery] = useState("");
   const [appSearchQuery, setAppSearchQuery] = useState("");
 
@@ -231,6 +233,11 @@ export function DealersDirectoryClient({
                               <div className="text-[10px] text-emerald-700 font-normal">
                                 Avail: {formatCurrency(d.creditProfile.availableCredit)} ({d.creditProfile.creditPeriodDays}d)
                               </div>
+                              {d.creditProfile.holdStatus && (
+                                <Badge variant="destructive" className="text-[9px] mt-0.5 px-1 py-0 h-4">
+                                  Hold
+                                </Badge>
+                              )}
                             </div>
                           ) : (
                             <span className="text-slate-400">No Credit Facility</span>
@@ -242,6 +249,15 @@ export function DealersDirectoryClient({
                         </td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setCreditModalDealer(d)}
+                              className="h-7 text-xs border-emerald-300 font-semibold flex items-center gap-1 hover:bg-emerald-50 text-emerald-800"
+                              title="Manage Credit Limit, Available Balance, and Payment Terms"
+                            >
+                              <CreditCard className="h-3 w-3 text-emerald-600" /> Credit Limit
+                            </Button>
                             <Link href={`/s/${sellerSlug}/admin/orders/new?dealerId=${d.id}`}>
                               <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center gap-1">
                                 <ShoppingCart className="h-3 w-3" /> Create Order
@@ -419,6 +435,14 @@ export function DealersDirectoryClient({
         }}
         dealerGroups={dealerGroups}
         pricingGroups={pricingGroups}
+      />
+
+      {/* Dealer Credit Limit Management Modal */}
+      <DealerCreditModal
+        isOpen={!!creditModalDealer}
+        dealer={creditModalDealer}
+        onClose={() => setCreditModalDealer(null)}
+        onSuccess={() => window.location.reload()}
       />
     </div>
   );

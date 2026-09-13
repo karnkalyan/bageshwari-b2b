@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { resolveDealerPrice } from "@/services/pricing.service";
 import { addItemToDealerCart, getDealerCartItemCount } from "@/services/cart.service";
+import { getCompanyVatSetting } from "@/services/vat.service";
 import { DealerCardAddToCart } from "@/components/cart/dealer-card-add-to-cart";
 import { DealerLiveSearch } from "@/components/search/dealer-live-search";
 import { buildProductSearchFilter, rankProductsBySearchRelevance } from "@/lib/search-utils";
@@ -36,12 +37,12 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
     ...(searchFilter ? searchFilter : {}),
   };
 
-  const [rawProducts, dealer, cartItemCount] = await Promise.all([
+  const [rawProducts, dealer, cartItemCount, companyVat] = await Promise.all([
     prisma.product.findMany({
       where,
       take: search ? 100 : 40,
       include: {
-        category: { select: { name: true } },
+        category: { select: { name: true, taxPercent: true } },
         brand: { select: { name: true } },
         variants: { where: { isDefault: true }, take: 1 },
         prices: { where: { active: true } },
@@ -53,6 +54,7 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
       select: { id: true, dealerGroupId: true, pricingGroupId: true, tradingName: true },
     }),
     getDealerCartItemCount(ctx.sellerId, ctx.dealerId),
+    getCompanyVatSetting(),
   ]);
 
   const products = search ? rankProductsBySearchRelevance(rawProducts, search) : rawProducts;
@@ -75,25 +77,28 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
 
     revalidatePath(`/s/${sellerSlug}/dealer/products`);
     revalidatePath("/dealer/products");
+    revalidatePath(`/s/${sellerSlug}/dealer/cart`);
+    revalidatePath("/dealer/cart");
+    revalidatePath("/dealer", "layout");
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="mx-auto w-full max-w-[1500px] space-y-4 sm:space-y-6 p-3 sm:p-7">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <div className="section-kicker">Unlocked dealer pricing</div>
-          <h1 className="text-2xl font-black text-[#0b2d55]">Dealer Ordering Catalogue</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Exclusive Dealer Prices (DP) & Shopping Cart Order Placement
+          <div className="section-kicker hidden sm:block">Unlocked dealer pricing</div>
+          <h1 className="text-xl sm:text-2xl font-black text-[#0b2d55]">Dealer Product Catalogue</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5 hidden sm:block">
+            Exclusive Dealer Rates (DP) • Instant Cart Draft • Automatic Sync
           </p>
         </div>
 
         <Link href="/dealer/cart">
-          <Button className="bg-[#0b2d55] hover:bg-[#124177] text-white">
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            View Dealer Cart
+          <Button className="bg-[#0b2d55] hover:bg-[#124177] text-white text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 shadow-sm">
+            <ShoppingCart className="h-4 w-4 mr-1.5 sm:mr-2" />
+            <span>Dealer Cart</span>
             {cartItemCount > 0 && (
-              <Badge className="ml-2 bg-red-600 text-white hover:bg-red-600 px-2 py-0.5 text-xs">
+              <Badge className="ml-1.5 sm:ml-2 bg-red-600 text-white hover:bg-red-600 px-1.5 py-0 text-[10px] sm:text-xs">
                 {cartItemCount}
               </Badge>
             )}
@@ -101,14 +106,14 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
         </Link>
       </div>
 
-      <Card>
-        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <Card className="shadow-xs border-slate-200">
+        <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <DealerLiveSearch
             placeholder="Search SKU, bearing number, or name (e.g. bearing 11949 10)..."
-            className="w-full sm:w-96"
+            className="w-full sm:w-96 text-xs"
           />
-          <div className="text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-md font-semibold border border-emerald-200">
-            Dealer Unlocked Pricing Active ({dealer?.tradingName || "Authorized Dealer"})
+          <div className="text-[11px] sm:text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 sm:py-1.5 rounded-md font-semibold border border-emerald-200 text-center sm:text-left truncate">
+            Dealer Unlocked Pricing Active ({dealer?.tradingName || "Authorized Account"})
           </div>
         </CardContent>
       </Card>
@@ -140,7 +145,11 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
           const variant = p.variants[0];
           const mrp = variant ? Number(variant.mrp) : 0;
           const dp = dealer ? resolveDealerPrice(p.prices, { dealerId: dealer.id, dealerGroupId: dealer.dealerGroupId, pricingGroupId: dealer.pricingGroupId }, mrp) : mrp;
-          const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+          const prodTax = (p as any).taxPercent !== null && (p as any).taxPercent !== undefined ? Number((p as any).taxPercent) : null;
+          const catTax = (p.category as any)?.taxPercent !== null && (p.category as any)?.taxPercent !== undefined ? Number((p.category as any).taxPercent) : null;
+          const effectiveVat = prodTax !== null ? prodTax : catTax !== null ? catTax : companyVat.defaultVatPercent;
+          const vatMultiplier = 1 + (effectiveVat / 100);
+          const dealerPriceInclVat = Number((dp * vatMultiplier).toFixed(2));
           const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
           const stock = p.inventories[0]?.availableQuantity ? Number(p.inventories[0].availableQuantity) : 0;
 
@@ -167,7 +176,7 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
                     <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(dealerPriceInclVat)}</span>
                   </div>
                   <div className="text-[10px] text-slate-500 text-right">
-                    Current price {formatCurrency(dp)} + 13% VAT
+                    Current price {formatCurrency(dp)} + {effectiveVat}% VAT
                   </div>
                 </div>
 

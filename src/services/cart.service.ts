@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { resolveDealerPrice } from "@/services/pricing.service";
 import { nextDocumentNumber } from "@/services/number-sequence.service";
+import { resolveProductVat, getCompanyVatSetting } from "@/services/vat.service";
 
 export type AddToCartInput = {
   sellerId: string;
@@ -95,8 +96,8 @@ export async function addItemToDealerCart(input: AddToCartInput) {
     mrpVal
   );
 
-  const rawTax = Number(product.taxPercent ?? 13);
-  const taxRate = rawTax > 1 ? rawTax / 100 : rawTax > 0 ? rawTax : 0.13;
+  const vatRes = await resolveProductVat(input.sellerId, product.id);
+  const taxRate = vatRes.vatPercent / 100;
 
   return prisma.$transaction(async (tx) => {
     let draft = await tx.order.findFirst({
@@ -226,11 +227,11 @@ export async function updateCartItemQuantity(input: {
       const lineSubtotal = unitDp * quantity;
       let effectiveTaxRate = 0.13;
       if (item.productId) {
-        const prod = await tx.product.findUnique({ where: { id: item.productId }, select: { taxPercent: true } });
-        if (prod?.taxPercent !== null && prod?.taxPercent !== undefined) {
-          const raw = Number(prod.taxPercent);
-          effectiveTaxRate = raw > 1 ? raw / 100 : raw > 0 ? raw : 0.13;
-        }
+        const vatRes = await resolveProductVat(item.order.sellerId, item.productId);
+        effectiveTaxRate = vatRes.vatPercent / 100;
+      } else {
+        const companyVat = await getCompanyVatSetting();
+        effectiveTaxRate = companyVat.defaultVatPercent / 100;
       }
       const lineTax = Number((lineSubtotal * effectiveTaxRate).toFixed(2));
       const lineTotal = Number((lineSubtotal + lineTax).toFixed(2));

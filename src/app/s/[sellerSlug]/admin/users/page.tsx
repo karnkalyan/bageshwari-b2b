@@ -25,6 +25,8 @@ import { formatDate } from "@/lib/utils";
 import { UserActions } from "./user-actions";
 import { Pagination } from "@/components/ui/pagination";
 
+import Link from "next/link";
+
 interface UsersPageProps {
   params: Promise<{ sellerSlug: string }>;
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -192,6 +194,14 @@ export default async function AdminUsersPage({ params, searchParams }: UsersPage
           <p className="text-sm text-muted-foreground mt-1">
             Manage organizational staff members, role assignments, security credentials, and login permissions.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/s/${sellerSlug}/admin/roles`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border bg-card hover:bg-muted text-foreground transition shadow-sm"
+          >
+            <Shield className="h-4 w-4 text-primary" /> Roles & RBAC Matrix
+          </Link>
         </div>
       </div>
 

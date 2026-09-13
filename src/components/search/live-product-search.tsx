@@ -197,7 +197,8 @@ export function LiveProductSearch({
                   const variant = product.variants?.[0];
                   const mrp = Number(variant?.mrp || 0);
                   const dp = Number(variant?.dealerPrice || mrp);
-                  const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+                  const effectiveVat = (product as any).taxPercent !== null && (product as any).taxPercent !== undefined ? Number((product as any).taxPercent) : 13;
+                  const dealerPriceInclVat = Number((dp * (1 + effectiveVat / 100)).toFixed(2));
                   const isSelected = selectedIndex === idx;
 
                   return (

@@ -36,6 +36,8 @@ export interface DealerOrderActionsProps {
   creditLimit?: number;
   availableCredit?: number;
   creditPeriodDays?: number;
+  creditEligible?: boolean;
+  holdStatus?: boolean;
   proforma?: {
     id: string;
     proformaNumber: string;
@@ -62,9 +64,11 @@ export function DealerOrderActions({
   orderNumber,
   orderStatus,
   grandTotal,
-  creditLimit = 500000,
-  availableCredit = 500000,
+  creditLimit = 0,
+  availableCredit = 0,
   creditPeriodDays = 30,
+  creditEligible = false,
+  holdStatus = false,
   proforma,
   latestRevisionRemarks,
   hasSubmittedPayment = false,
@@ -72,7 +76,8 @@ export function DealerOrderActions({
   rejectedPaymentRemarks = null,
 }: DealerOrderActionsProps) {
   const router = useRouter();
-  const [method, setMethod] = useState<PaymentOption>("CREDIT");
+  const canUseCredit = Boolean(creditEligible && !holdStatus && creditLimit > 0);
+  const [method, setMethod] = useState<PaymentOption>(canUseCredit ? "CREDIT" : "ONLINE");
   const [transactionRef, setTransactionRef] = useState("");
   const [dealerRemarks, setDealerRemarks] = useState("");
   const [receiptUrl, setReceiptUrl] = useState<string>("");
@@ -383,35 +388,37 @@ export function DealerOrderActions({
         </div>
       )}
 
-      {/* Dealer Credit Profile Banner */}
-      <div className="p-4 bg-gradient-to-r from-slate-900 to-[#072d57] text-white rounded-xl shadow-xs space-y-3">
-        <div className="flex items-center justify-between border-b border-white/10 pb-2">
-          <div className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4 text-emerald-400" />
-            <span className="font-bold text-xs">Dealer B2B Credit Facility</span>
+      {/* Dealer Credit Profile Banner (Only shown if dealer is credit eligible & active) */}
+      {canUseCredit && (
+        <div className="p-4 bg-gradient-to-r from-slate-900 to-[#072d57] text-white rounded-xl shadow-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-emerald-400" />
+              <span className="font-bold text-xs">Dealer B2B Credit Facility</span>
+            </div>
+            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
+              {creditPeriodDays} Days Net Terms
+            </Badge>
           </div>
-          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
-            {creditPeriodDays} Days Net Terms
-          </Badge>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div>
-            <span className="text-[10px] text-slate-400 block font-medium">Approved Credit Limit</span>
-            <span className="font-bold text-sm text-slate-200">{formatCurrency(creditLimit)}</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block font-medium">Available Credit Balance</span>
-            <span className="font-black text-sm text-emerald-400">{formatCurrency(availableCredit)}</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block font-medium">Credit Coverage</span>
-            <span className={isCreditSufficient ? "font-bold text-emerald-300" : "font-bold text-amber-300"}>
-              {isCreditSufficient ? "✅ 100% Covered" : "⚠️ Partial Limit"}
-            </span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Approved Credit Limit</span>
+              <span className="font-bold text-sm text-slate-200">{formatCurrency(creditLimit)}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Available Credit Balance</span>
+              <span className="font-black text-sm text-emerald-400">{formatCurrency(availableCredit)}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Credit Coverage</span>
+              <span className={isCreditSufficient ? "font-bold text-emerald-300" : "font-bold text-amber-300"}>
+                {isCreditSufficient ? "✅ 100% Covered" : "⚠️ Partial Limit"}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {error && (
         <div className="p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-xs flex items-center gap-2">
@@ -490,22 +497,24 @@ export function DealerOrderActions({
           <div className="space-y-2">
             <Label className="text-xs font-bold text-slate-800">Select Settlement Method</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {/* 1. Credit Limit */}
-              <button
-                type="button"
-                onClick={() => setMethod("CREDIT")}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  method === "CREDIT"
-                    ? "border-emerald-600 bg-emerald-100/50 ring-2 ring-emerald-600/30 text-emerald-950 font-bold"
-                    : "border-slate-200 hover:border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                <div className="flex items-center gap-2 text-xs">
-                  <CreditCard className="h-4 w-4 text-emerald-600" />
-                  <span>Dealer Credit</span>
-                </div>
-                <div className="text-[10px] text-slate-500 font-normal mt-1">{creditPeriodDays}-Day Credit Account</div>
-              </button>
+              {/* 1. Credit Limit (Only shown if dealer is credit eligible & active) */}
+              {canUseCredit && (
+                <button
+                  type="button"
+                  onClick={() => setMethod("CREDIT")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    method === "CREDIT"
+                      ? "border-emerald-600 bg-emerald-100/50 ring-2 ring-emerald-600/30 text-emerald-950 font-bold"
+                      : "border-slate-200 hover:border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <CreditCard className="h-4 w-4 text-emerald-600" />
+                    <span>Dealer Credit</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-normal mt-1">{creditPeriodDays}-Day Credit Account</div>
+                </button>
+              )}
 
               {/* 2. Fonepay QR */}
               <button

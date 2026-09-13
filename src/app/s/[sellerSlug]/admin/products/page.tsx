@@ -46,16 +46,20 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
       SELECT defaultVatPercent FROM CompanyProfile WHERE id = 'bageshwari-tractors' LIMIT 1
     `.catch(() => []),
     prisma.$queryRaw<any[]>`
-      SELECT id, taxPercent FROM ProductCategory WHERE sellerId = ${ctx.sellerId}
+      SELECT id, name, taxPercent FROM ProductCategory WHERE sellerId = ${ctx.sellerId} ORDER BY name ASC
     `.catch(() => []),
   ]);
 
   const globalVat = companyRows?.[0]?.defaultVatPercent ? Number(companyRows[0].defaultVatPercent) : 13.0;
   const categoryTaxMap = new Map<string, number | null>();
+  const categoriesList: { id: string; name: string }[] = [];
   if (Array.isArray(categoryRows)) {
     for (const cat of categoryRows) {
       if (cat.taxPercent !== null && cat.taxPercent !== undefined) {
         categoryTaxMap.set(cat.id, Number(cat.taxPercent));
+      }
+      if (cat.id && cat.name) {
+        categoriesList.push({ id: String(cat.id), name: String(cat.name) });
       }
     }
   }
@@ -122,7 +126,12 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
 
       <Card>
         <CardContent className="p-0">
-          <ProductsTableClient products={plainProducts} sellerSlug={sellerSlug} globalVatPercent={globalVat} />
+          <ProductsTableClient
+            products={plainProducts}
+            sellerSlug={sellerSlug}
+            globalVatPercent={globalVat}
+            categories={categoriesList}
+          />
           {Math.ceil(totalCount / pageSize) > 1 && (
             <div className="p-4 border-t border-border bg-muted/20">
               <Pagination totalPages={Math.ceil(totalCount / pageSize)} />

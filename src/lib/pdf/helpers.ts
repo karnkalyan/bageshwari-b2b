@@ -152,6 +152,25 @@ export function drawBox(
   });
 }
 
+export function drawLine(
+  page: PDFPage,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  options?: {
+    color?: RGB;
+    thickness?: number;
+  }
+) {
+  page.drawLine({
+    start: { x: x1, y: y1 },
+    end: { x: x2, y: y2 },
+    thickness: options?.thickness ?? 1,
+    color: options?.color ?? COLORS.black,
+  });
+}
+
 export async function generateBarcodeImage(
   pdf: PDFDocument,
   text: string,

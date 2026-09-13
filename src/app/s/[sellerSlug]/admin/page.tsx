@@ -99,16 +99,16 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
   const base = `/admin`;
 
   const kpis = [
-    { icon: ShoppingCart, label: "Total Orders", value: orderCount.toLocaleString(), color: "text-blue-500", bg: "bg-blue-500/10" },
-    { icon: TrendingUp, label: "Net Revenue", value: formatCurrency(totalSales), color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { icon: FileText, label: "Proforma Invoices", value: proformaCount.toLocaleString(), color: "text-amber-500", bg: "bg-amber-500/10" },
-    { icon: ShieldCheck, label: "VAT Invoices", value: finalInvoiceCount.toLocaleString(), color: "text-cyan-500", bg: "bg-cyan-500/10" },
-    { icon: Truck, label: "Dispatches", value: shipmentCount.toLocaleString(), color: "text-sky-500", bg: "bg-sky-500/10" },
-    { icon: PackageCheck, label: "Cartons Packed", value: packageCount.toLocaleString(), color: "text-indigo-500", bg: "bg-indigo-500/10" },
-    { icon: Users, label: "Active Dealers", value: dealers.toLocaleString(), color: "text-purple-500", bg: "bg-purple-500/10" },
-    { icon: UserPlus, label: "Dealer Requests", value: pendingApplications.toLocaleString(), color: "text-pink-500", bg: "bg-pink-500/10" },
-    { icon: Package, label: "Products Catalog", value: products.toLocaleString(), color: "text-orange-500", bg: "bg-orange-500/10" },
-    { icon: AlertTriangle, label: "Low Stock Alerts", value: lowStock.toLocaleString(), color: "text-red-500", bg: "bg-red-500/10" },
+    { icon: ShoppingCart, label: "Total Orders", value: orderCount.toLocaleString(), color: "text-blue-500", bg: "bg-blue-500/10", href: `${base}/orders` },
+    { icon: TrendingUp, label: "Net Revenue", value: formatCurrency(totalSales), color: "text-emerald-500", bg: "bg-emerald-500/10", href: `${base}/accounts` },
+    { icon: FileText, label: "Proforma Invoices", value: proformaCount.toLocaleString(), color: "text-amber-500", bg: "bg-amber-500/10", href: `${base}/accounts?tab=proformas` },
+    { icon: ShieldCheck, label: "VAT Invoices", value: finalInvoiceCount.toLocaleString(), color: "text-cyan-500", bg: "bg-cyan-500/10", href: `${base}/accounts?tab=tax-invoices` },
+    { icon: Truck, label: "Dispatches", value: shipmentCount.toLocaleString(), color: "text-sky-500", bg: "bg-sky-500/10", href: `${base}/dispatch` },
+    { icon: PackageCheck, label: "Cartons Packed", value: packageCount.toLocaleString(), color: "text-indigo-500", bg: "bg-indigo-500/10", href: `${base}/warehouse` },
+    { icon: Users, label: "Active Dealers", value: dealers.toLocaleString(), color: "text-purple-500", bg: "bg-purple-500/10", href: `${base}/dealers` },
+    { icon: UserPlus, label: "Dealer Requests", value: pendingApplications.toLocaleString(), color: "text-pink-500", bg: "bg-pink-500/10", href: `${base}/dealers?tab=applications` },
+    { icon: Package, label: "Products Catalog", value: products.toLocaleString(), color: "text-orange-500", bg: "bg-orange-500/10", href: `${base}/products` },
+    { icon: AlertTriangle, label: "Low Stock Alerts", value: lowStock.toLocaleString(), color: "text-red-500", bg: "bg-red-500/10", href: `${base}/products?filter=low_stock` },
   ];
 
   const quickActions = [
@@ -149,20 +149,25 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      {/* KPI Grid */}
+      {/* KPI Grid - Clickable Navigation Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 stagger-children">
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
-            <div key={k.label} className="glass-card p-4 transition-all">
+            <Link
+              key={k.label}
+              href={k.href}
+              className="glass-card p-4 transition-all hover:scale-[1.02] hover:shadow-md hover:border-primary/40 block cursor-pointer group"
+            >
               <div className="flex items-center justify-between">
-                <div className={`grid h-9 w-9 place-items-center rounded-xl ${k.bg}`}>
+                <div className={`grid h-9 w-9 place-items-center rounded-xl ${k.bg} transition-transform group-hover:scale-110`}>
                   <Icon className={`h-4 w-4 ${k.color}`} />
                 </div>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{k.label}</div>
+              <div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">{k.label}</div>
               <div className="mt-1 truncate text-xl font-black text-foreground">{k.value}</div>
-            </div>
+            </Link>
           );
         })}
       </div>

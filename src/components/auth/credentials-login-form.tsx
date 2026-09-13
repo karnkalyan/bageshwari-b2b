@@ -59,7 +59,7 @@ export function CredentialsLoginForm({
       }
 
       if (scope === "dealer") {
-        router.replace(safeLocalCallback(searchParams.get("callbackUrl"), "/dealer/dashboard"));
+        router.replace(safeLocalCallback(searchParams.get("callbackUrl"), "/dealer/products"));
       } else {
         const session = await getSession();
         const roles = session?.roles || [];

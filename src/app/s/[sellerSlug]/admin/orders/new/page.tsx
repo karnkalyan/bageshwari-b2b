@@ -8,6 +8,7 @@ import {
   SerializedDealer,
   SerializedProduct,
 } from "@/components/admin/sales-order-creator";
+import { getCompanyVatSetting } from "@/services/vat.service";
 
 interface NewOrderPageProps {
   params: Promise<{ sellerSlug: string }>;
@@ -40,7 +41,7 @@ export default async function NewSalesOrderPage({ params, searchParams }: NewOrd
     redirect("/admin/orders");
   }
 
-  const [dealers, products, categories] = await Promise.all([
+  const [dealers, products, categories, companyVat] = await Promise.all([
     prisma.dealer.findMany({
       where: { sellerId: ctx.sellerId },
       orderBy: { legalName: "asc" },
@@ -67,6 +68,7 @@ export default async function NewSalesOrderPage({ params, searchParams }: NewOrd
       select: { name: true },
       orderBy: { displayOrder: "asc" },
     }),
+    getCompanyVatSetting(),
   ]);
 
   const serializedDealers: SerializedDealer[] = dealers.map((d) => ({
@@ -131,6 +133,7 @@ export default async function NewSalesOrderPage({ params, searchParams }: NewOrd
         products={serializedProducts}
         initialDealerId={dealerId}
         initialCategories={categories.map((c) => c.name)}
+        vatPercent={companyVat.defaultVatPercent}
       />
     </div>
   );

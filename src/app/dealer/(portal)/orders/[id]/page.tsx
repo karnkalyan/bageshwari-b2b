@@ -91,12 +91,43 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
   ].includes(order.status);
 
   const workflowSteps = [
-    { title: "Order Placed", done: !isDraft },
-    { title: "Accounts Review", done: !["DRAFT", "PENDING_ACCOUNTS_REVIEW"].includes(order.status) },
-    { title: "Payment & Proforma", done: !["DRAFT", "PENDING_ACCOUNTS_REVIEW", "WAITING_FOR_DEALER_CONFIRMATION"].includes(order.status) },
-    { title: "Warehouse Picking", done: ["PICK_LIST_COMPLETED", "FINAL_INVOICE_ISSUED", "PAID", "PACKED", "PACKED_AND_LABELLED", "SHIPPED", "COMPLETED"].includes(order.status) },
-    { title: "Final Invoice", done: ["FINAL_INVOICE_ISSUED", "PAID", "PACKED", "PACKED_AND_LABELLED", "SHIPPED", "COMPLETED"].includes(order.status) },
-    { title: "Dispatched", done: ["SHIPPED", "IN_TRANSIT", "DELIVERED", "COMPLETED"].includes(order.status) },
+    {
+      title: "Order Placed",
+      description: isDraft ? "Pending Submission" : "Placed & Verified",
+      done: !isDraft,
+      current: order.status === "PENDING_ACCOUNTS_REVIEW" || order.status === "ACCOUNTS_REVIEW_IN_PROGRESS" || order.status === "WAITING_FOR_DEALER_CONFIRMATION",
+    },
+    {
+      title: "Under Packing",
+      description: "Picking & Assembly",
+      done: [
+        "READY_FOR_WAREHOUSE", "PICK_LIST_GENERATED", "PICKING_IN_PROGRESS",
+        "PARTIALLY_PICKED", "PICKING_COMPLETED", "PACKING_IN_PROGRESS",
+        "FINAL_INVOICE_ISSUED", "PACKED", "PACKED_AND_LABELLED",
+        "SHIPPED", "IN_TRANSIT", "PARTIALLY_DELIVERED", "DELIVERED", "COMPLETED"
+      ].includes(order.status),
+      current: [
+        "READY_FOR_WAREHOUSE", "PICK_LIST_GENERATED", "PICKING_IN_PROGRESS",
+        "PARTIALLY_PICKED", "PICKING_COMPLETED", "PACKING_IN_PROGRESS", "FINAL_INVOICE_ISSUED"
+      ].includes(order.status),
+    },
+    {
+      title: "Packed",
+      description: "Sealed & Labelled",
+      done: [
+        "PACKED", "PACKED_AND_LABELLED", "SHIPPED", "IN_TRANSIT",
+        "PARTIALLY_DELIVERED", "DELIVERED", "COMPLETED"
+      ].includes(order.status),
+      current: order.status === "PACKED" || order.status === "PACKED_AND_LABELLED",
+    },
+    {
+      title: "Dispatched",
+      description: "Transport / In Transit",
+      done: [
+        "SHIPPED", "IN_TRANSIT", "PARTIALLY_DELIVERED", "DELIVERED", "COMPLETED"
+      ].includes(order.status),
+      current: ["SHIPPED", "IN_TRANSIT"].includes(order.status),
+    },
   ];
 
   return (
@@ -190,27 +221,81 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
         </div>
       </div>
 
-      {/* Workflow Progress Tracker */}
-      <div className="bg-white rounded-xl border p-6 shadow-xs">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Order Pipeline Progression</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {workflowSteps.map((step, idx) => (
-            <div
-              key={step.title}
-              className={`p-3 rounded-lg border flex items-center gap-2.5 ${
-                step.done
-                  ? "bg-emerald-50/70 border-emerald-200 text-emerald-950 font-bold"
-                  : "bg-slate-50 border-slate-200 text-slate-400"
-              }`}
-            >
-              {step.done ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              ) : (
-                <Clock className="h-4 w-4 text-slate-300 shrink-0" />
-              )}
-              <span className="text-xs">{step.title}</span>
-            </div>
-          ))}
+      {/* Workflow Progress Tracker - Connected Stepper Bar */}
+      <div className="bg-white rounded-xl border p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <PackageCheck className="h-4 w-4 text-[#0b2d55]" /> Order Fulfillment Progress
+          </h2>
+          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+            {order.status === "COMPLETED" || order.status === "DELIVERED"
+              ? "Completed"
+              : order.status === "SHIPPED" || order.status === "IN_TRANSIT"
+                ? "Dispatched"
+                : order.status === "PACKED" || order.status === "PACKED_AND_LABELLED"
+                  ? "Packed"
+                  : isSentToWarehouse
+                    ? "Under Packing"
+                    : !isDraft
+                      ? "Order Placed"
+                      : "Draft Order"}
+          </span>
+        </div>
+
+        <div className="relative pt-2 pb-2">
+          <div className="grid grid-cols-4 gap-1 sm:gap-2 relative">
+            {workflowSteps.map((step, idx) => {
+              const isLast = idx === workflowSteps.length - 1;
+              const isStepDone = step.done;
+              const isStepCurrent = step.current;
+
+              return (
+                <div key={step.title} className="flex flex-col items-center text-center relative group">
+                  {/* Connecting Line between steps */}
+                  {!isLast && (
+                    <div
+                      className={`absolute top-4 left-1/2 w-full h-1 -z-0 transition-all ${
+                        workflowSteps[idx + 1]?.done
+                          ? "bg-emerald-500"
+                          : isStepDone
+                            ? "bg-gradient-to-r from-emerald-500 to-slate-200"
+                            : "bg-slate-200"
+                      }`}
+                    />
+                  )}
+
+                  {/* Step Icon / Circle */}
+                  <div
+                    className={`relative z-10 h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs transition-all shadow-sm ${
+                      isStepDone
+                        ? "bg-emerald-600 text-white ring-4 ring-emerald-100"
+                        : isStepCurrent
+                          ? "bg-[#0b2d55] text-white ring-4 ring-blue-100 animate-pulse"
+                          : "bg-slate-100 text-slate-400 border border-slate-300"
+                    }`}
+                  >
+                    {isStepDone ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <span>{idx + 1}</span>
+                    )}
+                  </div>
+
+                  {/* Step Title and Status */}
+                  <div className="mt-2 text-center w-full px-1">
+                    <div className={`text-xs font-bold leading-tight ${
+                      isStepDone ? "text-emerald-950" : isStepCurrent ? "text-[#0b2d55] font-black" : "text-slate-500"
+                    }`}>
+                      {step.title}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 hidden sm:block truncate">
+                      {step.description}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -252,9 +337,11 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
         orderNumber={order.orderNumber}
         orderStatus={order.status}
         grandTotal={Number(order.grandTotal)}
-        creditLimit={order.dealer?.creditProfile ? Number(order.dealer.creditProfile.creditLimit) : 500000}
-        availableCredit={order.dealer?.creditProfile ? Number(order.dealer.creditProfile.availableCredit) : 500000}
-        creditPeriodDays={order.dealer?.creditProfile?.creditPeriodDays || 30}
+        creditEligible={Boolean(order.dealer?.creditEligible && order.dealer?.creditProfile && !order.dealer?.creditProfile?.holdStatus && Number(order.dealer.creditProfile.creditLimit) > 0)}
+        holdStatus={Boolean(order.dealer?.creditProfile?.holdStatus)}
+        creditLimit={order.dealer?.creditProfile ? Number(order.dealer.creditProfile.creditLimit) : 0}
+        availableCredit={order.dealer?.creditProfile ? Number(order.dealer.creditProfile.availableCredit) : 0}
+        creditPeriodDays={order.dealer?.creditProfile?.creditPeriodDays || 0}
         proforma={proforma ? {
           id: proforma.id,
           proformaNumber: proforma.proformaNumber,

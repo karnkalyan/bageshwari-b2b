@@ -6,6 +6,7 @@ import {
   drawRightText,
   drawCenteredText,
   drawBox,
+  drawLine,
   generateBarcodeImage,
   generateQrImage,
 } from "../helpers";
@@ -31,170 +32,177 @@ export interface PackageLabelData {
 
 export async function renderPackageLabelPdf(data: PackageLabelData): Promise<Uint8Array> {
   const ctx = await createPdfContext();
-  const { pdf, regular, bold, oblique } = ctx;
+  const { pdf, regular, bold } = ctx;
 
   // 4 x 6 inches in PDF points (1 inch = 72 points)
   const PAGE_WIDTH = 288;
   const PAGE_HEIGHT = 432;
-  const MARGIN = 14;
+  const MARGIN = 12;
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
   const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  let y = PAGE_HEIGHT - MARGIN;
 
-  // Outer Border
+  // Outer Border (Clean solid/dashed line)
   drawBox(page, MARGIN, MARGIN, CONTENT_WIDTH, PAGE_HEIGHT - MARGIN * 2, {
-    borderColor: COLORS.primary,
+    borderColor: COLORS.black,
     borderWidth: 1.5,
-  });
-
-  // 1. TOP SENDER BANNER
-  drawBox(page, MARGIN, y - 36, CONTENT_WIDTH, 36, {
-    color: COLORS.primary,
-    borderColor: COLORS.primary,
-  });
-
-  drawText(page, "FROM:", MARGIN + 8, y - 12, { size: 6.5, font: bold, color: COLORS.white });
-  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS PVT. LTD.", MARGIN + 8, y - 22, {
-    size: 9,
-    font: bold,
     color: COLORS.white,
   });
-  drawText(page, `${data.company.city || "Nepalgunj"}, ${data.company.district || "Banke"}, Nepal | Ph: ${data.company.phone || "+977-81-520123"}`, MARGIN + 8, y - 31, {
-    size: 6.5,
+
+  // ==========================================
+  // 1. TOP SECTION: SENDER "FROM" (Small) & QR CODE
+  // ==========================================
+  const fromY = PAGE_HEIGHT - MARGIN - 14;
+  drawText(page, "FROM:", MARGIN + 8, fromY, { size: 7.5, font: bold, color: COLORS.black });
+  
+  const companyName = (data.company.legalName || data.company.tradingName || "Bageshwari Tractors Pvt. Ltd.").toUpperCase();
+  drawText(page, companyName, MARGIN + 8, fromY - 11, {
+    size: 8.5,
+    font: bold,
+    color: COLORS.black,
+    maxWidth: CONTENT_WIDTH - 80,
+  });
+
+  const city = data.company.city || "Nepalgunj";
+  const district = data.company.district || "Banke";
+  const phone = data.company.phone || "+977-81-520123";
+  drawText(page, `${city}, ${district}, Nepal | Ph: ${phone}`, MARGIN + 8, fromY - 22, {
+    size: 7,
     font: regular,
-    color: COLORS.white,
+    color: COLORS.black,
+    maxWidth: CONTENT_WIDTH - 80,
   });
 
-  y -= 42;
+  // QR Code on the top right
+  const qrImg = await generateQrImage(pdf, data.trackingUrl || `PKG:${data.packageNumber}|ORD:${data.orderNumber}|TO:${data.dealer.code}`, 56);
+  if (qrImg) {
+    page.drawImage(qrImg, {
+      x: MARGIN + CONTENT_WIDTH - 64,
+      y: PAGE_HEIGHT - MARGIN - 64,
+      width: 56,
+      height: 56,
+    });
+  }
 
-  // 2. SHIP TO (CONSIGNEE) SECTION (High Prominence)
-  const shipToHeight = 90;
-  drawBox(page, MARGIN + 4, y - shipToHeight, CONTENT_WIDTH - 8, shipToHeight, {
-    color: COLORS.bgLight,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-  });
+  // Divider Line 1
+  const div1Y = PAGE_HEIGHT - MARGIN - 70;
+  drawLine(page, MARGIN, div1Y, MARGIN + CONTENT_WIDTH, div1Y, { color: COLORS.black, thickness: 1.5 });
 
-  drawText(page, "SHIP TO (CONSIGNEE):", MARGIN + 10, y - 12, { size: 7, font: bold, color: COLORS.danger });
-  drawText(page, data.dealer.tradingName || data.dealer.legalName, MARGIN + 10, y - 26, {
-    size: 11,
+  // ==========================================
+  // 2. SHIP TO (CONSIGNEE) SECTION (BIG & PROMINENT)
+  // ==========================================
+  const shipToY = div1Y - 12;
+  drawText(page, "SHIP TO (CONSIGNEE):", MARGIN + 8, shipToY, { size: 8.5, font: bold, color: COLORS.black });
+
+  // HUGE Dealer Name
+  const consigneeName = data.dealer.tradingName || data.dealer.legalName;
+  drawText(page, consigneeName, MARGIN + 8, shipToY - 22, {
+    size: 16,
     font: bold,
-    color: COLORS.primary,
-    maxWidth: CONTENT_WIDTH - 28,
+    color: COLORS.black,
+    maxWidth: CONTENT_WIDTH - 16,
   });
 
-  drawText(page, `Address: ${data.dealer.addressLine1 || ""}, ${data.dealer.city || ""}, ${data.dealer.district || ""}`, MARGIN + 10, y - 40, {
+  // Consignee Address & Contact
+  const dealerAddr = [data.dealer.addressLine1, data.dealer.city, data.dealer.district].filter(Boolean).join(", ") || "Nepalgunj, Banke";
+  drawText(page, `Address: ${dealerAddr}`, MARGIN + 8, shipToY - 38, {
     size: 8,
     font: bold,
     color: COLORS.black,
-    maxWidth: CONTENT_WIDTH - 28,
+    maxWidth: CONTENT_WIDTH - 120,
   });
 
-  drawText(page, `Contact Person: ${data.dealer.contactName || "Authorized Dealer"}`, MARGIN + 10, y - 54, {
+  drawRightText(page, `Phone: ${data.dealer.phone || "N/A"}`, MARGIN + CONTENT_WIDTH - 8, shipToY - 38, bold, {
+    size: 8,
+    color: COLORS.black,
+  });
+
+  drawText(page, `Contact Person: ${data.dealer.contactName || "Authorized Dealer"}`, MARGIN + 8, shipToY - 51, {
     size: 8,
     font: regular,
-    color: COLORS.secondary,
+    color: COLORS.black,
+    maxWidth: CONTENT_WIDTH - 120,
   });
 
-  drawText(page, `Phone: ${data.dealer.phone || "N/A"}`, MARGIN + 10, y - 68, {
-    size: 9,
-    font: bold,
-    color: COLORS.primary,
+  drawRightText(page, `Dealer Code: ${data.dealer.code}`, MARGIN + CONTENT_WIDTH - 8, shipToY - 51, regular, {
+    size: 8,
+    color: COLORS.black,
   });
 
-  drawText(page, `Dealer Code: ${data.dealer.code}`, MARGIN + 10, y - 82, {
-    size: 7,
-    font: regular,
-    color: COLORS.muted,
-  });
+  // Divider Line 2
+  const div2Y = div1Y - 76;
+  drawLine(page, MARGIN, div2Y, MARGIN + CONTENT_WIDTH, div2Y, { color: COLORS.black, thickness: 1.5 });
 
-  y -= shipToHeight + 6;
+  // ==========================================
+  // 3. 2-COLUMN GRID: PACKAGE DETAILS | ORDER DETAILS
+  // ==========================================
+  const gridMidX = MARGIN + Math.floor(CONTENT_WIDTH / 2);
+  const gridY = div2Y - 12;
 
-  // 3. CARTON & PACKAGE STATS (Box 1 of N, Weight, Dim)
-  const statsHeight = 44;
-  drawBox(page, MARGIN + 4, y - statsHeight, CONTENT_WIDTH - 8, statsHeight, {
-    color: COLORS.white,
-    borderColor: COLORS.border,
-    borderWidth: 0.75,
-  });
-
-  // Box X of Y
-  drawText(page, "PACKAGE NUMBER:", MARGIN + 10, y - 12, { size: 6.5, font: bold, color: COLORS.muted });
-  drawText(page, data.packageNumber, MARGIN + 10, y - 24, { size: 10, font: bold, color: COLORS.primary });
-  drawText(page, `Box ${data.cartonIndex || 1} of ${data.totalCartons || 1}`, MARGIN + 10, y - 36, { size: 8.5, font: bold, color: COLORS.danger });
-
-  // Weight & Dims
-  const midX = MARGIN + CONTENT_WIDTH / 2 + 10;
-  drawText(page, "GROSS WEIGHT:", midX, y - 12, { size: 6.5, font: bold, color: COLORS.muted });
-  drawText(page, `${Number(data.weight).toFixed(2)} KG`, midX, y - 24, { size: 10, font: bold, color: COLORS.primary });
+  // Left Column: Package Details
+  drawText(page, "PACKAGE NUMBER:", MARGIN + 8, gridY, { size: 7.5, font: bold, color: COLORS.black });
+  drawText(page, data.packageNumber, MARGIN + 8, gridY - 14, { size: 13, font: bold, color: COLORS.black });
+  drawText(page, `Box ${data.cartonIndex || 1} of ${data.totalCartons || 1}`, MARGIN + 8, gridY - 26, { size: 8, font: regular, color: COLORS.black });
+  drawText(page, `GROSS WEIGHT: ${Number(data.weight).toFixed(2)} KG`, MARGIN + 8, gridY - 38, { size: 8, font: bold, color: COLORS.black });
   const dimStr = data.length && data.width && data.height ? `${data.length}x${data.width}x${data.height} CM` : (data.packageType || "Standard Carton");
-  drawText(page, `Dims: ${dimStr}`, midX, y - 36, { size: 7.5, font: regular, color: COLORS.secondary });
+  drawText(page, `Dims: ${dimStr}`, MARGIN + 8, gridY - 49, { size: 7.5, font: regular, color: COLORS.black });
 
-  y -= statsHeight + 8;
+  // Vertical Separator
+  drawLine(page, gridMidX, div2Y, gridMidX, div2Y - 72, { color: COLORS.black, thickness: 1.5 });
 
-  // 4. BIG LOGISTICS BARCODE & QR CODE
-  const barcodeHeight = 85;
-  drawBox(page, MARGIN + 4, y - barcodeHeight, CONTENT_WIDTH - 8, barcodeHeight, {
-    color: COLORS.white,
-    borderColor: COLORS.border,
-    borderWidth: 0.75,
+  // Right Column: Order Details
+  drawText(page, "ORDER #:", gridMidX + 8, gridY, { size: 7.5, font: bold, color: COLORS.black });
+  drawText(page, data.orderNumber, gridMidX + 8, gridY - 14, { size: 13, font: bold, color: COLORS.black });
+  drawText(page, `Challan #: ${data.challanNumber || "Pending"}`, gridMidX + 8, gridY - 26, { size: 8.5, font: bold, color: COLORS.black });
+  drawText(page, "Carrier:", gridMidX + 8, gridY - 38, { size: 8, font: regular, color: COLORS.black });
+  drawText(page, data.transporterName || "Direct Transport / Courier", gridMidX + 8, gridY - 49, {
+    size: 7.5,
+    font: regular,
+    color: COLORS.black,
+    maxWidth: Math.floor(CONTENT_WIDTH / 2) - 16,
   });
 
-  // Barcode
-  const barcodeImg = await generateBarcodeImage(pdf, data.packageNumber, { height: 14, scale: 2.2 });
+  // Divider Line 3
+  const div3Y = div2Y - 72;
+  drawLine(page, MARGIN, div3Y, MARGIN + CONTENT_WIDTH, div3Y, { color: COLORS.black, thickness: 1.5 });
+
+  // ==========================================
+  // 4. FULL-WIDTH LOGISTICS BARCODE & TEXT
+  // ==========================================
+  const barcodeY = div3Y - 58;
+  const barcodeImg = await generateBarcodeImage(pdf, data.packageNumber, { height: 16, scale: 2.5 });
   if (barcodeImg) {
     page.drawImage(barcodeImg, {
-      x: MARGIN + 12,
-      y: y - 55,
-      width: 175,
-      height: 40,
+      x: MARGIN + (CONTENT_WIDTH - 210) / 2,
+      y: barcodeY,
+      width: 210,
+      height: 46,
     });
   }
-  drawCenteredText(page, data.packageNumber, MARGIN + 95, y - 68, bold, { size: 8, color: COLORS.primary });
-
-  // QR Code on right
-  const qrImg = await generateQrImage(pdf, data.trackingUrl || `PKG:${data.packageNumber}|ORD:${data.orderNumber}`, 60);
-  if (qrImg) {
-    page.drawImage(qrImg, {
-      x: MARGIN + CONTENT_WIDTH - 72,
-      y: y - 72,
-      width: 60,
-      height: 60,
-    });
-  }
-
-  y -= barcodeHeight + 6;
-
-  // 5. SHIPMENT & ORDER REFERENCES
-  drawBox(page, MARGIN + 4, y - 38, CONTENT_WIDTH - 8, 38, {
-    color: COLORS.bgLight,
-    borderColor: COLORS.borderLight,
-    borderWidth: 0.5,
+  drawCenteredText(page, data.packageNumber, MARGIN + CONTENT_WIDTH / 2, barcodeY - 12, bold, {
+    size: 11,
+    color: COLORS.black,
   });
 
-  drawText(page, `Order #: ${data.orderNumber}`, MARGIN + 10, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawText(page, `Challan #: ${data.challanNumber || "Pending"}`, MARGIN + 10, y - 24, { size: 7.5, font: bold, color: COLORS.primary });
-  drawText(page, `Carrier: ${data.transporterName || "Direct Transport / Courier"}`, MARGIN + 10, y - 34, { size: 7, font: regular, color: COLORS.secondary });
-
-  y -= 44;
-
-  // 6. HANDLING ICONS / WARNING BADGES (Bottom)
-  const warnHeight = 32;
-  drawBox(page, MARGIN + 4, y - warnHeight, CONTENT_WIDTH - 8, warnHeight, {
-    color: COLORS.white,
-    borderColor: COLORS.danger,
+  // ==========================================
+  // 5. BOTTOM SOLID BLACK HANDLING INSTRUCTIONS BANNER
+  // ==========================================
+  const bannerHeight = 36;
+  drawBox(page, MARGIN, MARGIN, CONTENT_WIDTH, bannerHeight, {
+    color: COLORS.black,
+    borderColor: COLORS.black,
     borderWidth: 1,
   });
 
-  const instructions = data.handlingInstructions || "FRAGILE - HANDLE WITH CARE | THIS SIDE UP ^ | KEEP DRY";
-  drawCenteredText(page, "WARNING / HANDLING INSTRUCTIONS:", MARGIN + CONTENT_WIDTH / 2, y - 12, bold, {
-    size: 7,
-    color: COLORS.danger,
+  drawCenteredText(page, "WARNING / HANDLING INSTRUCTIONS", MARGIN + CONTENT_WIDTH / 2, MARGIN + bannerHeight - 13, bold, {
+    size: 8,
+    color: COLORS.white,
   });
-  drawCenteredText(page, instructions.toUpperCase(), MARGIN + CONTENT_WIDTH / 2, y - 24, bold, {
-    size: 7.5,
-    color: COLORS.danger,
+
+  const instructions = (data.handlingInstructions || "FRAGILE - HANDLE WITH CARE | THIS SIDE UP ^ | KEEP DRY").toUpperCase();
+  drawCenteredText(page, instructions, MARGIN + CONTENT_WIDTH / 2, MARGIN + bannerHeight - 25, bold, {
+    size: 7,
+    color: COLORS.white,
   });
 
   return pdf.save();

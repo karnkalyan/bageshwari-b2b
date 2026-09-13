@@ -59,12 +59,22 @@ export default async function AccountsPortalPage({ params, searchParams }: Accou
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
-      <div>
-        <div className="section-kicker">Finance & Tax Invoicing</div>
-        <h1 className="text-2xl font-black text-foreground">Accounts & Financial Invoicing Portal</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Review orders, generate & print proforma invoices, issue Nepal IRD VAT tax invoices, and verify credit limits.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="section-kicker">Finance & Tax Invoicing</div>
+          <h1 className="text-2xl font-black text-foreground">Accounts & Financial Invoicing Portal</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Review orders, generate & print proforma invoices, issue Nepal IRD VAT tax invoices, and verify credit limits.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/s/${sellerSlug}/admin/products`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border bg-card hover:bg-muted text-foreground transition shadow-sm"
+          >
+            <Download className="h-4 w-4 text-primary" /> Product Catalogue & Bulk Export
+          </Link>
+        </div>
       </div>
 
       {/* Top 3 Metric Cards */}
