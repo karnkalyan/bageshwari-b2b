@@ -98,7 +98,7 @@ export default async function DealerNewOrderPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-4 sm:space-y-6 p-3 sm:p-7">
-      <div>
+      <div className="hidden sm:block">
         <Link
           href="/dealer/orders"
           className="inline-flex items-center text-xs text-slate-500 hover:text-slate-900 font-medium mb-2"
@@ -106,19 +106,14 @@ export default async function DealerNewOrderPage() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Orders
         </Link>
-        <div className="section-kicker hidden sm:block">Dealer Direct Bulk Order</div>
+        <div className="section-kicker">Dealer Direct Bulk Order</div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-[#0b2d55]">Create Sales Order</h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 hidden sm:block">
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Quickly select products, customize quantities with your unlocked dealer rates, and submit directly for Accounts review.
             </p>
           </div>
-          <Link href="/dealer/products" className="sm:hidden">
-            <span className="text-xs font-bold text-primary underline">
-              Switch to Live Product Catalogue
-            </span>
-          </Link>
         </div>
       </div>
 

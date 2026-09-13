@@ -424,7 +424,12 @@ export function SalesOrderCreator({
       )}
 
       {/* Top Sticky Dealer Selection & Info Strip */}
-      <div className="bg-white rounded-xl border p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div
+        className={cn(
+          "bg-white rounded-xl border p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4",
+          isDealer && "hidden sm:flex"
+        )}
+      >
         {/* Dealer Combobox or Fixed Dealer View */}
         <div className="flex-1 max-w-lg relative">
           <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
@@ -566,7 +571,7 @@ export function SalesOrderCreator({
         <div className={cn("lg:col-span-7 space-y-4", mobileView === "cart" ? "hidden lg:block" : "block")}>
           <Card className="shadow-xs">
             <CardHeader className="pb-3 border-b bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <CardTitle className="text-sm font-bold flex items-center gap-2 text-[#0b2d55]">
+              <CardTitle className="text-sm font-bold hidden sm:flex items-center gap-2 text-[#0b2d55]">
                 <Package className="h-4 w-4 text-primary" /> Product Catalogue & Spare Parts
               </CardTitle>
               <div className="relative w-full sm:w-72">
