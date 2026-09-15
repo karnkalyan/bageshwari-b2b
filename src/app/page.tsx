@@ -19,6 +19,7 @@ import { PublicFooter } from "@/app/s/[sellerSlug]/_components/public-footer";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buildProductSearchFilter } from "@/lib/search-utils";
+import { DatabaseOfflineNotice } from "@/components/common/database-offline-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -50,23 +51,52 @@ interface HomePageProps {
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const query = (await searchParams) || {};
-  const activeCategorySlug = query.category?.trim() || "";
-  const activeSearch = query.search?.trim() || "";
-  const hasFilter = Boolean(activeCategorySlug || activeSearch);
+  // Server action to add to cart from homepage
+  async function handleAddToCart(formData: FormData) {
+    "use server";
+    const currentSession = await auth();
+    if (!currentSession?.dealerId || !currentSession?.user?.id) {
+      redirect("/dealer/login");
+    }
 
-  const [session, seller] = await Promise.all([
-    auth(),
-    prisma.seller.findFirst({
-      where: { code: "BAGESHWARI", status: "ACTIVE", deletedAt: null },
-      include: {
-        homepageSections: {
-          where: { enabled: true },
-          orderBy: { displayOrder: "asc" },
+    const currentSeller = await prisma.seller.findFirst({
+      where: { code: "BAGESHWARI", status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (!currentSeller) return;
+
+    const productId = String(formData.get("productId") || "");
+    const qty = Number(formData.get("quantity") || 1);
+
+    await addItemToDealerCart({
+      sellerId: currentSeller.id,
+      dealerId: currentSession.dealerId,
+      userId: currentSession.user.id,
+      productId,
+      quantity: qty,
+    });
+
+    revalidatePath("/");
+  }
+
+  try {
+    const query = (await searchParams) || {};
+    const activeCategorySlug = query.category?.trim() || "";
+    const activeSearch = query.search?.trim() || "";
+    const hasFilter = Boolean(activeCategorySlug || activeSearch);
+
+    const [session, seller] = await Promise.all([
+      auth().catch(() => null),
+      prisma.seller.findFirst({
+        where: { code: "BAGESHWARI", status: "ACTIVE", deletedAt: null },
+        include: {
+          homepageSections: {
+            where: { enabled: true },
+            orderBy: { displayOrder: "asc" },
+          },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
 
   if (!seller) {
     return (
@@ -232,34 +262,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     filteredProducts = rawFilteredProducts.map(enrichProduct);
   }
 
-  // Server action to add to cart from homepage
-  async function handleAddToCart(formData: FormData) {
-    "use server";
-    const currentSession = await auth();
-    if (!currentSession?.dealerId || !currentSession?.user?.id) {
-      redirect("/dealer/login");
-    }
-
-    const currentSeller = await prisma.seller.findFirst({
-      where: { code: "BAGESHWARI", status: "ACTIVE" },
-      select: { id: true },
-    });
-    if (!currentSeller) return;
-
-    const productId = String(formData.get("productId") || "");
-    const qty = Number(formData.get("quantity") || 1);
-
-    await addItemToDealerCart({
-      sellerId: currentSeller.id,
-      dealerId: currentSession.dealerId,
-      userId: currentSession.user.id,
-      productId,
-      quantity: qty,
-    });
-
-    revalidatePath("/");
-  }
-
   const section = (type: string) => seller.homepageSections.find((item) => item.sectionType === type);
 
   return (
@@ -364,4 +366,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <PublicFooter seller={seller} sellerSlug="bageshwari" />
     </div>
   );
+} catch (err: any) {
+  console.error("Database connection error in HomePage:", err);
+  return <DatabaseOfflineNotice error={err} />;
 }
+}
+
