@@ -66,6 +66,7 @@ interface DealersDirectoryClientProps {
   appsPage?: number;
   dealerGroups: DealerGroupOption[];
   pricingGroups: PricingGroupOption[];
+  initialTab?: string;
 }
 
 export function DealersDirectoryClient({
@@ -78,7 +79,9 @@ export function DealersDirectoryClient({
   appsPage,
   dealerGroups,
   pricingGroups,
+  initialTab,
 }: DealersDirectoryClientProps) {
+  const [activeTab, setActiveTab] = useState<string>(initialTab || "dealers");
   const [selectedApp, setSelectedApp] = useState<SerializedDealerApplication | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [creditModalDealer, setCreditModalDealer] = useState<SerializedDealer | null>(null);
@@ -140,7 +143,7 @@ export function DealersDirectoryClient({
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="dealers">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white border rounded-lg p-1">
           <TabsTrigger value="dealers" className="text-xs font-bold">
             Active Dealers ({filteredDealers.length}{dealers.length !== filteredDealers.length ? ` / ${dealers.length}` : ""})

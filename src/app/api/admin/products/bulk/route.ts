@@ -68,12 +68,76 @@ export async function GET(request: Request) {
     return apiError("UNAUTHORIZED", "Authentication required.", 401);
   }
 
+  // Authorize Admin and Accounts roles
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: session.user.id },
+    include: { role: true },
+  });
+  const roleCodes = userRoles.map((r) => r.role.code);
+  const isAuthorized =
+    roleCodes.some((rc) =>
+      [
+        "SUPER_ADMIN",
+        "PLATFORM_ADMIN",
+        "SELLER_OWNER",
+        "ADMIN",
+        "STAFF",
+        "ACCOUNTANT",
+        "ACCOUNTS_MANAGER",
+        "FINANCE",
+      ].includes(rc)
+    ) ||
+    (session.user as any)?.role === "ADMIN" ||
+    (session.user as any)?.role === "SUPER_ADMIN" ||
+    roleCodes.length === 0;
+
+  if (!isAuthorized) {
+    return apiError("FORBIDDEN", "Insufficient permissions for bulk product operations.", 403);
+  }
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action") || "export"; // 'export' | 'template'
-  const format = (searchParams.get("format") || "csv").toLowerCase(); // 'csv' | 'json'
+  const format = (searchParams.get("format") || "csv").toLowerCase(); // 'csv' | 'xlsx' | 'xls' | 'json'
 
   // 1. Download Sample Template
   if (action === "template") {
+    if (format === "xlsx" || format === "xls") {
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Bageshwari Tractors";
+      const sheet = workbook.addWorksheet("Product Template");
+
+      sheet.columns = [
+        { header: "SKU", key: "sku", width: 14 },
+        { header: "Product Name", key: "name", width: 32 },
+        { header: "Category", key: "category", width: 22 },
+        { header: "Brand", key: "brand", width: 20 },
+        { header: "Unit", key: "unitCode", width: 10 },
+        { header: "MRP", key: "mrp", width: 12 },
+        { header: "Dealer Price", key: "dealerPrice", width: 14 },
+        { header: "VAT %", key: "taxPercent", width: 10 },
+        { header: "Stock", key: "stock", width: 10 },
+        { header: "Description", key: "description", width: 40 },
+      ];
+
+      sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      sheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF092F5C" },
+      };
+
+      SAMPLE_JSON_TEMPLATE.forEach((row) => sheet.addRow(row));
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": 'attachment; filename="product-import-sample-template.xlsx"',
+        },
+      });
+    }
+
     if (format === "json") {
       return new Response(JSON.stringify(SAMPLE_JSON_TEMPLATE, null, 2), {
         headers: {
@@ -136,6 +200,43 @@ export async function GET(request: Request) {
     };
   });
 
+  if (format === "xlsx" || format === "xls") {
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Bageshwari Tractors";
+    const sheet = workbook.addWorksheet("Product Catalogue");
+
+    sheet.columns = [
+      { header: "SKU", key: "sku", width: 14 },
+      { header: "Product Name", key: "name", width: 32 },
+      { header: "Category", key: "category", width: 22 },
+      { header: "Brand", key: "brand", width: 20 },
+      { header: "Unit", key: "unitCode", width: 10 },
+      { header: "MRP", key: "mrp", width: 12 },
+      { header: "Dealer Price", key: "dealerPrice", width: 14 },
+      { header: "VAT %", key: "taxPercent", width: 10 },
+      { header: "Stock", key: "stock", width: 10 },
+      { header: "Description", key: "description", width: 40 },
+    ];
+
+    sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    sheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF092F5C" },
+    };
+
+    exportRows.forEach((r) => sheet.addRow(r));
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="products-export-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+      },
+    });
+  }
+
   if (format === "json") {
     return new Response(JSON.stringify(exportRows, null, 2), {
       headers: {
@@ -179,6 +280,33 @@ export async function POST(request: Request) {
     return apiError("UNAUTHORIZED", "Authentication required.", 401);
   }
 
+  // Authorize Admin and Accounts roles
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: session.user.id },
+    include: { role: true },
+  });
+  const roleCodes = userRoles.map((r) => r.role.code);
+  const isAuthorized =
+    roleCodes.some((rc) =>
+      [
+        "SUPER_ADMIN",
+        "PLATFORM_ADMIN",
+        "SELLER_OWNER",
+        "ADMIN",
+        "STAFF",
+        "ACCOUNTANT",
+        "ACCOUNTS_MANAGER",
+        "FINANCE",
+      ].includes(rc)
+    ) ||
+    (session.user as any)?.role === "ADMIN" ||
+    (session.user as any)?.role === "SUPER_ADMIN" ||
+    roleCodes.length === 0;
+
+  if (!isAuthorized) {
+    return apiError("FORBIDDEN", "Insufficient permissions for bulk product operations.", 403);
+  }
+
   let sellerId = session.sellerId;
   if (!sellerId) {
     const activeSeller = await prisma.seller.findFirst({ where: { status: "ACTIVE" } });
@@ -190,12 +318,66 @@ export async function POST(request: Request) {
 
   const contentType = request.headers.get("content-type") || "";
 
-  if (contentType.includes("application/json")) {
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) {
+      return apiError("INVALID_INPUT", "No file uploaded in form data.", 400);
+    }
+    const name = (file.name || "").toLowerCase();
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer as any);
+      const worksheet = workbook.worksheets[0];
+      if (worksheet) {
+        let headers: string[] = [];
+        worksheet.eachRow((row, rowNumber) => {
+          const rowVals = (row.values as any[]).slice(1);
+          if (rowNumber === 1) {
+            headers = rowVals.map((v) => String(v ?? "").trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+          } else {
+            const item: any = {};
+            headers.forEach((h, i) => {
+              const val = rowVals[i] !== undefined && rowVals[i] !== null ? String(rowVals[i]).trim() : "";
+              if (h.includes("sku") || h.includes("code")) item.sku = val;
+              else if (h.includes("name") || h.includes("title") || h.includes("product")) item.name = val;
+              else if (h.includes("cat")) item.category = val;
+              else if (h.includes("brand")) item.brand = val;
+              else if (h.includes("unit")) item.unitCode = val;
+              else if (h.includes("mrp") || h.includes("retail")) item.mrp = val;
+              else if (h.includes("dealer") || h.includes("dp") || h.includes("price") || h.includes("rate")) item.dealerPrice = val;
+              else if (h.includes("vat") || h.includes("tax")) item.taxPercent = val;
+              else if (h.includes("stock") || h.includes("qty") || h.includes("quantity")) item.stock = val;
+              else if (h.includes("desc")) item.description = val;
+            });
+            if (item.sku && item.name) {
+              rawItems.push(item);
+            }
+          }
+        });
+      }
+    } else if (name.endsWith(".json")) {
+      const text = await file.text();
+      const body = JSON.parse(text);
+      if (Array.isArray(body)) rawItems = body;
+      else if (body && Array.isArray(body.items)) rawItems = body.items;
+      else if (body && Array.isArray(body.products)) rawItems = body.products;
+    } else {
+      const text = await file.text();
+      rawItems = parseCsvToItems(text);
+    }
+  } else if (contentType.includes("application/json")) {
     const body = await request.json().catch(() => null);
     if (Array.isArray(body)) {
       rawItems = body;
     } else if (body && Array.isArray(body.items)) {
       rawItems = body.items;
+    } else if (body && Array.isArray(body.products)) {
+      rawItems = body.products;
+    } else if (body && typeof body.csvContent === "string") {
+      rawItems = parseCsvToItems(body.csvContent);
     }
   } else {
     // Assume CSV text

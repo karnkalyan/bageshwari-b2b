@@ -7,6 +7,7 @@ import {
   transitionOrderStatusInTransaction,
 } from "@/modules/orders/order-transition.service";
 import { sendWorkflowNotification } from "@/services/notification.service";
+import { getCompanyVatSetting, resolveProductVat } from "@/services/vat.service";
 
 async function nextDocumentNumber(
   tx: Prisma.TransactionClient,
@@ -77,7 +78,15 @@ export async function reviseOrderBulk(input: ReviseOrderBulkInput) {
       const discount = itemInput.discountAmount !== undefined ? new Prisma.Decimal(itemInput.discountAmount) : existingItem.discountAmount;
 
       const lineSubtotal = Number(revisedPrice) * revisedQuantity - Number(discount);
-      const lineTax = lineSubtotal * 0.13;
+      let itemTaxRate = 0.13;
+      if (existingItem.productId) {
+        const vatRes = await resolveProductVat(input.sellerId, existingItem.productId);
+        itemTaxRate = vatRes.vatPercent / 100;
+      } else {
+        const companyVat = await getCompanyVatSetting();
+        itemTaxRate = companyVat.defaultVatPercent / 100;
+      }
+      const lineTax = Number((lineSubtotal * itemTaxRate).toFixed(2));
       const lineTotal = lineSubtotal + lineTax;
 
       let changeType = "MODIFIED";

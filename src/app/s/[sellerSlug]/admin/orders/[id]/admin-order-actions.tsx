@@ -52,6 +52,7 @@ export interface AdminOrderActionsProps {
   userRoles?: string[];
   userPermissions?: string[];
   warehouseStaff?: Array<{ id: string; name?: string | null; email: string }>;
+  vatPercent?: number;
 }
 
 export function AdminOrderActions({
@@ -60,6 +61,7 @@ export function AdminOrderActions({
   userRoles = [],
   userPermissions = [],
   warehouseStaff = [],
+  vatPercent = 13.0,
 }: AdminOrderActionsProps) {
   const router = useRouter();
   const [isRevisionOpen, setIsRevisionOpen] = useState(false);
@@ -186,6 +188,7 @@ export function AdminOrderActions({
         isOpen={isRevisionOpen}
         onClose={() => setIsRevisionOpen(false)}
         onSuccess={() => router.refresh()}
+        vatPercent={vatPercent}
       />
 
       <PaymentConfirmationDialog

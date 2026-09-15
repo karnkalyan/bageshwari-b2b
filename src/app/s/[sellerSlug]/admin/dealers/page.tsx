@@ -154,6 +154,7 @@ export default async function AdminDealersPage({ params, searchParams }: Dealers
         appsPage={appsPage}
         dealerGroups={dealerGroups}
         pricingGroups={pricingGroups}
+        initialTab={resolvedSearchParams?.tab === "applications" ? "applications" : "dealers"}
       />
     </div>
   );

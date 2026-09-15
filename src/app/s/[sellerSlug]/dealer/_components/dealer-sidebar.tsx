@@ -92,7 +92,35 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
             <NotificationBell />
           </div>
         </header>
-        <main>{children}</main>
+        <main className="pb-20 lg:pb-0">{children}</main>
+
+        {/* Mobile App Bottom Navigation Bar */}
+        <nav className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md py-1.5 px-2 text-[10px] text-slate-500 shadow-lg lg:hidden">
+          {[
+            { label: "Dashboard", href: "/dealer/dashboard", icon: LayoutDashboard, exact: true },
+            { label: "Catalog", href: "/dealer/products", icon: ShoppingBag },
+            { label: "Quick Order", href: "/dealer/orders/new", icon: Store },
+            { label: "Cart", href: "/dealer/cart", icon: ShoppingCart },
+            { label: "Orders", href: "/dealer/orders", icon: FileText },
+          ].map((item) => {
+            const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors min-w-[54px]",
+                  active ? "text-[#0b2d55] font-black" : "text-slate-500 hover:text-slate-900"
+                )}
+              >
+                <div className={cn("p-1 rounded-full", active ? "bg-blue-50 text-[#0b2d55]" : "")}>
+                  <item.icon className={cn("h-4 w-4", active ? "text-[#0b2d55]" : "text-slate-500")} />
+                </div>
+                <span className="leading-tight">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </div>
   );

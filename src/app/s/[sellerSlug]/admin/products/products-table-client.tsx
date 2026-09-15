@@ -106,7 +106,8 @@ export function ProductsTableClient({
               <th className="px-4 py-3 text-right">MRP (Base)</th>
               <th className="px-4 py-3 text-right">MRP (Incl. VAT)</th>
               <th className="px-4 py-3 text-center">VAT Rate</th>
-              <th className="px-4 py-3 text-right">Dealer Price</th>
+              <th className="px-4 py-3 text-right">Dealer (Base)</th>
+              <th className="px-4 py-3 text-right">Dealer (Incl. VAT)</th>
               <th className="px-4 py-3 text-right">Stock</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -117,6 +118,7 @@ export function ProductsTableClient({
               const primaryImage = p.images?.find((img) => img.isPrimary) || p.images?.[0];
               const vatRate = p.effectiveVatPercent;
               const mrpGross = p.mrp * (1 + vatRate / 100);
+              const dealerGross = p.dealerPrice * (1 + vatRate / 100);
 
               const hasCustomTax = p.taxPercent !== null && p.taxPercent !== undefined;
               const hasCategoryTax = !hasCustomTax && p.categoryTaxPercent !== null && p.categoryTaxPercent !== undefined;
@@ -170,7 +172,11 @@ export function ProductsTableClient({
                       {vatRate}% {hasCustomTax ? "Product" : hasCategoryTax ? "Category" : "Global"}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3.5 text-right font-bold text-emerald-600">{formatCurrency(p.dealerPrice)}</td>
+                  <td className="px-4 py-3.5 text-right font-medium text-slate-500">{formatCurrency(p.dealerPrice)}</td>
+                  <td className="px-4 py-3.5 text-right font-bold text-emerald-600">
+                    <div>{formatCurrency(dealerGross)}</div>
+                    <span className="text-[9px] text-emerald-600/70 font-normal">Incl. {vatRate}% VAT</span>
+                  </td>
                   <td className="px-4 py-3.5 text-right font-medium text-slate-900">{p.stock} {p.unitCode}</td>
                   <td className="px-4 py-3.5">
                     <Badge

@@ -368,7 +368,10 @@ export function SalesOrderCreator({
   const totalItemUnits = orderItems.reduce((sum, it) => sum + it.quantity, 0);
 
   const isCreditExceeded =
-    currentDealer && currentDealer.availableCredit > 0 && grandTotal > currentDealer.availableCredit;
+    currentDealer &&
+    (currentDealer.creditLimit ?? 0) > 0 &&
+    currentDealer.availableCredit > 0 &&
+    grandTotal > currentDealer.availableCredit;
 
   // Submit Order
   const handleSubmit = async (submitForReview: boolean) => {
@@ -423,12 +426,9 @@ export function SalesOrderCreator({
         </div>
       )}
 
-      {/* Top Sticky Dealer Selection & Info Strip */}
+      {/* Top Sticky Dealer Selection & Info Strip (Hidden on mobile for clean app experience) */}
       <div
-        className={cn(
-          "bg-white rounded-xl border p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4",
-          isDealer && "hidden sm:flex"
-        )}
+        className="hidden sm:flex bg-white rounded-xl border p-4 shadow-xs flex-col md:flex-row md:items-center justify-between gap-4"
       >
         {/* Dealer Combobox or Fixed Dealer View */}
         <div className="flex-1 max-w-lg relative">
@@ -848,10 +848,10 @@ export function SalesOrderCreator({
                         {/* Price & Total */}
                         <div className="text-right">
                           <span className="font-black text-xs text-slate-900">
-                            {formatCurrency(item.unitPrice * item.quantity * 1.13)}
+                            {formatCurrency(item.unitPrice * item.quantity * (1 + vatPercent / 100))}
                           </span>
                           <span className="text-[9px] text-slate-400 block font-normal">
-                            @{formatCurrency(item.unitPrice)}/ea + 13% VAT
+                            @{formatCurrency(item.unitPrice)}/ea + {vatPercent}% VAT
                           </span>
                         </div>
                       </div>

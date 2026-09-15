@@ -110,6 +110,21 @@ export async function getTenantContext(
     }
 
     const authorization = await loadAuthorization(session.user.id, seller.id);
+    let resolvedDealerId =
+      membership?.dealerId ||
+      (sessionData as any).dealerId ||
+      (sessionData.user as any)?.dealerId ||
+      (sessionData.user as any)?.memberships?.find((m: any) => m.dealerId)?.dealerId ||
+      null;
+
+    if (!resolvedDealerId && session.user?.email) {
+      const matchedDealer = await prisma.dealer.findFirst({
+        where: { sellerId: seller.id, email: session.user.email, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (matchedDealer) resolvedDealerId = matchedDealer.id;
+    }
+
     return {
       sellerId: seller.id,
       sellerSlug: seller.slug,
@@ -117,7 +132,7 @@ export async function getTenantContext(
       userId: session.user.id,
       roles: authorization.roles,
       permissions: authorization.permissions,
-      dealerId: membership?.dealerId || null,
+      dealerId: resolvedDealerId,
     };
   }
 
@@ -144,6 +159,21 @@ export async function getTenantContext(
     if (!seller) redirect("/unauthorized");
     const authorization = await loadAuthorization(session.user.id, seller.id);
 
+    let resolvedDealerId =
+      membership?.dealerId ||
+      (sessionData as any).dealerId ||
+      (sessionData.user as any)?.dealerId ||
+      (sessionData.user as any)?.memberships?.find((m: any) => m.dealerId)?.dealerId ||
+      null;
+
+    if (!resolvedDealerId && session.user?.email) {
+      const matchedDealer = await prisma.dealer.findFirst({
+        where: { sellerId: seller.id, email: session.user.email, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (matchedDealer) resolvedDealerId = matchedDealer.id;
+    }
+
     return {
       sellerId: seller.id,
       sellerSlug: seller.slug,
@@ -151,7 +181,7 @@ export async function getTenantContext(
       userId: session.user.id,
       roles: authorization.roles,
       permissions: authorization.permissions,
-      dealerId: membership?.dealerId || null,
+      dealerId: resolvedDealerId,
     };
   }
 

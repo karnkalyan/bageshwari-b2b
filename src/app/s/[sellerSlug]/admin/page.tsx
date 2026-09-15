@@ -233,9 +233,16 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
                 const barColor = colors[index % colors.length];
 
                 return (
-                  <div key={row.status}>
+                  <Link
+                    key={row.status}
+                    href={`${base}/orders?status=${row.status}`}
+                    className="block p-1.5 -mx-1.5 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
+                  >
                     <div className="mb-1.5 flex items-center justify-between text-xs">
-                      <span className="font-semibold text-foreground">{ORDER_STATUS_LABELS[row.status] || row.status}</span>
+                      <span className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                        {ORDER_STATUS_LABELS[row.status] || row.status}
+                        <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </span>
                       <span className="font-mono font-bold text-muted-foreground">
                         {row._count._all} ({pct}%)
                       </span>
@@ -243,7 +250,7 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div className={`h-full ${barColor} rounded-full`} style={{ width: `${Math.max(6, pct)}%` }} />
                     </div>
-                  </div>
+                  </Link>
                 );
               })
             ) : (
@@ -373,8 +380,8 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
               </h2>
               <p className="text-[11px] text-muted-foreground mt-0.5">Review, approve, or request documents</p>
             </div>
-            <Link href={`${base}/dealers`} className="text-xs font-bold text-pink-500 hover:underline">
-              Dealers Portal &rarr;
+            <Link href={`${base}/dealers?tab=applications`} className="text-xs font-bold text-pink-500 hover:underline">
+              Applications Queue &rarr;
             </Link>
           </div>
 
@@ -390,7 +397,7 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
                       {app.contactName} • {app.phone} • {app.city}
                     </div>
                   </div>
-                  <Link href={`${base}/dealers`}>
+                  <Link href={`${base}/dealers?tab=applications`}>
                     <Button size="sm" className="h-8 text-xs bg-pink-600 hover:bg-pink-700 text-white font-bold px-3">
                       Review <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>

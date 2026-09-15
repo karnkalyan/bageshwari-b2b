@@ -25,7 +25,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
   const { sellerSlug, id } = await params;
   const ctx = await getTenantContext(sellerSlug);
 
-  const [rawOrder, warehouseStaff] = await Promise.all([
+  const [rawOrder, warehouseStaff, companyProfile] = await Promise.all([
     prisma.order.findFirst({
       where: {
         sellerId: ctx.sellerId,
@@ -75,9 +75,13 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
       },
       include: { user: { select: { id: true, name: true, email: true } } },
     }),
+    prisma.companyProfile.findUnique({ where: { id: "bageshwari-tractors" } }).catch(() => null),
   ]);
 
   if (!rawOrder) notFound();
+
+  const rawCompanyVat = companyProfile?.defaultVatPercent ? Number(companyProfile.defaultVatPercent) : 13.0;
+  const effectiveVatPercent = rawCompanyVat > 0 && rawCompanyVat <= 1.0 ? rawCompanyVat * 100 : rawCompanyVat;
 
   // Role-Based Authorization Checks
   const isPrivileged = hasRole(ctx, "SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN", "STAFF");
@@ -417,6 +421,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
               userRoles={ctx.roles}
               userPermissions={ctx.permissions}
               warehouseStaff={uniqueWarehouseStaff}
+              vatPercent={effectiveVatPercent}
             />
 
             {/* DRAFT -> Submit Sales Order */}

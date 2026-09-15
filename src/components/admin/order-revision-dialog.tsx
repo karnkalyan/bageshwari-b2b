@@ -45,6 +45,7 @@ interface OrderRevisionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  vatPercent?: number;
 }
 
 export function OrderRevisionDialog({
@@ -54,6 +55,7 @@ export function OrderRevisionDialog({
   isOpen,
   onClose,
   onSuccess,
+  vatPercent = 13.0,
 }: OrderRevisionDialogProps) {
   const router = useRouter();
   const [items, setItems] = useState<RevisionItemState[]>([]);
@@ -99,7 +101,7 @@ export function OrderRevisionDialog({
     (acc, it) => acc + it.unitPrice * it.approvedQuantity,
     0
   );
-  const calculatedTax = calculatedSubtotal * 0.13;
+  const calculatedTax = calculatedSubtotal * (vatPercent / 100);
   const calculatedGrandTotal = calculatedSubtotal + calculatedTax;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,7 +189,7 @@ export function OrderRevisionDialog({
                       <span className="text-[10px] text-slate-400 font-mono ml-2">SKU: {it.sku}</span>
                     </div>
                     <div className="text-right font-black text-slate-900 text-xs">
-                      Line Total: {formatCurrency(it.unitPrice * it.approvedQuantity * 1.13)}
+                      Line Total: {formatCurrency(it.unitPrice * it.approvedQuantity * (1 + vatPercent / 100))}
                     </div>
                   </div>
 
@@ -241,7 +243,7 @@ export function OrderRevisionDialog({
                 <span className="font-bold text-slate-900">{formatCurrency(calculatedSubtotal)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>13% VAT Tax:</span>
+                <span>{vatPercent}% VAT Tax:</span>
                 <span className="font-bold text-slate-900">{formatCurrency(calculatedTax)}</span>
               </div>
               <div className="flex justify-between text-sm font-black text-slate-950 pt-2 border-t border-slate-300">

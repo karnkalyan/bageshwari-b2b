@@ -164,17 +164,30 @@ export function DealerCreditModal({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-bold text-slate-700">Available Credit (NPR)</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleResetAvailable}
-                disabled={!creditEligible}
-                className="h-6 px-2 text-[10px] font-bold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 gap-1"
-                title="Reset available credit to (Limit - Outstanding)"
-              >
-                <RotateCcw className="h-3 w-3" /> Reset to Max
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAvailableCredit(0)}
+                  disabled={!creditEligible}
+                  className="h-6 px-1.5 text-[10px] font-bold text-slate-500 hover:text-red-700 hover:bg-red-50"
+                  title="Reset available credit to NPR 0"
+                >
+                  Reset to 0
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetAvailable}
+                  disabled={!creditEligible}
+                  className="h-6 px-2 text-[10px] font-bold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 gap-1"
+                  title="Reset available credit to (Limit - Outstanding)"
+                >
+                  <RotateCcw className="h-3 w-3" /> Reset to Max
+                </Button>
+              </div>
             </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">NPR</span>

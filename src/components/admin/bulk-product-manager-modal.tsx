@@ -29,8 +29,9 @@ export function BulkProductManagerModal({
   onImportSuccess,
 }: BulkProductManagerModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-  const [exportFormat, setExportFormat] = useState<"csv" | "json">("csv");
-  const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
+  const [exportFormat, setExportFormat] = useState<"xlsx" | "csv" | "json">("xlsx");
+  const [importFormat, setImportFormat] = useState<"xlsx" | "csv" | "json">("xlsx");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
   const [previewItems, setPreviewItems] = useState<any[]>([]);
@@ -46,7 +47,7 @@ export function BulkProductManagerModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDownloadTemplate = (format: "csv" | "json") => {
+  const handleDownloadTemplate = (format: "xlsx" | "csv" | "json") => {
     window.open(`/api/admin/products/bulk?action=template&format=${format}`, "_blank");
   };
 
@@ -64,11 +65,29 @@ export function BulkProductManagerModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSelectedFile(file);
     setFileName(file.name);
     setImportResult(null);
 
-    const isJson = file.name.endsWith(".json");
-    setImportFormat(isJson ? "json" : "csv");
+    const lower = file.name.toLowerCase();
+    const isJson = lower.endsWith(".json");
+    const isExcel = lower.endsWith(".xlsx") || lower.endsWith(".xls");
+    setImportFormat(isJson ? "json" : isExcel ? "xlsx" : "csv");
+
+    if (isExcel) {
+      setFileContent("");
+      setPreviewItems([
+        {
+          sku: "EXCEL WORKBOOK READY",
+          name: file.name,
+          category: `Size: ${(file.size / 1024).toFixed(1)} KB`,
+          mrp: "Parsed on server",
+          dealerPrice: "Auto-upserted",
+          stock: "Ready to process",
+        },
+      ]);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -83,7 +102,7 @@ export function BulkProductManagerModal({
           } else if (parsed.products && Array.isArray(parsed.products)) {
             setPreviewItems(parsed.products.slice(0, 5));
           }
-        } catch (err) {
+        } catch {
           setPreviewItems([]);
         }
       } else {
@@ -109,46 +128,56 @@ export function BulkProductManagerModal({
   };
 
   const handleExecuteImport = async () => {
-    if (!fileContent) return;
+    if (!selectedFile && !fileContent) return;
 
     setIsImporting(true);
     setImportResult(null);
 
     try {
-      let bodyData: any;
-      if (importFormat === "json") {
-        try {
-          const parsed = JSON.parse(fileContent);
-          bodyData = Array.isArray(parsed) ? { products: parsed } : parsed;
-        } catch {
-          setImportResult({ success: false, errors: ["Invalid JSON file syntax."] });
-          setIsImporting(false);
-          return;
-        }
+      let res: Response;
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        res = await fetch("/api/admin/products/bulk", {
+          method: "POST",
+          body: formData,
+        });
       } else {
-        bodyData = { csvContent: fileContent };
-      }
+        let bodyData: any;
+        if (importFormat === "json") {
+          try {
+            const parsed = JSON.parse(fileContent);
+            bodyData = Array.isArray(parsed) ? { products: parsed } : parsed;
+          } catch {
+            setImportResult({ success: false, errors: ["Invalid JSON file syntax."] });
+            setIsImporting(false);
+            return;
+          }
+        } else {
+          bodyData = { csvContent: fileContent };
+        }
 
-      const res = await fetch("/api/admin/products/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bodyData),
-      });
+        res = await fetch("/api/admin/products/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyData),
+        });
+      }
 
       const data = await res.json();
       if (!res.ok) {
         setImportResult({
           success: false,
-          errors: [data.error || "Failed to process bulk import."],
+          errors: [data.error || data.message || "Failed to process bulk import."],
         });
       } else {
         setImportResult({
           success: true,
-          totalReceived: data.totalReceived,
-          created: data.created,
-          updated: data.updated,
-          errors: data.errors,
-          message: data.message,
+          totalReceived: data.data?.totalReceived ?? data.totalReceived,
+          created: data.data?.created ?? data.created,
+          updated: data.data?.updated ?? data.updated,
+          errors: data.data?.errors ?? data.errors,
+          message: data.data?.message ?? data.message,
         });
         if (onImportSuccess) {
           onImportSuccess();
@@ -204,15 +233,15 @@ export function BulkProductManagerModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.json"
+                accept=".xlsx,.xls,.csv,.json"
                 className="hidden"
                 onChange={handleFileChange}
               />
               <FileSpreadsheet className="h-10 w-10 text-slate-400 mx-auto mb-2" />
               <div className="text-sm font-bold text-slate-700">
-                {fileName ? fileName : "Select CSV or JSON file to import"}
+                {fileName ? fileName : "Select Excel (.xlsx, .xls), CSV, or JSON file to import"}
               </div>
-              <p className="text-xs text-slate-400 mt-1">Supports UTF-8 CSV or standard JSON array</p>
+              <p className="text-xs text-slate-400 mt-1">Supports Microsoft Excel (.xlsx, .xls), UTF-8 CSV, or JSON</p>
               <div className="mt-4 flex items-center justify-center gap-2">
                 <Button
                   type="button"
@@ -371,7 +400,17 @@ export function BulkProductManagerModal({
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Export File Format:</label>
-                <div className="flex items-center gap-4 text-xs font-medium">
+                <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value="xlsx"
+                      checked={exportFormat === "xlsx"}
+                      onChange={() => setExportFormat("xlsx")}
+                    />
+                    Excel Workbook (.xlsx)
+                  </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
@@ -380,7 +419,7 @@ export function BulkProductManagerModal({
                       checked={exportFormat === "csv"}
                       onChange={() => setExportFormat("csv")}
                     />
-                    CSV (Excel Compatible)
+                    CSV (Spreadsheet Compatible)
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -408,7 +447,27 @@ export function BulkProductManagerModal({
 
           {/* TAB 3: SAMPLE TEMPLATES */}
           <TabsContent value="templates" className="space-y-4 pt-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="border rounded-xl p-4 bg-slate-50 hover:bg-slate-100 transition-colors flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 font-bold text-slate-900 text-sm mb-1">
+                    <FileSpreadsheet className="h-4 w-4 text-emerald-700" />
+                    Excel (.xlsx) Template
+                  </div>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Pre-formatted Microsoft Excel template with styled headers, sample rows, and auto-width columns.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDownloadTemplate("xlsx")}
+                  className="w-full text-xs font-semibold gap-1.5 border-emerald-300 text-emerald-800 bg-emerald-50/50 hover:bg-emerald-100"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download Excel Template
+                </Button>
+              </div>
+
               <div className="border rounded-xl p-4 bg-slate-50 hover:bg-slate-100 transition-colors flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2 font-bold text-slate-900 text-sm mb-1">

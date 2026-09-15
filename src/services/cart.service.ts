@@ -225,13 +225,11 @@ export async function updateCartItemQuantity(input: {
     } else {
       const unitDp = Number(item.dealerPrice);
       const lineSubtotal = unitDp * quantity;
-      let effectiveTaxRate = 0.13;
+      const companyVat = await getCompanyVatSetting();
+      let effectiveTaxRate = companyVat.defaultVatPercent / 100;
       if (item.productId) {
         const vatRes = await resolveProductVat(item.order.sellerId, item.productId);
         effectiveTaxRate = vatRes.vatPercent / 100;
-      } else {
-        const companyVat = await getCompanyVatSetting();
-        effectiveTaxRate = companyVat.defaultVatPercent / 100;
       }
       const lineTax = Number((lineSubtotal * effectiveTaxRate).toFixed(2));
       const lineTotal = Number((lineSubtotal + lineTax).toFixed(2));
