@@ -23,7 +23,7 @@ export function normalizeVatRate(rate: number | null | undefined, defaultRate = 
  * 2. Category-level override (ProductCategory.taxPercent)
  * 3. Global Admin Company Setting (CompanyProfile.defaultVatPercent, default: 13.00%)
  */
-export async function getCompanyVatSetting(): Promise<{
+export async function getCompanyVatSetting(sellerId?: string): Promise<{
   defaultVatPercent: number;
   pricesIncludeVat: boolean;
   companyName: string;
@@ -35,9 +35,20 @@ export async function getCompanyVatSetting(): Promise<{
   district: string | null;
 }> {
   try {
-    const profile = await prisma.companyProfile.findUnique({
-      where: { id: "bageshwari-tractors" },
-    });
+    let profile = sellerId
+      ? await prisma.companyProfile.findUnique({ where: { sellerId } }).catch(() => null)
+      : null;
+
+    if (!profile) {
+      profile = await prisma.companyProfile.findUnique({
+        where: { id: "bageshwari-tractors" },
+      }).catch(() => null);
+    }
+
+    if (!profile) {
+      profile = await prisma.companyProfile.findFirst().catch(() => null);
+    }
+
     if (profile) {
       return {
         defaultVatPercent: normalizeVatRate(Number(profile.defaultVatPercent), 13.0),
@@ -62,6 +73,19 @@ export async function getCompanyVatSetting(): Promise<{
     address: "Nepalgunj, Banke",
     city: "Nepalgunj",
     district: "Banke",
+  };
+}
+
+export function calculateDealerPriceWithVat(basePrice: number, vatPercent: number) {
+  const normalizedVat = normalizeVatRate(vatPercent, 13.0);
+  const vatAmount = Number((basePrice * (normalizedVat / 100)).toFixed(2));
+  const dealerPrice = Number((basePrice + vatAmount).toFixed(2));
+  return {
+    basePrice,
+    vatPercent: normalizedVat,
+    vatAmount,
+    dealerPrice,
+    formulaText: `${basePrice} + ${normalizedVat}% = ${dealerPrice}`,
   };
 }
 export async function resolveProductVat(

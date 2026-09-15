@@ -749,23 +749,36 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                         </tr>
                       </thead>
                       <tbody className="divide-y text-slate-700">
-                        {order.items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="px-4 py-3 font-semibold text-slate-900">
-                              <div>{item.productName}</div>
-                              <div className="text-[10px] text-slate-400">SKU: {item.sku}</div>
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium text-slate-500">{item.originalQuantity}</td>
-                            <td className="px-4 py-3 text-right font-bold text-blue-700">
-                              {item.approvedQuantity ?? item.originalQuantity} {item.product?.unitCode || "PCS"}
-                            </td>
-                            <td className="px-4 py-3 text-right font-semibold text-emerald-600">{formatCurrency(item.dealerPrice)}</td>
-                            <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(item.lineTotal)}</td>
-                            <td className="px-4 py-3 text-slate-500 text-[11px]">
-                              {item.accountsRemarks || "—"}
-                            </td>
-                          </tr>
-                        ))}
+                        {order.items.map((item) => {
+                          const itemQty = Number(item.approvedQuantity ?? item.originalQuantity);
+                          const baseDp = Number(item.dealerPrice);
+                          const itemTax = Number(item.taxAmount);
+                          const itemVatRate = itemQty > 0 && baseDp > 0 && itemTax > 0 ? Number(((itemTax / (baseDp * itemQty)) * 100).toFixed(1)) : effectiveVatPercent;
+                          const unitDpWithVat = Number((baseDp * (1 + itemVatRate / 100)).toFixed(2));
+
+                          return (
+                            <tr key={item.id}>
+                              <td className="px-4 py-3 font-semibold text-slate-900">
+                                <div>{item.productName}</div>
+                                <div className="text-[10px] text-slate-400">SKU: {item.sku}</div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-medium text-slate-500">{item.originalQuantity}</td>
+                              <td className="px-4 py-3 text-right font-bold text-blue-700">
+                                {item.approvedQuantity ?? item.originalQuantity} {item.product?.unitCode || "PCS"}
+                              </td>
+                              <td className="px-4 py-3 text-right font-semibold text-emerald-600">
+                                <div className="font-bold">{formatCurrency(unitDpWithVat)}</div>
+                                <div className="text-[10px] font-mono text-slate-500">
+                                  {formatCurrency(baseDp)} + {itemVatRate}%
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(item.lineTotal)}</td>
+                              <td className="px-4 py-3 text-slate-500 text-[11px]">
+                                {item.accountsRemarks || "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -777,7 +790,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                       <span className="font-semibold text-slate-900">{formatCurrency(order.subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-slate-600">
-                      <span>VAT Tax (13%)</span>
+                      <span>VAT Tax ({effectiveVatPercent}%)</span>
                       <span className="font-semibold text-slate-900">{formatCurrency(order.taxTotal)}</span>
                     </div>
                     <div className="flex justify-between text-slate-600">

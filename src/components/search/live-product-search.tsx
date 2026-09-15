@@ -238,8 +238,8 @@ export function LiveProductSearch({
                             <div className="text-xs font-black text-emerald-700">
                               {formatCurrency(dealerPriceInclVat)}
                             </div>
-                            <div className="text-[9px] text-slate-500">
-                              {formatCurrency(dp)} + 13%
+                            <div className="text-[9px] font-mono text-emerald-800">
+                              {formatCurrency(dp)} + {effectiveVat}%
                             </div>
                           </>
                         ) : (

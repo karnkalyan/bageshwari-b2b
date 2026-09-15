@@ -62,7 +62,9 @@ export function FeaturedProducts({
           {products.map((product) => {
             const mrp = Number(product.variants?.[0]?.mrp || 0);
             const dp = product.dealerPrice ?? mrp;
-            const discountPercent = product.discountPercent ?? (mrp > 0 && dp < mrp ? Math.round(((mrp - dp) / mrp) * 100) : 0);
+            const effectiveVat = (product as any).effectiveVat || 13;
+            const dealerPriceInclVat = (product as any).dealerPriceInclVat ?? Number((dp * (1 + effectiveVat / 100)).toFixed(2));
+            const discountPercent = product.discountPercent ?? (mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0);
 
             return (
               <article
@@ -74,8 +76,8 @@ export function FeaturedProducts({
                     href={`${base}/products/${product.sku}`}
                     className="relative grid aspect-square place-items-center bg-gradient-to-br from-slate-50 to-slate-100"
                   >
-                    <Package className="h-14 w-14 text-slate-200 transition group-hover:scale-110" />
-                    {(product.featured || product.newArrival) && (
+                    <Package className="h-12 w-12 text-slate-300 transition-transform group-hover:scale-105" />
+                    {(product.newArrival || product.featured) && (
                       <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-xs">
                         {product.newArrival ? "New" : "Featured"}
                       </span>
@@ -113,8 +115,11 @@ export function FeaturedProducts({
                         <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs font-bold text-emerald-800 mt-0.5">
                           <span className="text-[10px] font-semibold text-emerald-700">DP</span>
                           <strong className="text-xs sm:text-sm font-black text-emerald-950 tracking-tight tabular-nums truncate max-w-[125px]">
-                            {formatCurrency(dp)}
+                            {formatCurrency(dealerPriceInclVat)}
                           </strong>
+                        </div>
+                        <div className="text-[9px] font-medium text-slate-500 truncate pt-0.5 mt-0.5 border-t border-emerald-100/80">
+                          {formatCurrency(dp)} + {effectiveVat}%
                         </div>
                       </div>
                     ) : (

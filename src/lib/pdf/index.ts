@@ -28,25 +28,25 @@ export type OrderDocumentKind =
   | "package-labels"
   | "packing-list";
 
-function mapCompany(company: any): CompanyInfo {
+function mapCompany(company: any, seller?: any): CompanyInfo {
   return {
-    legalName: company?.companyName || company?.legalName || "",
-    tradingName: company?.tradingName || company?.companyName || "",
-    panNumber: company?.panNumber || "",
-    vatNumber: company?.vatNumber || company?.panNumber || "",
-    registrationNumber: company?.registrationNumber || "",
-    address: company?.address || "",
-    city: company?.city || "",
-    district: company?.district || "",
-    province: company?.province || "",
-    phone: company?.phone || "",
-    email: company?.email || "",
-    website: company?.website || "",
-    bankName: company?.bankName || "",
-    bankAccountName: company?.bankAccountName || company?.companyName || "",
-    bankAccountNumber: company?.bankAccountNumber || "",
-    bankBranch: company?.bankBranch || "",
-    bankSwiftCode: company?.bankSwiftCode || "",
+    legalName: company?.companyName || seller?.legalName || company?.legalName || "Bageshwari Tractors Pvt. Ltd.",
+    tradingName: company?.tradingName || seller?.tradingName || company?.companyName || "Bageshwari Tractors",
+    panNumber: company?.panNumber || company?.vatNumber || seller?.taxNumber || "302918239",
+    vatNumber: company?.vatNumber || company?.panNumber || seller?.taxNumber || "302918239",
+    registrationNumber: company?.registrationNumber || seller?.registrationNumber || "",
+    address: company?.address || seller?.addressLine1 || "Nepalgunj, Banke",
+    city: company?.city || seller?.city || "Nepalgunj",
+    district: company?.district || seller?.district || "Banke",
+    province: company?.province || seller?.province || "Lumbini Province",
+    phone: company?.phone || seller?.phone || "+977-81-520123",
+    email: company?.email || seller?.email || "info@bageshwari.com.np",
+    website: company?.website || seller?.website || "https://bageshwari.com.np",
+    bankName: company?.bankName || "NIC ASIA Bank Ltd.",
+    bankAccountName: company?.bankAccountName || company?.companyName || seller?.legalName || "Bageshwari Tractors Pvt. Ltd.",
+    bankAccountNumber: company?.bankAccountNumber || "0194291823901928",
+    bankBranch: company?.bankBranch || "Nepalgunj Main Branch",
+    bankSwiftCode: company?.bankSwiftCode || "NICA-NP",
   };
 }
 
@@ -60,24 +60,47 @@ function mapDealer(dealer: any): DealerInfo {
     contactName: dealer?.contactName || "",
     phone: dealer?.phone || "N/A",
     email: dealer?.email || "N/A",
-    addressLine1: address?.line1 || dealer?.address || "",
+    addressLine1: address?.addressLine1 || address?.line1 || dealer?.address || "",
     city: address?.city || dealer?.city || "",
     district: address?.district || "",
     province: address?.province || "",
   };
 }
 
-async function getCompanyProfileSafe(): Promise<any> {
+async function getCompanyProfileSafe(sellerId?: string): Promise<{ profile: any; seller: any }> {
+  let profile: any = null;
+  let seller: any = null;
+
   try {
-    return await prisma.companyProfile.findUnique({ where: { id: "bageshwari-tractors" } });
+    if (sellerId) {
+      seller = await prisma.seller.findUnique({
+        where: { id: sellerId },
+      }).catch(() => null);
+
+      profile = await prisma.companyProfile.findUnique({
+        where: { sellerId },
+      }).catch(() => null);
+    }
+
+    if (!profile) {
+      profile = await prisma.companyProfile.findUnique({
+        where: { id: "bageshwari-tractors" },
+      }).catch(() => null);
+    }
+
+    if (!profile) {
+      profile = await prisma.companyProfile.findFirst().catch(() => null);
+    }
   } catch {
     try {
       const rows = await prisma.$queryRaw<any[]>`SELECT * FROM CompanyProfile WHERE id = 'bageshwari-tractors' LIMIT 1`;
-      return rows?.[0] || null;
+      profile = rows?.[0] || null;
     } catch {
-      return null;
+      profile = null;
     }
   }
+
+  return { profile, seller };
 }
 
 export async function generateOrderPdf(
@@ -85,7 +108,7 @@ export async function generateOrderPdf(
   sellerId: string,
   kind: OrderDocumentKind
 ): Promise<Uint8Array | null> {
-  const [order, companyRaw] = await Promise.all([
+  const [order, companyMeta] = await Promise.all([
     prisma.order.findFirst({
       where: { id: orderId, sellerId },
       include: {
@@ -98,12 +121,12 @@ export async function generateOrderPdf(
         shipments: { orderBy: { createdAt: "desc" }, take: 1, include: { transportCompany: true, driver: true, vehicle: true, packages: { orderBy: { packageNumber: "asc" } } } },
       },
     }),
-    getCompanyProfileSafe(),
+    getCompanyProfileSafe(sellerId),
   ]);
 
   if (!order) return null;
 
-  const company = mapCompany(companyRaw);
+  const company = mapCompany(companyMeta.profile, companyMeta.seller);
   const dealer = mapDealer(order.dealer);
   const orderPackages = (order.packages && order.packages.length > 0)
     ? order.packages
@@ -224,7 +247,7 @@ export async function generateOrderPdf(
     const assignedPicker = pickList?.assignedTo;
     const pickerName = assignedPicker?.name || assignedPicker?.email || (pickList?.assignedToId ? "Assigned Picker" : null);
     // Use warehouse name from company profile settings if available
-    const warehouseName = companyRaw?.warehouseName || (company.city ? `${company.city} Warehouse` : "Warehouse");
+    const warehouseName = (companyMeta.profile as any)?.warehouseName || (company.city ? `${company.city} Warehouse` : "Warehouse");
 
     return renderPickListPdf({
       pickListNumber,
@@ -305,7 +328,7 @@ export async function generateOrderPdf(
             ],
       totalCartons: totalCartons || 1,
       totalWeight,
-      warehouseName: companyRaw?.warehouseName || (company.city ? `${company.city} Central Warehouse` : "Warehouse"),
+      warehouseName: (companyMeta.profile as any)?.warehouseName || (company.city ? `${company.city} Central Warehouse` : "Warehouse"),
       packedByName: (pickList?.assignedTo?.name || pickList?.assignedTo?.email || "Warehouse Lead Specialist"),
       transporterName: shipment?.transporter || shipment?.transportCompany?.name || "",
       driverName: shipment?.driverName || shipment?.driver?.name,
@@ -442,7 +465,7 @@ export async function generateOrderPdf(
 }
 
 export async function generatePackageLabelPdf(packageId: string, sellerId: string): Promise<Uint8Array | null> {
-  const [pkg, companyRaw] = await Promise.all([
+  const [pkg, companyMeta] = await Promise.all([
     prisma.package.findFirst({
       where: { id: packageId, sellerId },
       include: {
@@ -455,12 +478,12 @@ export async function generatePackageLabelPdf(packageId: string, sellerId: strin
         shipment: { include: { transportCompany: true, packages: true } },
       },
     }),
-    getCompanyProfileSafe(),
+    getCompanyProfileSafe(sellerId),
   ]);
 
   if (!pkg) return null;
 
-  const company = mapCompany(companyRaw);
+  const company = mapCompany(companyMeta.profile, companyMeta.seller);
   const dealer = mapDealer(pkg.order.dealer);
   const totalCartons = pkg.shipment?.packages?.length || 1;
   const cartonIndex = pkg.shipment?.packages?.findIndex((p) => p.id === pkg.id) ?? 0;
@@ -490,7 +513,7 @@ export async function generateProductBarcodeLabelPdf(
   count = 1,
   stickerSize: "32x20" | "standard" = "32x20"
 ): Promise<Uint8Array | null> {
-  const [product, companyRaw] = await Promise.all([
+  const [product, companyMeta] = await Promise.all([
     prisma.product.findFirst({
       where: {
         sellerId,
@@ -502,7 +525,7 @@ export async function generateProductBarcodeLabelPdf(
         variants: { where: { isDefault: true }, take: 1 },
       },
     }),
-    getCompanyProfileSafe(),
+    getCompanyProfileSafe(sellerId),
   ]);
 
   if (!product) return null;
@@ -512,7 +535,7 @@ export async function generateProductBarcodeLabelPdf(
   const barcode = variant?.barcode || product.sku;
 
   // 3-Tier VAT Resolution
-  const globalVatRaw = companyRaw?.defaultVatPercent ? Number(companyRaw.defaultVatPercent) : 13.0;
+  const globalVatRaw = companyMeta.profile?.defaultVatPercent ? Number(companyMeta.profile.defaultVatPercent) : 13.0;
   const globalVat = globalVatRaw > 0 && globalVatRaw <= 1.0 ? globalVatRaw * 100 : globalVatRaw;
   const rawVatPercent =
     product.taxPercent !== null && product.taxPercent !== undefined
@@ -535,7 +558,7 @@ export async function generateProductBarcodeLabelPdf(
       categoryName: product.category?.name,
       brandName: product.brand?.name,
       unitCode: product.unitCode,
-      companyName: companyRaw?.companyName || companyRaw?.tradingName || "BAGESHWARI TRACTOR, NEPALGUNJ",
+      companyName: companyMeta.profile?.companyName || companyMeta.profile?.tradingName || companyMeta.seller?.tradingName || companyMeta.seller?.companyName || "BAGESHWARI TRACTOR, NEPALGUNJ",
       stickerSize,
     },
     count

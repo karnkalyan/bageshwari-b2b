@@ -238,7 +238,7 @@ export async function renderProformaInvoicePdf(data: ProformaInvoiceData): Promi
 
   drawText(page, "BANK PAYMENT DEPOSIT INSTRUCTIONS:", MARGIN + 8, y - 56, { size: 7.5, font: bold, color: COLORS.muted });
   drawText(page, `Bank: ${data.company.bankName || "NIC ASIA Bank Ltd."} | Branch: ${data.company.bankBranch || "Nepalgunj"}`, MARGIN + 8, y - 68, { size: 7.5, font: regular, color: COLORS.secondary });
-  drawText(page, `A/C: ${data.company.bankAccountNumber || "0194291823901928"} (${data.company.bankAccountName || "Bageshwari Tractors"})`, MARGIN + 8, y - 80, { size: 7.5, font: bold, color: COLORS.primary });
+  drawText(page, `A/C: ${data.company.bankAccountNumber || "0194291823901928"} (${data.company.bankAccountName || data.company.legalName || data.company.tradingName || "Company"})`, MARGIN + 8, y - 80, { size: 7.5, font: bold, color: COLORS.primary });
 
   y -= summaryBoxHeight + 12;
 
@@ -281,7 +281,7 @@ export async function renderProformaInvoicePdf(data: ProformaInvoiceData): Promi
     thickness: 0.75,
   });
   drawCenteredText(page, "Authorized Commercial Signatory", sigX + 70, y - footerHeight + 18, bold, { size: 7.5, color: COLORS.primary });
-  drawCenteredText(page, "For Bageshwari Tractors Pvt. Ltd.", sigX + 70, y - footerHeight + 8, regular, { size: 6.5, color: COLORS.muted });
+  drawCenteredText(page, `For ${data.company.legalName || data.company.tradingName || "Company"}`, sigX + 70, y - footerHeight + 8, regular, { size: 6.5, color: COLORS.muted });
 
   return pdf.save();
 }

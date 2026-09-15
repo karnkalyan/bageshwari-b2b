@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getTenantContext, hasRole } from "@/lib/tenant";
+import { ensureRbacPermissions } from "@/lib/auth/rbac-sync";
 import { redirect } from "next/navigation";
 import { RbacMatrixClient, type SerializedRole, type SerializedPermission } from "@/components/admin/rbac-matrix-client";
 
@@ -14,6 +15,9 @@ export default async function AdminRolesPage({ params }: RolesPageProps) {
   if (!hasRole(ctx, "SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN", "STAFF")) {
     redirect("/admin");
   }
+
+  // Ensure standard permissions (including user.edit) are present in the system
+  await ensureRbacPermissions(ctx.sellerId);
 
   const [roles, permissions] = await Promise.all([
     prisma.role.findMany({

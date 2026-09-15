@@ -39,8 +39,10 @@ async function main() {
     // Users
     { code: "user.create", name: "Create User", module: "user" },
     { code: "user.read", name: "Read User", module: "user" },
+    { code: "user.edit", name: "Edit User", module: "user" },
     { code: "user.update", name: "Update User", module: "user" },
     { code: "user.disable", name: "Disable User", module: "user" },
+    { code: "user.manage", name: "Manage Users", module: "user" },
     { code: "role.manage", name: "Manage Roles", module: "role" },
     // Dealers
     { code: "dealer.create", name: "Create Dealer", module: "dealer" },

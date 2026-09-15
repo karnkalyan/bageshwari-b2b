@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { resolveDealerPrice } from "@/services/pricing.service";
+import { getCompanyVatSetting, normalizeVatRate } from "@/services/vat.service";
 import { productRepository } from "@/repositories/product.repository";
 import { addItemToDealerCart, getDealerCartItemCount } from "@/services/cart.service";
 import { UtilityBar } from "@/app/s/[sellerSlug]/_components/utility-bar";
@@ -234,7 +235,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       ]),
     ];
 
-    const activePrices = await productRepository.listActivePrices(seller.id, allProductIds);
+    const [activePrices, companyVat] = await Promise.all([
+      productRepository.listActivePrices(seller.id, allProductIds),
+      getCompanyVatSetting(seller.id),
+    ]);
 
     const enrichProduct = (product: (typeof rawFeaturedProducts)[0]) => {
       const mrp = Number(product.variants?.[0]?.mrp || 0);
@@ -248,10 +252,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         },
         mrp
       );
-      const discountPercent = mrp > 0 && dp < mrp ? Math.round(((mrp - dp) / mrp) * 100) : 0;
+      const prodTax = (product as any).taxPercent !== null && (product as any).taxPercent !== undefined ? normalizeVatRate(Number((product as any).taxPercent)) : null;
+      const catTax = (product.category as any)?.taxPercent !== null && (product.category as any)?.taxPercent !== undefined ? normalizeVatRate(Number((product.category as any).taxPercent)) : null;
+      const effectiveVat = prodTax !== null ? prodTax : catTax !== null ? catTax : companyVat.defaultVatPercent;
+      const vatMultiplier = 1 + (effectiveVat / 100);
+      const dealerPriceInclVat = Number((dp * vatMultiplier).toFixed(2));
+      const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
       return {
         ...product,
         dealerPrice: dp,
+        dealerPriceInclVat,
+        effectiveVat,
         discountPercent,
       };
     };

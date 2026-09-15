@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { resolveDealerPrice } from "@/services/pricing.service";
+import { resolveProductVat } from "@/services/vat.service";
 import { addItemToDealerCart, getDealerCartItemCount } from "@/services/cart.service";
 import { PublicHeader } from "../../_components/public-header";
 import { PublicFooter } from "../../_components/public-footer";
@@ -65,6 +66,8 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
 
   let dp = mrp;
   let discountPercent = 0;
+  const vatInfo = await resolveProductVat(seller.id, product.id);
+  const vatPercent = vatInfo.vatPercent;
 
   if (isDealer && dealer) {
     dp = resolveDealerPrice(
@@ -76,10 +79,11 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
       },
       mrp
     );
-    const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+    const vatMultiplier = 1 + (vatPercent / 100);
+    const dealerPriceInclVat = Number((dp * vatMultiplier).toFixed(2));
     discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
   }
-  const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+  const dealerPriceInclVat = Number((dp * (1 + (vatPercent / 100))).toFixed(2));
 
   // Server action to add product to dealer draft order cart
   async function handleAddToCart(formData: FormData) {
@@ -187,8 +191,11 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
                       </div>
                       <span className="text-2xl font-black text-emerald-700">{formatCurrency(dealerPriceInclVat)}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 text-right">
-                      Current price {formatCurrency(dp)} + 13% VAT
+                    <div className="text-[11px] font-medium text-slate-600 flex items-center justify-between pt-1 border-t border-emerald-200/70">
+                      <span className="text-slate-500">Rate Formula:</span>
+                      <span className="font-mono text-emerald-800 text-[11px]">
+                        {formatCurrency(dp)} + {vatPercent}% = {formatCurrency(dealerPriceInclVat)} Dealer Price
+                      </span>
                     </div>
                   </div>
                 ) : (

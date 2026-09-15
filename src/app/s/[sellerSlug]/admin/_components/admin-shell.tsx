@@ -142,7 +142,7 @@ const navigationGroups: NavGroup[] = [
         icon: UserCog,
         color: "text-indigo-500",
         allowedRoles: [...ALL_PRIVILEGED_ROLES],
-        allowedPermissions: ["system.manage", "seller.manage"],
+        allowedPermissions: ["system.manage", "seller.manage", "user.read", "user.create", "user.update", "user.edit", "user.manage"],
       },
       {
         label: "Roles & Permissions",
@@ -150,7 +150,7 @@ const navigationGroups: NavGroup[] = [
         icon: KeyRound,
         color: "text-cyan-500",
         allowedRoles: [...ALL_PRIVILEGED_ROLES],
-        allowedPermissions: ["system.manage", "seller.manage"],
+        allowedPermissions: ["system.manage", "seller.manage", "role.manage"],
       },
     ],
   },

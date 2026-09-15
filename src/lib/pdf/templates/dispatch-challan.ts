@@ -208,7 +208,7 @@ export async function renderDispatchChallanPdf(data: DispatchChallanData): Promi
   // 1. Warehouse Dispatcher
   page.drawLine({ start: { x: MARGIN + 15, y: y - signHeight + 30 }, end: { x: MARGIN + colWidth - 15, y: y - signHeight + 30 }, color: COLORS.border, thickness: 0.75 });
   drawCenteredText(page, "Warehouse Dispatcher Signature", MARGIN + colWidth / 2, y - signHeight + 18, bold, { size: 7.5, color: COLORS.primary });
-  drawCenteredText(page, "Bageshwari Tractors Logistics", MARGIN + colWidth / 2, y - signHeight + 8, regular, { size: 6.5, color: COLORS.muted });
+  drawCenteredText(page, `${data.company.tradingName || data.company.legalName || "Company"} Logistics`, MARGIN + colWidth / 2, y - signHeight + 8, regular, { size: 6.5, color: COLORS.muted });
 
   // 2. Transport Driver Sign
   page.drawLine({ start: { x: MARGIN + colWidth + 15, y: y - signHeight + 30 }, end: { x: MARGIN + colWidth * 2 - 15, y: y - signHeight + 30 }, color: COLORS.border, thickness: 0.75 });

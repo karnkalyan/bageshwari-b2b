@@ -247,7 +247,9 @@ export async function renderTaxInvoicePdf(data: TaxInvoiceData): Promise<Uint8Ar
 
   drawText(page, "BANK PAYMENT REMITTANCE DETAILS:", MARGIN + 8, y - 56, { size: 7.5, font: bold, color: COLORS.muted });
   drawText(page, `Bank: ${data.company.bankName || "NIC ASIA Bank Ltd."} | Branch: ${data.company.bankBranch || "Nepalgunj Main"}`, MARGIN + 8, y - 68, { size: 7.5, font: regular, color: COLORS.secondary });
-  drawText(page, `A/C Name: ${data.company.bankAccountName || "Bageshwari Tractors Pvt. Ltd."}`, MARGIN + 8, y - 80, { size: 7.5, font: bold, color: COLORS.primary });
+  if (data.company.bankAccountName || data.company.legalName) {
+    drawText(page, `A/C Name: ${data.company.bankAccountName || data.company.legalName}`, MARGIN + 8, y - 80, { size: 7.5, font: bold, color: COLORS.primary });
+  }
   drawText(page, `A/C Number: ${data.company.bankAccountNumber || "0194291823901928"} | SWIFT: ${data.company.bankSwiftCode || "NICA-NP"}`, MARGIN + 8, y - 92, { size: 7.5, font: regular, color: COLORS.secondary });
 
   y -= summaryBoxHeight + 12;
@@ -293,7 +295,7 @@ export async function renderTaxInvoicePdf(data: TaxInvoiceData): Promise<Uint8Ar
     thickness: 0.75,
   });
   drawCenteredText(page, "Authorized Signatory", sigX + 70, y - footerHeight + 18, bold, { size: 7.5, color: COLORS.primary });
-  drawCenteredText(page, "For Bageshwari Tractors Pvt. Ltd.", sigX + 70, y - footerHeight + 8, regular, { size: 6.5, color: COLORS.muted });
+  drawCenteredText(page, `For ${data.company.legalName || data.company.tradingName || "Company"}`, sigX + 70, y - footerHeight + 8, regular, { size: 6.5, color: COLORS.muted });
 
   return pdf.save();
 }

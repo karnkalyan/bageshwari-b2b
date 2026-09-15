@@ -17,7 +17,7 @@ export default async function DealerCartPage() {
 
   const [draft, companyVat] = await Promise.all([
     getDealerCart(ctx.sellerId, ctx.dealerId),
-    getCompanyVatSetting(),
+    getCompanyVatSetting(ctx.sellerId),
   ]);
 
   if (!draft || !draft.items.length) {
@@ -113,7 +113,9 @@ export default async function DealerCartPage() {
                         MRP: <span className="font-semibold text-slate-700">{formatCurrency(mrp)}</span>
                       </div>
                       <div className="text-sm font-bold text-emerald-700">{formatCurrency(dealerPriceInclVat)}</div>
-                      <div className="text-[10px] text-slate-400">Current {formatCurrency(dp)} + {itemVatRate}% VAT</div>
+                      <div className="text-[10px] font-mono text-emerald-800">
+                        {formatCurrency(dp)} + {itemVatRate}% = {formatCurrency(dealerPriceInclVat)}
+                      </div>
                     </div>
 
                     {/* Quantity Update Controls */}

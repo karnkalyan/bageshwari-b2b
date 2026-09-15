@@ -648,15 +648,20 @@ export function SalesOrderCreator({
                             </span>
                             <span>• Unit: {product.unitCode}</span>
                           </div>
-                          <div className="flex items-center gap-3 mt-1.5 text-xs">
-                            <span className="font-bold text-emerald-700">
-                              Dealer Rate: {formatCurrency(product.defaultPrice)}
-                            </span>
-                            {product.mrp > product.defaultPrice && (
-                              <span className="text-[10px] text-slate-400 line-through">
-                                MRP: {formatCurrency(product.mrp)}
+                          <div className="flex flex-col gap-0.5 mt-1.5 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-emerald-800">
+                                Dealer Price: {formatCurrency(Number((product.defaultPrice * (1 + vatPercent / 100)).toFixed(2)))}
                               </span>
-                            )}
+                              {product.mrp > product.defaultPrice && (
+                                <span className="text-[10px] text-slate-400 line-through">
+                                  MRP: {formatCurrency(product.mrp)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-500">
+                              {formatCurrency(product.defaultPrice)} + {vatPercent}% = {formatCurrency(Number((product.defaultPrice * (1 + vatPercent / 100)).toFixed(2)))}
+                            </div>
                           </div>
                         </div>
 

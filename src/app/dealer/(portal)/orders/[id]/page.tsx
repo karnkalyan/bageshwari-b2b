@@ -296,26 +296,37 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
                     </tr>
                   </thead>
                   <tbody className="divide-y text-slate-700">
-                    {order.items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-4 py-3.5">
-                          <div className="font-bold text-slate-900">{item.productName}</div>
-                          <div className="text-[10px] text-slate-400">SKU: {item.sku}</div>
-                        </td>
-                        <td className="px-4 py-3.5 text-center font-bold text-blue-900">
-                          {Number(item.approvedQuantity ?? item.originalQuantity)} {item.product?.unitCode || "Pcs."}
-                        </td>
-                        <td className="px-4 py-3.5 text-right font-semibold text-emerald-700">
-                          {formatCurrency(Number(item.dealerPrice))}
-                        </td>
-                        <td className="px-4 py-3.5 text-right font-black text-slate-900">
-                          {formatCurrency(Number(item.lineTotal))}
-                        </td>
-                        <td className="px-4 py-3.5 text-slate-500 text-[11px]">
-                          {item.accountsRemarks || "—"}
-                        </td>
-                      </tr>
-                    ))}
+                    {order.items.map((item) => {
+                      const itemQty = Number(item.approvedQuantity ?? item.originalQuantity);
+                      const baseDp = Number(item.dealerPrice);
+                      const itemTax = Number(item.taxAmount);
+                      const itemVatRate = itemQty > 0 && baseDp > 0 && itemTax > 0 ? Number(((itemTax / (baseDp * itemQty)) * 100).toFixed(1)) : 13;
+                      const unitDpWithVat = Number((baseDp * (1 + itemVatRate / 100)).toFixed(2));
+
+                      return (
+                        <tr key={item.id}>
+                          <td className="px-4 py-3.5">
+                            <div className="font-bold text-slate-900">{item.productName}</div>
+                            <div className="text-[10px] text-slate-400">SKU: {item.sku}</div>
+                          </td>
+                          <td className="px-4 py-3.5 text-center font-bold text-blue-900">
+                            {itemQty} {item.product?.unitCode || "Pcs."}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-semibold text-emerald-700">
+                            <div className="font-bold">{formatCurrency(unitDpWithVat)}</div>
+                            <div className="text-[10px] font-mono text-slate-500">
+                              {formatCurrency(baseDp)} + {itemVatRate}%
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-black text-slate-900">
+                            {formatCurrency(Number(item.lineTotal))}
+                          </td>
+                          <td className="px-4 py-3.5 text-slate-500 text-[11px]">
+                            {item.accountsRemarks || "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -335,7 +346,13 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
                 <span className="font-semibold text-slate-900">{formatCurrency(Number(order.subtotal))}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>VAT (13%):</span>
+                <span>
+                  VAT (
+                  {Number(order.subtotal) > 0 && Number(order.taxTotal) > 0
+                    ? Number(((Number(order.taxTotal) / Number(order.subtotal)) * 100).toFixed(1))
+                    : 13}
+                  %):
+                </span>
                 <span className="font-semibold text-slate-900">{formatCurrency(Number(order.taxTotal))}</span>
               </div>
               <div className="flex justify-between text-slate-600">

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { getTenantContext, hasRole } from "@/lib/tenant";
+import { getTenantContext, hasRole, hasPermission } from "@/lib/tenant";
+import { ensureRbacPermissions } from "@/lib/auth/rbac-sync";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
@@ -40,9 +41,23 @@ export default async function AdminUsersPage({ params, searchParams }: UsersPage
   const limit = 20;
   const offset = (currentPage - 1) * limit;
 
-  if (!hasRole(ctx, "SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN", "STAFF")) {
+  // Auto-sync RBAC permissions including user.edit
+  await ensureRbacPermissions(ctx.sellerId);
+
+  if (
+    !hasRole(ctx, "SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN", "STAFF") &&
+    !hasPermission(ctx, "user.read") &&
+    !hasPermission(ctx, "user.edit") &&
+    !hasPermission(ctx, "user.manage")
+  ) {
     redirect("/admin");
   }
+
+  const canEdit =
+    hasRole(ctx, "SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN") ||
+    hasPermission(ctx, "user.edit") ||
+    hasPermission(ctx, "user.update") ||
+    hasPermission(ctx, "user.manage");
 
   // Server Action: Create New Staff Member
   async function createStaffUserAction(formData: FormData) {
@@ -339,10 +354,14 @@ export default async function AdminUsersPage({ params, searchParams }: UsersPage
                             <UserActions 
                               userId={u.id} 
                               userName={u.name || "User"} 
+                              userEmail={u.email}
+                              userPhone={u.phone || ""}
+                              userStatus={u.status}
                               sellerId={ctx.sellerId}
                               sellerSlug={sellerSlug}
                               currentRoles={currentRoleIds}
                               availableRoles={availableRoles.map(r => ({ id: r.id, code: r.code, name: r.name || "" }))}
+                              canEditUser={canEdit}
                             />
                           </div>
                         </td>

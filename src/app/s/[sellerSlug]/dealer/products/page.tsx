@@ -54,7 +54,7 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
       select: { id: true, dealerGroupId: true, pricingGroupId: true, tradingName: true },
     }),
     getDealerCartItemCount(ctx.sellerId, ctx.dealerId),
-    getCompanyVatSetting(),
+    getCompanyVatSetting(ctx.sellerId),
   ]);
 
   const products = search ? rankProductsBySearchRelevance(rawProducts, search) : rawProducts;
@@ -173,10 +173,13 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
                   </div>
                   <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs sm:text-sm font-bold text-emerald-700">
                     <span>Dealer Price</span>
-                    <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(dealerPriceInclVat)}</span>
+                    <span className="font-black text-emerald-950 truncate max-w-[150px] tabular-nums">{formatCurrency(dealerPriceInclVat)}</span>
                   </div>
-                  <div className="text-[10px] text-slate-500 text-right">
-                    Current price {formatCurrency(dp)} + {effectiveVat}% VAT
+                  <div className="text-[11px] font-medium text-slate-600 flex items-center justify-between pt-0.5 border-t border-slate-200/70">
+                    <span className="text-slate-400">Rate:</span>
+                    <span className="font-mono text-emerald-800 text-[11px]">
+                      {formatCurrency(dp)} + {effectiveVat}% = {formatCurrency(dealerPriceInclVat)}
+                    </span>
                   </div>
                 </div>
 

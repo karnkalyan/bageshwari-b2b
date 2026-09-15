@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { resolveDealerPrice } from "@/services/pricing.service";
+import { getCompanyVatSetting, normalizeVatRate } from "@/services/vat.service";
 import { productRepository } from "@/repositories/product.repository";
 import { addItemToDealerCart, getDealerCartItemCount } from "@/services/cart.service";
 import { PublicHeader } from "../_components/public-header";
@@ -113,8 +114,10 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
   });
 
   if (isDealer && dealer) {
-    const productIds = rawProducts.map((p) => p.id);
-    const activePrices = await productRepository.listActivePrices(seller.id, productIds);
+    const [activePrices, companyVat] = await Promise.all([
+      productRepository.listActivePrices(seller.id, rawProducts.map((p) => p.id)),
+      getCompanyVatSetting(seller.id),
+    ]);
 
     products = rawProducts.map((p) => {
       const variant = p.variants?.[0];
@@ -129,13 +132,18 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
         },
         mrp
       );
-      const dealerPriceInclVat = Number((dp * 1.13).toFixed(2));
+      const prodTax = (p as any).taxPercent !== null && (p as any).taxPercent !== undefined ? normalizeVatRate(Number((p as any).taxPercent)) : null;
+      const catTax = (p.category as any)?.taxPercent !== null && (p.category as any)?.taxPercent !== undefined ? normalizeVatRate(Number((p.category as any).taxPercent)) : null;
+      const effectiveVat = prodTax !== null ? prodTax : catTax !== null ? catTax : companyVat.defaultVatPercent;
+      const vatMultiplier = 1 + (effectiveVat / 100);
+      const dealerPriceInclVat = Number((dp * vatMultiplier).toFixed(2));
       const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
 
       return {
         ...p,
         mrp,
         dealerPrice: dp,
+        effectiveVat,
         dealerPriceInclVat,
         discountPercent,
       };
@@ -298,10 +306,13 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                               </div>
                               <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs sm:text-sm font-bold text-emerald-700">
                                 <span>Dealer Price</span>
-                                <span className="font-black text-emerald-950 truncate max-w-[135px] tabular-nums">{formatCurrency(product.dealerPriceInclVat)}</span>
+                                <span className="font-black text-emerald-950 truncate max-w-[150px] tabular-nums">{formatCurrency(product.dealerPriceInclVat)}</span>
                               </div>
-                              <div className="text-[10px] text-slate-500 text-right">
-                                Current price {formatCurrency(product.dealerPrice)} + 13% VAT
+                              <div className="text-[11px] font-medium text-slate-600 flex items-center justify-between pt-0.5 border-t border-slate-200/70">
+                                <span className="text-slate-400">Rate:</span>
+                                <span className="font-mono text-emerald-800 text-[11px]">
+                                  {formatCurrency(product.dealerPrice)} + {product.effectiveVat || 13}% = {formatCurrency(product.dealerPriceInclVat)}
+                                </span>
                               </div>
                             </div>
                           ) : (
