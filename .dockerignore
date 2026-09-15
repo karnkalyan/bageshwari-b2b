@@ -13,3 +13,8 @@ test-results
 playwright-report
 .DS_Store
 *.pem
+refrence
+product.xlsx
+*.bat
+*.ps1
+tsconfig.tsbuildinfo
