@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      args:
-        - DATABASE_URL=${DATABASE_URL:-mysql://root:quantumSql%40123@host.docker.internal:3306/bageshwari_b2b}
+    build: .
     container_name: bageshwari-b2b
     restart: unless-stopped
     init: true
@@ -13,8 +10,8 @@ services:
       NODE_ENV: production
       PORT: "3011"
       HOSTNAME: 0.0.0.0
-      DATABASE_URL: ${DATABASE_URL:-mysql://root:quantumSql%40123@host.docker.internal:3306/bageshwari_b2b}
-      SEED_PASSWORD: ${SEED_PASSWORD:-Admin@123456789}
+      DATABASE_URL: "mysql://root:quantumSql%40123@host.docker.internal:3306/bageshwari_b2b"
+      SEED_PASSWORD: "Admin@123456789"
     ports:
       - "3011:3011"
     extra_hosts:
