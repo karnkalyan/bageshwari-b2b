@@ -10,7 +10,6 @@ ARG DATABASE_URL="mysql://dummy:dummy@localhost:3306/bageshwari_b2b"
 ARG NEXTAUTH_SECRET="simulcast-docker-build-secret-placeholder-32chars"
 ARG AUTH_SECRET="simulcast-docker-build-secret-placeholder-32chars"
 
-ENV NODE_ENV=production
 ENV PORT=3011
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -23,11 +22,14 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
-# Install all dependencies (including devDependencies required for build)
-RUN npm install --legacy-peer-deps
+# Install all dependencies (including devDependencies required for Next.js build)
+RUN npm install --legacy-peer-deps --include=dev
 
 # Copy all source files
 COPY . .
+
+# Set NODE_ENV to production for the build and runtime
+ENV NODE_ENV=production
 
 # Generate Prisma client and build Next.js application
 RUN npx prisma generate && npm run build
