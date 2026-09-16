@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { resolveDealerPrice } from "@/services/pricing.service";
-import { resolveProductVat } from "@/services/vat.service";
+import { resolveProductVat, normalizeVatRate } from "@/services/vat.service";
 import { addItemToDealerCart, getDealerCartItemCount } from "@/services/cart.service";
 import { PublicHeader } from "../../_components/public-header";
 import { PublicFooter } from "../../_components/public-footer";
@@ -67,7 +67,7 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
   let dp = mrp;
   let discountPercent = 0;
   const vatInfo = await resolveProductVat(seller.id, product.id);
-  const vatPercent = vatInfo.vatPercent;
+  const vatPercent = normalizeVatRate(vatInfo.vatPercent);
 
   if (isDealer && dealer) {
     dp = resolveDealerPrice(
@@ -302,7 +302,7 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
                 </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-muted-foreground">Tax Percentage</span>
-                  <span className="font-medium">{Number(product.taxPercent || 13)}%</span>
+                  <span className="font-medium">{normalizeVatRate(Number(product.taxPercent || 13))}%</span>
                 </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-muted-foreground">Minimum Order</span>

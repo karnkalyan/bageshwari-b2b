@@ -134,7 +134,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
       );
       const prodTax = (p as any).taxPercent !== null && (p as any).taxPercent !== undefined ? normalizeVatRate(Number((p as any).taxPercent)) : null;
       const catTax = (p.category as any)?.taxPercent !== null && (p.category as any)?.taxPercent !== undefined ? normalizeVatRate(Number((p.category as any).taxPercent)) : null;
-      const effectiveVat = prodTax !== null ? prodTax : catTax !== null ? catTax : companyVat.defaultVatPercent;
+      const effectiveVat = normalizeVatRate(prodTax !== null ? prodTax : catTax !== null ? catTax : companyVat.defaultVatPercent);
       const vatMultiplier = 1 + (effectiveVat / 100);
       const dealerPriceInclVat = Number((dp * vatMultiplier).toFixed(2));
       const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;

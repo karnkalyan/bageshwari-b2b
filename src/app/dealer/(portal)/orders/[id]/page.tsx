@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getTenantContext } from "@/lib/tenant";
+import { normalizeVatRate } from "@/services/vat.service";
 import { formatCurrency, formatDate, formatDateTime, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -300,7 +301,8 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
                       const itemQty = Number(item.approvedQuantity ?? item.originalQuantity);
                       const baseDp = Number(item.dealerPrice);
                       const itemTax = Number(item.taxAmount);
-                      const itemVatRate = itemQty > 0 && baseDp > 0 && itemTax > 0 ? Number(((itemTax / (baseDp * itemQty)) * 100).toFixed(1)) : 13;
+                      const rawRate = itemQty > 0 && baseDp > 0 && itemTax > 0 ? Number(((itemTax / (baseDp * itemQty)) * 100).toFixed(1)) : 13;
+                      const itemVatRate = normalizeVatRate(rawRate, 13.0);
                       const unitDpWithVat = Number((baseDp * (1 + itemVatRate / 100)).toFixed(2));
 
                       return (

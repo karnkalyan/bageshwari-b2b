@@ -1099,7 +1099,8 @@ async function main() {
       const salePrice = parseFloat(String(row["SALE price"] || "0").replace(/,/g, ""));
       const mrp = parseFloat(String(row["MRP"] || "0").replace(/,/g, ""));
       const costPrice = parseFloat(String(row["PUR"] || "0").replace(/,/g, ""));
-      const taxPercent = parseFloat(String(row["TAX"] || "0").replace(/%/g, ""));
+      const rawTax = parseFloat(String(row["TAX"] || "0").replace(/%/g, ""));
+      const taxPercent = rawTax > 0 && rawTax <= 1.0 ? Number((rawTax * 100).toFixed(2)) : (rawTax || 13.0);
       const hsnCode = String(row["HSN"] || "").trim();
       const unit = String(row["MAIN UNIT"] || "Pcs.").trim();
       const altUnit = String(row["ALTERNATE UNIT"] || "").trim();

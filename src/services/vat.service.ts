@@ -137,7 +137,7 @@ export async function resolveProductVat(
   // Tier 1: Product-level override
   if (productTax !== null) {
     return {
-      vatPercent: productTax,
+      vatPercent: normalizeVatRate(productTax, 13.0),
       source: "PRODUCT",
       pricesIncludeVat,
     };
@@ -146,7 +146,7 @@ export async function resolveProductVat(
   // Tier 2: Category-level override
   if (categoryTax !== null) {
     return {
-      vatPercent: categoryTax,
+      vatPercent: normalizeVatRate(categoryTax, 13.0),
       source: "CATEGORY",
       pricesIncludeVat,
     };
@@ -154,7 +154,7 @@ export async function resolveProductVat(
 
   // Tier 3: Global Admin setting
   return {
-    vatPercent: globalVat,
+    vatPercent: normalizeVatRate(globalVat, 13.0),
     source: "GLOBAL_SETTING",
     pricesIncludeVat,
   };

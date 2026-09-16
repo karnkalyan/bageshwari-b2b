@@ -61,6 +61,19 @@ async function start() {
     console.warn("Notice: prisma db push warning:", err.message);
   }
 
+  // Normalize any legacy fractional VAT values (e.g. 0.13 -> 13.00) in database
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+    await prisma.$executeRawUnsafe(`UPDATE Product SET taxPercent = taxPercent * 100 WHERE taxPercent > 0 AND taxPercent <= 1.0`);
+    await prisma.$executeRawUnsafe(`UPDATE ProductCategory SET taxPercent = taxPercent * 100 WHERE taxPercent > 0 AND taxPercent <= 1.0`);
+    await prisma.$executeRawUnsafe(`UPDATE CompanyProfile SET defaultVatPercent = defaultVatPercent * 100 WHERE defaultVatPercent > 0 AND defaultVatPercent <= 1.0`);
+    await prisma.$disconnect();
+    console.log("✓ Verified and normalized database VAT percentages.");
+  } catch (err) {
+    console.warn("Notice: VAT percentage normalization skipped:", err.message);
+  }
+
   // Seed initial data if required
   try {
     console.log("Seeding initial data if required (prisma db seed)...");

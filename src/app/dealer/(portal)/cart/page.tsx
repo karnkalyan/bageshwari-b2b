@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTenantContext } from "@/lib/tenant";
 import { getDealerCart } from "@/services/cart.service";
-import { getCompanyVatSetting } from "@/services/vat.service";
+import { getCompanyVatSetting, normalizeVatRate } from "@/services/vat.service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +83,8 @@ export default async function DealerCartPage() {
               const dp = Number(item.dealerPrice);
               const mrp = Number(item.mrp);
               const lineTotal = Number(item.lineTotal);
-              const itemVatRate = qty > 0 && item.taxAmount ? Number(((Number(item.taxAmount) / (dp * qty)) * 100).toFixed(1)) : companyVat.defaultVatPercent;
+              const rawRate = qty > 0 && item.taxAmount ? Number(((Number(item.taxAmount) / (dp * qty)) * 100).toFixed(1)) : companyVat.defaultVatPercent;
+              const itemVatRate = normalizeVatRate(rawRate, companyVat.defaultVatPercent);
               const dealerPriceInclVat = qty > 0 ? Number((lineTotal / qty).toFixed(2)) : Number((dp * (1 + itemVatRate / 100)).toFixed(2));
               const discountPercent = mrp > 0 && dealerPriceInclVat < mrp ? Math.round(((mrp - dealerPriceInclVat) / mrp) * 100) : 0;
 

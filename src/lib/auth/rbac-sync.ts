@@ -45,6 +45,15 @@ export async function ensureRbacPermissions(sellerId?: string) {
         });
       }
     }
+
+    // Normalize any legacy fractional VAT values (e.g. 0.13 -> 13.00) in database
+    try {
+      await prisma.$executeRawUnsafe(`UPDATE Product SET taxPercent = taxPercent * 100 WHERE taxPercent > 0 AND taxPercent <= 1.0`);
+      await prisma.$executeRawUnsafe(`UPDATE ProductCategory SET taxPercent = taxPercent * 100 WHERE taxPercent > 0 AND taxPercent <= 1.0`);
+      await prisma.$executeRawUnsafe(`UPDATE CompanyProfile SET defaultVatPercent = defaultVatPercent * 100 WHERE defaultVatPercent > 0 AND defaultVatPercent <= 1.0`);
+    } catch {
+      // ignore
+    }
   } catch (err) {
     console.warn("Failed to ensure RBAC permissions:", err);
   }
