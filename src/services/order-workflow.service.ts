@@ -512,11 +512,17 @@ export async function dealerConfirmOrder(input: {
     }
 
     if (currentStatus === "FINAL_ORDER_CONFIRMED" && order.proformaInvoices[0]) {
+      // Advance to PROFORMA_INVOICE_GENERATED using system workflow context because the Proforma
+      // was already created/updated by the Accountant and the Dealer is accepting it.
       await transitionOrderStatusInTransaction(tx, {
         sellerId: input.sellerId,
         orderId: order.id,
         targetStatus: "PROFORMA_INVOICE_GENERATED",
-        actor: input.actor,
+        actor: {
+          userId: input.actor.userId,
+          permissions: ["proforma.generate"],
+          roles: input.actor.roles,
+        },
         reason: "Dealer accepted revised order. Proforma Invoice ready for payment.",
       });
     }

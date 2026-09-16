@@ -163,6 +163,16 @@ const rolePermissionsMap: Record<string, string[]> = {
   DEALER_OWNER: [
     "order.submit", "order.confirm", "proforma.confirm"
   ],
+  DEALER_ADMIN: [
+    "order.submit", "order.confirm", "proforma.confirm"
+  ],
+  DEALER_BUYER: [
+    "order.submit", "order.confirm"
+  ],
+  DEALER_ACCOUNTS_USER: [
+    "order.confirm", "proforma.confirm"
+  ],
+  DEALER_VIEWER: [],
 };
 
 export function isActorAuthorizedForTransition(actor: TransitionActor, targetStatus: OrderStatus): boolean {
