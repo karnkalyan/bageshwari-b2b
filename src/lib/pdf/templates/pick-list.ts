@@ -41,7 +41,7 @@ export async function renderPickListPdf(data: PickListData): Promise<Uint8Array>
     borderWidth: 0.75,
   });
 
-  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS PVT. LTD.", MARGIN + 12, y - 18, {
+  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS", MARGIN + 12, y - 18, {
     size: 12,
     font: bold,
     color: COLORS.primary,
@@ -61,11 +61,13 @@ export async function renderPickListPdf(data: PickListData): Promise<Uint8Array>
     size: 13,
     color: COLORS.primary,
   });
-  drawRightText(page, `Pick List #: ${data.pickListNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 32, bold, {
+  const cleanPickListNo = (data.pickListNumber || "").replace(/--+/g, "-");
+  drawRightText(page, `Pick List #: ${cleanPickListNo}`, MARGIN + CONTENT_WIDTH - 12, y - 32, bold, {
     size: 9,
     color: COLORS.primary,
   });
-  drawRightText(page, `Order #: ${data.orderNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 44, regular, {
+  const cleanOrderNo = (data.orderNumber || "").replace(/--+/g, "-");
+  drawRightText(page, `Order #: ${cleanOrderNo}`, MARGIN + CONTENT_WIDTH - 12, y - 44, regular, {
     size: 8.5,
     color: COLORS.secondary,
   });

@@ -53,27 +53,37 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
 
   let companyRaw: any = null;
   try {
-    const rows = await prisma.$queryRaw<any[]>`SELECT * FROM CompanyProfile WHERE id = 'bageshwari-tractors' LIMIT 1`.catch(() => []);
-    companyRaw = rows?.[0] || null;
+    companyRaw = await prisma.companyProfile.findFirst({
+      where: {
+        OR: [
+          ...(ctx.sellerId ? [{ sellerId: ctx.sellerId }] : []),
+          { id: "bageshwari-tractors" },
+        ],
+      },
+    }).catch(() => null);
+
+    if (!companyRaw) {
+      companyRaw = await prisma.companyProfile.findFirst().catch(() => null);
+    }
   } catch {
     // fallback
   }
 
   const serializedCompany: SerializedCompanyProfile = {
-    companyName: seller?.legalName || companyRaw?.companyName || "Bageshwari Tractors Pvt. Ltd.",
-    tradingName: seller?.tradingName || companyRaw?.tradingName || "Bageshwari Tractors",
+    companyName: companyRaw?.companyName || seller?.legalName || "Bageshwari Tractors",
+    tradingName: companyRaw?.tradingName || seller?.tradingName || "Bageshwari Tractors",
     contactPerson: companyRaw?.contactPerson || "Managing Director",
-    email: seller?.email || companyRaw?.email || "info@bageshwari.com.np",
-    phone: seller?.phone || companyRaw?.phone || "+977-81-520123",
-    website: seller?.website || companyRaw?.website || "https://bageshwari.com.np",
-    country: seller?.country || companyRaw?.country || "Nepal",
-    province: seller?.province || companyRaw?.province || "Lumbini Province",
-    district: seller?.district || companyRaw?.district || "Banke",
-    city: seller?.city || companyRaw?.city || "Nepalgunj",
-    address: seller?.addressLine1 || companyRaw?.address || "Main Highway Road, Nepalgunj",
-    panNumber: seller?.taxNumber || companyRaw?.panNumber || "302918239",
-    vatNumber: seller?.taxNumber || companyRaw?.vatNumber || companyRaw?.panNumber || "302918239",
-    registrationNumber: seller?.registrationNumber || companyRaw?.registrationNumber || "29384/078/079",
+    email: companyRaw?.email || seller?.email || "info@bageshwari.com.np",
+    phone: companyRaw?.phone || seller?.phone || "+977-81-520123",
+    website: companyRaw?.website || seller?.website || "https://bageshwari.com.np",
+    country: companyRaw?.country || seller?.country || "Nepal",
+    province: companyRaw?.province || seller?.province || "Lumbini Province",
+    district: companyRaw?.district || seller?.district || "Banke",
+    city: companyRaw?.city || seller?.city || "Nepalgunj",
+    address: companyRaw?.address || seller?.addressLine1 || "Nepalgunj, Banke",
+    panNumber: companyRaw?.panNumber || seller?.taxNumber || "302918239",
+    vatNumber: companyRaw?.vatNumber || companyRaw?.panNumber || seller?.taxNumber || "302918239",
+    registrationNumber: companyRaw?.registrationNumber || seller?.registrationNumber || "29384/078/079",
     defaultVatPercent: companyRaw?.defaultVatPercent
       ? Number(companyRaw.defaultVatPercent) > 0 && Number(companyRaw.defaultVatPercent) <= 1.0
         ? Number(companyRaw.defaultVatPercent) * 100
@@ -81,7 +91,7 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
       : 13.0,
     pricesIncludeVat: Boolean(companyRaw?.pricesIncludeVat),
     bankName: companyRaw?.bankName || "NIC ASIA Bank Ltd.",
-    bankAccountName: companyRaw?.bankAccountName || "Bageshwari Tractors Pvt. Ltd.",
+    bankAccountName: companyRaw?.bankAccountName || companyRaw?.companyName || "Bageshwari Tractors",
     bankAccountNumber: companyRaw?.bankAccountNumber || "0194291823901928",
     bankBranch: companyRaw?.bankBranch || "Nepalgunj Main Branch",
     bankSwiftCode: companyRaw?.bankSwiftCode || "NICA-NP",

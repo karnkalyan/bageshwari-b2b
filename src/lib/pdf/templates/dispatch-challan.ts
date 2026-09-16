@@ -6,6 +6,7 @@ import {
   drawRightText,
   drawCenteredText,
   drawBox,
+  formatFullAddress,
   generateBarcodeImage,
   generateQrImage,
 } from "../helpers";
@@ -19,22 +20,25 @@ export interface PackageManifestDto {
 
 export interface DispatchChallanData {
   challanNumber: string;
-  shipmentNumber: string;
+  shipmentNumber?: string | null;
   dispatchDate: Date | string;
   orderNumber: string;
   invoiceNumber?: string | null;
-  company: CompanyInfo;
-  dealer: DealerInfo;
-  transporterName: string;
+  transporterName?: string | null;
+  transportCompanyName?: string | null;
+  vehicleNumber?: string | null;
   driverName?: string | null;
   driverPhone?: string | null;
-  vehicleNumber?: string | null;
   trackingNumber?: string | null;
-  totalCartons: number;
-  totalWeight: number;
+  company: CompanyInfo;
+  dealer: DealerInfo;
   packages: PackageManifestDto[];
+  items: LineItemDto[];
+  totalCartons?: number;
+  totalPackages?: number;
+  totalWeight?: number;
   remarks?: string | null;
-  verificationUrl?: string;
+  verificationUrl?: string | null;
 }
 
 export async function renderDispatchChallanPdf(data: DispatchChallanData): Promise<Uint8Array> {
@@ -56,17 +60,23 @@ export async function renderDispatchChallanPdf(data: DispatchChallanData): Promi
     borderWidth: 1,
   });
 
-  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS PVT. LTD.", MARGIN + 12, y - 18, {
+  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS", MARGIN + 12, y - 18, {
     size: 13,
     font: bold,
     color: COLORS.primary,
   });
-  drawText(page, `${data.company.address || "Main Road"}, ${data.company.city || "Nepalgunj"}, ${data.company.district || "Banke"}, Nepal`, MARGIN + 12, y - 32, {
+  const companyAddress = formatFullAddress(
+    data.company.address,
+    data.company.city,
+    data.company.district,
+    "Nepal"
+  );
+  drawText(page, companyAddress, MARGIN + 12, y - 32, {
     size: 8,
     font: regular,
     color: COLORS.secondary,
   });
-  drawText(page, `Ph: ${data.company.phone || "+977-81-520123"} | PAN: ${data.company.panNumber || "302918239"}`, MARGIN + 12, y - 44, {
+  drawText(page, `Ph: ${data.company.phone || "+977-81-520123"} | PAN: ${data.company.panNumber || data.company.vatNumber || "302918239"}`, MARGIN + 12, y - 44, {
     size: 8,
     font: regular,
     color: COLORS.secondary,
@@ -86,7 +96,8 @@ export async function renderDispatchChallanPdf(data: DispatchChallanData): Promi
     size: 7,
     color: COLORS.danger,
   });
-  drawRightText(page, `Challan #: ${data.challanNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 44, bold, {
+  const cleanChallanNumber = (data.challanNumber || "").replace(/--+/g, "-");
+  drawRightText(page, `Challan #: ${cleanChallanNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 44, bold, {
     size: 9,
     color: COLORS.primary,
   });

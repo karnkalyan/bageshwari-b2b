@@ -9,6 +9,7 @@ import {
   drawCenteredText,
   drawBox,
   formatNpr,
+  formatFullAddress,
   generateBarcodeImage,
   generateQrImage,
 } from "../helpers";
@@ -31,7 +32,7 @@ export interface TaxInvoiceData {
   grandTotal: number;
   paymentTerms?: string | null;
   remarks?: string | null;
-  verificationUrl?: string;
+  verificationUrl?: string | null;
 }
 
 export async function renderTaxInvoicePdf(data: TaxInvoiceData): Promise<Uint8Array> {
@@ -54,12 +55,18 @@ export async function renderTaxInvoicePdf(data: TaxInvoiceData): Promise<Uint8Ar
   });
 
   // Company Information (Left)
-  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS PVT. LTD.", MARGIN + 12, y - 18, {
+  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS", MARGIN + 12, y - 18, {
     size: 13,
     font: bold,
     color: COLORS.primary,
   });
-  drawText(page, `${data.company.address || "Main Road"}, ${data.company.city || "Nepalgunj"}, ${data.company.district || "Banke"}, Nepal`, MARGIN + 12, y - 32, {
+  const companyAddress = formatFullAddress(
+    data.company.address,
+    data.company.city,
+    data.company.district,
+    "Nepal"
+  );
+  drawText(page, companyAddress, MARGIN + 12, y - 32, {
     size: 8,
     font: regular,
     color: COLORS.secondary,
@@ -84,7 +91,8 @@ export async function renderTaxInvoicePdf(data: TaxInvoiceData): Promise<Uint8Ar
     size: 7,
     color: COLORS.danger,
   });
-  drawRightText(page, `Invoice No: ${data.invoiceNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 46, bold, {
+  const cleanInvoiceNo = (data.invoiceNumber || "").replace(/--+/g, "-");
+  drawRightText(page, `Invoice No: ${cleanInvoiceNo}`, MARGIN + CONTENT_WIDTH - 12, y - 46, bold, {
     size: 9,
     color: COLORS.primary,
   });

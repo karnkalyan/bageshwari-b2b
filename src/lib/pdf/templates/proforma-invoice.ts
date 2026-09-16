@@ -7,6 +7,7 @@ import {
   drawCenteredText,
   drawBox,
   formatNpr,
+  formatFullAddress,
   generateBarcodeImage,
   generateQrImage,
 } from "../helpers";
@@ -28,7 +29,7 @@ export interface ProformaInvoiceData {
   paymentTerms?: string | null;
   creditTerms?: string | null;
   remarks?: string | null;
-  verificationUrl?: string;
+  verificationUrl?: string | null;
 }
 
 export async function renderProformaInvoicePdf(data: ProformaInvoiceData): Promise<Uint8Array> {
@@ -43,20 +44,20 @@ export async function renderProformaInvoicePdf(data: ProformaInvoiceData): Promi
   let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN;
 
-  // 1. TOP NOTICE BADGE
-  drawBox(page, MARGIN, y - 18, CONTENT_WIDTH, 18, {
-    color: COLORS.bgLight,
-    borderColor: COLORS.danger,
+  // 1. TOP HEADER BANNER (Proforma Notice - Non-negotiable indicator)
+  drawBox(page, MARGIN, y - 24, CONTENT_WIDTH, 24, {
+    color: COLORS.bgHeader,
+    borderColor: COLORS.border,
     borderWidth: 0.75,
   });
-  drawCenteredText(page, "PROFORMA INVOICE  —  COMMERCIAL ESTIMATE & QUOTATION  (NOT A TAX INVOICE)", MARGIN + CONTENT_WIDTH / 2, y - 13, bold, {
-    size: 7.5,
-    color: COLORS.danger,
+  drawCenteredText(page, "PROFORMA INVOICE COMMERCIAL ESTIMATE & QUOTATION (NOT A TAX INVOICE)", PAGE_WIDTH / 2, y - 16, bold, {
+    size: 8.5,
+    color: COLORS.primary,
   });
 
-  y -= 26;
+  y -= 30;
 
-  // 2. COMPANY & PROFORMA HEADER
+  // 2. COMPANY & INVOICE HEADER BOX
   drawBox(page, MARGIN, y - 64, CONTENT_WIDTH, 64, {
     color: COLORS.white,
     borderColor: COLORS.border,
@@ -64,22 +65,28 @@ export async function renderProformaInvoicePdf(data: ProformaInvoiceData): Promi
   });
 
   // Company Details (Left)
-  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS PVT. LTD.", MARGIN + 12, y - 18, {
+  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS", MARGIN + 12, y - 18, {
     size: 13,
     font: bold,
     color: COLORS.primary,
   });
-  drawText(page, `${data.company.address || "Main Road"}, ${data.company.city || "Nepalgunj"}, ${data.company.district || "Banke"}, Nepal`, MARGIN + 12, y - 32, {
+  const companyAddress = formatFullAddress(
+    data.company.address,
+    data.company.city,
+    data.company.district,
+    "Nepal"
+  );
+  drawText(page, companyAddress, MARGIN + 12, y - 32, {
     size: 8,
     font: regular,
     color: COLORS.secondary,
   });
-  drawText(page, `Tel: ${data.company.phone || "+977-81-520123"} | Email: ${data.company.email || "orders@bageshwari.com.np"}`, MARGIN + 12, y - 44, {
+  drawText(page, `Tel: ${data.company.phone || "+977-81-520123"} | Email: ${data.company.email || "info@bageshwari.com.np"}`, MARGIN + 12, y - 44, {
     size: 8,
     font: regular,
     color: COLORS.secondary,
   });
-  drawText(page, `PAN No: ${data.company.panNumber || "302918239"}`, MARGIN + 12, y - 56, {
+  drawText(page, `PAN No: ${data.company.panNumber || data.company.vatNumber || "302918239"}`, MARGIN + 12, y - 56, {
     size: 8.5,
     font: bold,
     color: COLORS.primary,
@@ -90,7 +97,8 @@ export async function renderProformaInvoicePdf(data: ProformaInvoiceData): Promi
     size: 13,
     color: COLORS.primary,
   });
-  drawRightText(page, `PI No: ${data.proformaNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 34, bold, {
+  const cleanProformaNumber = (data.proformaNumber || "").replace(/--+/g, "-");
+  drawRightText(page, `PI No: ${cleanProformaNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 34, bold, {
     size: 9,
     color: COLORS.primary,
   });

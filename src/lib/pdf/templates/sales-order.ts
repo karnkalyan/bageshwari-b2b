@@ -7,6 +7,7 @@ import {
   drawCenteredText,
   drawBox,
   formatNpr,
+  formatFullAddress,
   generateBarcodeImage,
   generateQrImage,
 } from "../helpers";
@@ -49,17 +50,23 @@ export async function renderSalesOrderPdf(data: SalesOrderData): Promise<Uint8Ar
     borderWidth: 1,
   });
 
-  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS PVT. LTD.", MARGIN + 12, y - 18, {
+  drawText(page, data.company.legalName || "BAGESHWARI TRACTORS", MARGIN + 12, y - 18, {
     size: 13,
     font: bold,
     color: COLORS.primary,
   });
-  drawText(page, `${data.company.address || "Nepalgunj"}, Nepal | Ph: ${data.company.phone || "+977-81-520123"}`, MARGIN + 12, y - 32, {
+  const companyAddress = formatFullAddress(
+    data.company.address,
+    data.company.city,
+    data.company.district,
+    "Nepal"
+  );
+  drawText(page, `${companyAddress} | Ph: ${data.company.phone || "+977-81-520123"}`, MARGIN + 12, y - 32, {
     size: 8,
     font: regular,
     color: COLORS.secondary,
   });
-  drawText(page, `B2B Order Confirmation | PAN: ${data.company.panNumber || "302918239"}`, MARGIN + 12, y - 44, {
+  drawText(page, `B2B Order Confirmation | PAN: ${data.company.panNumber || data.company.vatNumber || "302918239"}`, MARGIN + 12, y - 44, {
     size: 8,
     font: bold,
     color: COLORS.primary,
@@ -69,7 +76,8 @@ export async function renderSalesOrderPdf(data: SalesOrderData): Promise<Uint8Ar
     size: 14,
     color: COLORS.primary,
   });
-  drawRightText(page, `Order #: ${data.orderNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 32, bold, {
+  const cleanOrderNo = (data.orderNumber || "").replace(/--+/g, "-");
+  drawRightText(page, `Order #: ${cleanOrderNo}`, MARGIN + CONTENT_WIDTH - 12, y - 32, bold, {
     size: 9,
     color: COLORS.primary,
   });

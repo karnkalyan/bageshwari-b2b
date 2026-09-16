@@ -7,10 +7,12 @@ export async function nextDocumentNumber(
   prefix: string,
 ) {
   const year = new Date().getFullYear();
+  const cleanBasePrefix = prefix.replace(/[-_\s]+$/g, "");
   const sequence = await tx.numberSequence.upsert({
     where: { sellerId_entityType: { sellerId, entityType: `${entityType}-${year}` } },
-    update: { lastNumber: { increment: 1 }, prefix, padLength: 6 },
-    create: { sellerId, entityType: `${entityType}-${year}`, prefix, lastNumber: 1, padLength: 6 },
+    update: { lastNumber: { increment: 1 }, prefix: cleanBasePrefix, padLength: 6 },
+    create: { sellerId, entityType: `${entityType}-${year}`, prefix: cleanBasePrefix, lastNumber: 1, padLength: 6 },
   });
-  return `${prefix}-${year}-${String(sequence.lastNumber).padStart(sequence.padLength, "0")}`;
+  const cleanPrefix = (sequence.prefix || cleanBasePrefix || "DOC").replace(/[-_\s]+$/g, "");
+  return `${cleanPrefix}-${year}-${String(sequence.lastNumber).padStart(sequence.padLength, "0")}`;
 }

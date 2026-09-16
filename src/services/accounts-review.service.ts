@@ -15,13 +15,15 @@ async function nextDocumentNumber(
   entityType: string,
   prefix: string,
 ) {
+  const cleanBasePrefix = prefix.replace(/[-_\s]+$/g, "");
   const sequence = await tx.numberSequence.upsert({
     where: { sellerId_entityType: { sellerId, entityType } },
     update: { lastNumber: { increment: 1 } },
-    create: { sellerId, entityType, prefix, lastNumber: 1, padLength: 5 },
+    create: { sellerId, entityType, prefix: cleanBasePrefix, lastNumber: 1, padLength: 5 },
   });
 
-  return `${sequence.prefix}-${String(sequence.lastNumber).padStart(sequence.padLength, "0")}`;
+  const cleanPrefix = (sequence.prefix || cleanBasePrefix || "DOC").replace(/[-_\s]+$/g, "");
+  return `${cleanPrefix}-${String(sequence.lastNumber).padStart(sequence.padLength, "0")}`;
 }
 
 export type ReviseOrderItemInput = {

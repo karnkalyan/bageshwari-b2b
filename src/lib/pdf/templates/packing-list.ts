@@ -6,6 +6,7 @@ import {
   drawRightText,
   drawCenteredText,
   drawBox,
+  formatFullAddress,
   generateBarcodeImage,
   generateQrImage,
 } from "../helpers";
@@ -69,15 +70,21 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
     borderWidth: 1,
   });
 
-  drawText(page, (data.company.tradingName || data.company.legalName || "BAGESHWARI TRACTORS PVT. LTD.").toUpperCase(), MARGIN + 12, y - 18, {
+  drawText(page, (data.company.tradingName || data.company.legalName || "BAGESHWARI TRACTORS").toUpperCase(), MARGIN + 12, y - 18, {
     size: 13,
     font: bold,
     color: COLORS.primary,
   });
 
+  const companyAddress = formatFullAddress(
+    data.company.address,
+    data.company.city,
+    data.company.district,
+    "Nepal"
+  );
   drawText(
     page,
-    `${data.company.address || "Main Highway Road"}, ${data.company.city || "Nepalgunj"}, Nepal | PAN: ${data.company.panNumber || "302918239"} | Ph: ${data.company.phone || "+977-81-520123"}`,
+    `${companyAddress} | PAN: ${data.company.panNumber || data.company.vatNumber || "302918239"} | Ph: ${data.company.phone || "+977-81-520123"}`,
     MARGIN + 12,
     y - 32,
     { size: 7.5, font: regular, color: COLORS.secondary }
@@ -104,7 +111,8 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
     size: 7,
     color: COLORS.danger,
   });
-  drawRightText(page, `Packing List #: ${data.packingListNumber}`, MARGIN + CONTENT_WIDTH - 12, y - 44, bold, {
+  const cleanPackingListNo = (data.packingListNumber || "").replace(/--+/g, "-");
+  drawRightText(page, `Packing List #: ${cleanPackingListNo}`, MARGIN + CONTENT_WIDTH - 12, y - 44, bold, {
     size: 8.5,
     color: COLORS.primary,
   });

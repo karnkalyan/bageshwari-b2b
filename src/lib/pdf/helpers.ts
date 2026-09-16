@@ -41,6 +41,40 @@ export function sanitizeText(text: string | null | undefined): string {
   return text.replace(/[^\x20-\x7E]/g, "").trim();
 }
 
+/**
+ * Combines address segments (street, city, district, country) into a clean,
+ * deduplicated comma-separated string without repetition.
+ */
+export function formatFullAddress(
+  address?: string | null,
+  city?: string | null,
+  district?: string | null,
+  country?: string | null
+): string {
+  const parts: string[] = [];
+
+  const addPart = (part?: string | null) => {
+    if (!part) return;
+    const clean = part.trim();
+    if (!clean) return;
+    const segments = clean.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const seg of segments) {
+      const lower = seg.toLowerCase();
+      const exists = parts.some((p) => p.toLowerCase() === lower);
+      if (!exists) {
+        parts.push(seg);
+      }
+    }
+  };
+
+  addPart(address);
+  addPart(city);
+  addPart(district);
+  addPart(country || "Nepal");
+
+  return parts.join(", ");
+}
+
 export function formatNpr(amount: number | string): string {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
   if (isNaN(num)) return "NPR 0.00";

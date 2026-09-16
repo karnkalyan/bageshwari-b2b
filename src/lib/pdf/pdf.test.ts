@@ -9,14 +9,15 @@ import {
   renderPackingListPdf,
   renderProductBarcodeLabelPdf,
 } from "./templates";
+import { formatFullAddress } from "./helpers";
 
 const mockCompany = {
-  legalName: "Bageshwari Tractors Pvt. Ltd.",
+  legalName: "Bageshwari Tractors",
   tradingName: "Bageshwari Tractors",
   panNumber: "302918239",
   vatNumber: "302918239",
   registrationNumber: "29384/078/079",
-  address: "Main Highway Road",
+  address: "Nepalgunj, Banke",
   city: "Nepalgunj",
   district: "Banke",
   province: "Lumbini Province",
@@ -24,7 +25,7 @@ const mockCompany = {
   email: "info@bageshwari.com.np",
   website: "https://bageshwari.com.np",
   bankName: "NIC ASIA Bank Ltd.",
-  bankAccountName: "Bageshwari Tractors Pvt. Ltd.",
+  bankAccountName: "Bageshwari Tractors",
   bankAccountNumber: "0194291823901928",
   bankBranch: "Nepalgunj Main Branch",
   bankSwiftCode: "NICA-NP",
@@ -176,6 +177,7 @@ describe("PDF Template Renderers", () => {
       vehicleNumber: "Lu 1 Kha 8832",
       totalCartons: 3,
       totalWeight: 42.5,
+      items: mockItems,
       packages: [
         { packageNumber: "PKG-2026-00045", packageType: "Heavy Box", weight: 14.5 },
         { packageNumber: "PKG-2026-00046", packageType: "Heavy Box", weight: 15.0 },
@@ -262,5 +264,47 @@ describe("PDF Template Renderers", () => {
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(bytes.length).toBeGreaterThan(1000);
     expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+  });
+
+  describe("formatFullAddress helper", () => {
+    it("deduplicates address when address already contains city, district, and country", () => {
+      const formatted = formatFullAddress(
+        "Main Highway Road, Nepalgunj, Banke, Nepal",
+        "Nepalgunj",
+        "Banke",
+        "Nepal"
+      );
+      expect(formatted).toBe("Main Highway Road, Nepalgunj, Banke, Nepal");
+    });
+
+    it("deduplicates address when address has street and city/district only", () => {
+      const formatted = formatFullAddress(
+        "Nepalgunj, Banke",
+        "Nepalgunj",
+        "Banke",
+        "Nepal"
+      );
+      expect(formatted).toBe("Nepalgunj, Banke, Nepal");
+    });
+
+    it("combines distinct street, city, district, and country without repeating", () => {
+      const formatted = formatFullAddress(
+        "Main Highway Road",
+        "Nepalgunj",
+        "Banke",
+        "Nepal"
+      );
+      expect(formatted).toBe("Main Highway Road, Nepalgunj, Banke, Nepal");
+    });
+
+    it("handles missing address gracefully", () => {
+      const formatted = formatFullAddress(
+        null,
+        "Nepalgunj",
+        "Banke",
+        "Nepal"
+      );
+      expect(formatted).toBe("Nepalgunj, Banke, Nepal");
+    });
   });
 });

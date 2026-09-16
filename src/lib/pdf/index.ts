@@ -30,11 +30,11 @@ export type OrderDocumentKind =
 
 function mapCompany(company: any, seller?: any): CompanyInfo {
   return {
-    legalName: company?.companyName || seller?.legalName || company?.legalName || "Bageshwari Tractors Pvt. Ltd.",
+    legalName: company?.companyName || seller?.legalName || company?.legalName || "Bageshwari Tractors",
     tradingName: company?.tradingName || seller?.tradingName || company?.companyName || "Bageshwari Tractors",
     panNumber: company?.panNumber || company?.vatNumber || seller?.taxNumber || "302918239",
     vatNumber: company?.vatNumber || company?.panNumber || seller?.taxNumber || "302918239",
-    registrationNumber: company?.registrationNumber || seller?.registrationNumber || "",
+    registrationNumber: company?.registrationNumber || seller?.registrationNumber || "29384/078/079",
     address: company?.address || seller?.addressLine1 || "Nepalgunj, Banke",
     city: company?.city || seller?.city || "Nepalgunj",
     district: company?.district || seller?.district || "Banke",
@@ -43,7 +43,7 @@ function mapCompany(company: any, seller?: any): CompanyInfo {
     email: company?.email || seller?.email || "info@bageshwari.com.np",
     website: company?.website || seller?.website || "https://bageshwari.com.np",
     bankName: company?.bankName || "NIC ASIA Bank Ltd.",
-    bankAccountName: company?.bankAccountName || company?.companyName || seller?.legalName || "Bageshwari Tractors Pvt. Ltd.",
+    bankAccountName: company?.bankAccountName || company?.companyName || seller?.legalName || "Bageshwari Tractors",
     bankAccountNumber: company?.bankAccountNumber || "0194291823901928",
     bankBranch: company?.bankBranch || "Nepalgunj Main Branch",
     bankSwiftCode: company?.bankSwiftCode || "NICA-NP",
@@ -77,14 +77,27 @@ async function getCompanyProfileSafe(sellerId?: string): Promise<{ profile: any;
         where: { id: sellerId },
       }).catch(() => null);
 
-      profile = await prisma.companyProfile.findUnique({
-        where: { sellerId },
+      profile = await prisma.companyProfile.findFirst({
+        where: {
+          OR: [{ sellerId }, { id: "bageshwari-tractors" }],
+        },
+      }).catch(() => null);
+    }
+
+    if (!seller) {
+      seller = await prisma.seller.findFirst({
+        where: { status: "ACTIVE" },
       }).catch(() => null);
     }
 
     if (!profile) {
-      profile = await prisma.companyProfile.findUnique({
-        where: { id: "bageshwari-tractors" },
+      profile = await prisma.companyProfile.findFirst({
+        where: {
+          OR: [
+            ...(seller?.id ? [{ sellerId: seller.id }] : []),
+            { id: "bageshwari-tractors" },
+          ],
+        },
       }).catch(() => null);
     }
 
@@ -135,7 +148,8 @@ export async function generateOrderPdf(
   // 1. FINAL TAX INVOICE
   if (kind === "final-invoice") {
     const finalInv = order.finalInvoices[0];
-    const invoiceNumber = finalInv?.invoiceNumber || `INV-${order.orderNumber.replace(/^[A-Za-z]+-?/, "")}`;
+    const rawInvoiceNumber = finalInv?.invoiceNumber || `INV-${order.orderNumber.replace(/^[A-Za-z]+[-_]?/, "")}`;
+    const invoiceNumber = rawInvoiceNumber.replace(/-+/g, "-");
     const issueDate = finalInv?.createdAt || new Date();
 
     const items: LineItemDto[] = (finalInv?.items && finalInv.items.length > 0
@@ -187,7 +201,8 @@ export async function generateOrderPdf(
   // 2. PROFORMA INVOICE
   if (kind === "proforma") {
     const proforma = order.proformaInvoices[0];
-    const proformaNumber = proforma?.proformaNumber || `PI-${order.orderNumber.replace(/^[A-Za-z]+-?/, "")}`;
+    const rawProformaNumber = proforma?.proformaNumber || `PI-${order.orderNumber.replace(/^[A-Za-z]+[-_]?/, "")}`;
+    const proformaNumber = rawProformaNumber.replace(/-+/g, "-");
     const issueDate = proforma?.issueDate || order.createdAt;
 
     const items: LineItemDto[] = order.items.map((item, idx) => {
@@ -228,7 +243,8 @@ export async function generateOrderPdf(
   // 3. WAREHOUSE PICK LIST
   if (kind === "pick-list") {
     const pickList = order.pickLists[0];
-    const pickListNumber = pickList?.pickListNumber || `PL-${order.orderNumber.replace(/^[A-Za-z]+-?/, "")}`;
+    const rawPickListNumber = pickList?.pickListNumber || `PL-${order.orderNumber.replace(/^[A-Za-z]+[-_]?/, "")}`;
+    const pickListNumber = rawPickListNumber.replace(/-+/g, "-");
 
     const items: LineItemDto[] = order.items.map((item, idx) => {
       const approvedQty = Number(item.approvedQuantity ?? item.originalQuantity);
@@ -340,7 +356,8 @@ export async function generateOrderPdf(
   // 5. DELIVERY CHALLAN
   if (kind === "dispatch-challan") {
     const shipment = order.shipments[0];
-    const challanNumber = shipment?.challanNumber || `CHL-${order.orderNumber.replace(/^[A-Za-z]+-?/, "")}`;
+    const rawChallanNumber = shipment?.challanNumber || `CHL-${order.orderNumber.replace(/^[A-Za-z]+[-_]?/, "")}`;
+    const challanNumber = rawChallanNumber.replace(/-+/g, "-");
     const dispatchDate = shipment?.dispatchDate || new Date();
 
     const items: LineItemDto[] = order.items.map((item, idx) => {
@@ -374,6 +391,7 @@ export async function generateOrderPdf(
       company,
       dealer,
       packages,
+      items,
       totalCartons: packages.length || Number(shipment?.totalCartons || 0),
       totalWeight: Number(shipment?.totalWeight || packages.reduce((sum, p) => sum + p.weight, 0)),
       transporterName: shipment?.transporter || shipment?.transportCompany?.name || "",

@@ -7,6 +7,7 @@ import {
   drawCenteredText,
   drawBox,
   drawLine,
+  formatFullAddress,
   generateBarcodeImage,
   generateQrImage,
 } from "../helpers";
@@ -27,6 +28,8 @@ export interface PackageLabelData {
   company: CompanyInfo;
   dealer: DealerInfo;
   transporterName?: string | null;
+  deliveryCity?: string | null;
+  specialInstructions?: string | null;
   trackingUrl?: string;
 }
 
@@ -34,10 +37,9 @@ export async function renderPackageLabelPdf(data: PackageLabelData): Promise<Uin
   const ctx = await createPdfContext();
   const { pdf, regular, bold } = ctx;
 
-  // 4 x 6 inches in PDF points (1 inch = 72 points)
-  const PAGE_WIDTH = 288;
-  const PAGE_HEIGHT = 432;
-  const MARGIN = 12;
+  const PAGE_WIDTH = 283.46;
+  const PAGE_HEIGHT = 283.46;
+  const MARGIN = 10;
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
   const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -55,7 +57,7 @@ export async function renderPackageLabelPdf(data: PackageLabelData): Promise<Uin
   const fromY = PAGE_HEIGHT - MARGIN - 14;
   drawText(page, "FROM:", MARGIN + 8, fromY, { size: 7.5, font: bold, color: COLORS.black });
   
-  const companyName = (data.company.legalName || data.company.tradingName || "Bageshwari Tractors Pvt. Ltd.").toUpperCase();
+  const companyName = (data.company.legalName || data.company.tradingName || "Bageshwari Tractors").toUpperCase();
   drawText(page, companyName, MARGIN + 8, fromY - 11, {
     size: 8.5,
     font: bold,
@@ -63,10 +65,9 @@ export async function renderPackageLabelPdf(data: PackageLabelData): Promise<Uin
     maxWidth: CONTENT_WIDTH - 80,
   });
 
-  const city = data.company.city || "Nepalgunj";
-  const district = data.company.district || "Banke";
+  const fromAddress = formatFullAddress(data.company.address, data.company.city, data.company.district, "Nepal");
   const phone = data.company.phone || "+977-81-520123";
-  drawText(page, `${city}, ${district}, Nepal | Ph: ${phone}`, MARGIN + 8, fromY - 22, {
+  drawText(page, `${fromAddress} | Ph: ${phone}`, MARGIN + 8, fromY - 22, {
     size: 7,
     font: regular,
     color: COLORS.black,

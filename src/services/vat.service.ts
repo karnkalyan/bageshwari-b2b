@@ -53,8 +53,8 @@ export async function getCompanyVatSetting(sellerId?: string): Promise<{
       return {
         defaultVatPercent: normalizeVatRate(Number(profile.defaultVatPercent), 13.0),
         pricesIncludeVat: Boolean(profile.pricesIncludeVat),
-        companyName: profile.companyName || "Bageshwari Tractors Pvt. Ltd.",
-        tradingName: profile.tradingName || "Bageshwari Tractor",
+        companyName: profile.companyName || "Bageshwari Tractors",
+        tradingName: profile.tradingName || "Bageshwari Tractors",
         panNumber: profile.panNumber || profile.vatNumber || null,
         phone: profile.phone || "+977-81-520123",
         address: profile.address || "Nepalgunj, Banke",
@@ -66,8 +66,8 @@ export async function getCompanyVatSetting(sellerId?: string): Promise<{
   return {
     defaultVatPercent: 13.0,
     pricesIncludeVat: false,
-    companyName: "Bageshwari Tractors Pvt. Ltd.",
-    tradingName: "Bageshwari Tractor",
+    companyName: "Bageshwari Tractors",
+    tradingName: "Bageshwari Tractors",
     panNumber: null,
     phone: "+977-81-520123",
     address: "Nepalgunj, Banke",
