@@ -25,6 +25,10 @@ import {
   Monitor,
   Eye,
   Check,
+  QrCode,
+  Upload,
+  Trash2,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -66,6 +70,10 @@ export interface SerializedCompanyProfile {
   bankAccountNumber?: string | null;
   bankBranch?: string | null;
   bankSwiftCode?: string | null;
+  bankAccountType?: string | null;
+  merchantQrUrl?: string | null;
+  upiId?: string | null;
+  paymentInstructions?: string | null;
   // Master Dealer Credit Configuration
   enableDealerCredit?: boolean;
   defaultCreditLimit?: number;
@@ -121,6 +129,50 @@ export function AdminSettingsClient({
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [uploadingQr, setUploadingQr] = useState(false);
+  const [qrUploadError, setQrUploadError] = useState<string | null>(null);
+
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+    if (!allowed.includes(file.type)) {
+      setQrUploadError("Please upload a PNG, JPG, or WebP image file.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setQrUploadError("QR image file size must be less than 10MB.");
+      return;
+    }
+
+    setUploadingQr(true);
+    setQrUploadError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("assetType", "merchant_qr");
+
+      const res = await fetch("/api/admin/company/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.url) {
+        throw new Error(json.error || "Failed to upload QR code image.");
+      }
+
+      setCompany((prev) => ({ ...prev, merchantQrUrl: json.url }));
+    } catch (err: any) {
+      setQrUploadError(err.message || "Failed to upload image.");
+    } finally {
+      setUploadingQr(false);
+    }
+  };
 
   const handleCategoryTaxChange = (id: string, value: string) => {
     const trimmed = value.trim();
@@ -499,17 +551,144 @@ export function AdminSettingsClient({
 
         {/* 3. BANK & SETTLEMENT INFO TAB */}
         <TabsContent value="bank" className="space-y-6">
+          {/* Card A: Company Merchant QR Code Configuration */}
+          <Card className="shadow-xs border-purple-200 bg-gradient-to-br from-purple-50/40 via-white to-blue-50/20">
+            <CardHeader className="border-b pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-[#0b2d55]">
+                    <QrCode className="h-4 w-4 text-purple-600" /> Company Merchant QR Code (Fonepay / Digital Settlement)
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    Upload your official Merchant QR code image. This QR will be prominently shown to dealers during the order payment process.
+                  </CardDescription>
+                </div>
+                <Badge className="bg-purple-600 text-white font-black text-xs px-2.5 py-1 w-fit">
+                  {company.merchantQrUrl ? "Merchant QR Active" : "No QR Uploaded"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-start">
+                {/* QR Preview Box */}
+                <div className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-purple-200 bg-white shadow-2xs">
+                  {company.merchantQrUrl ? (
+                    <div className="relative group flex flex-col items-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={company.merchantQrUrl}
+                        alt="Merchant QR Code"
+                        className="h-44 w-44 object-contain rounded-lg border p-1 bg-white shadow-xs"
+                      />
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCompany({ ...company, merchantQrUrl: null })}
+                          className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 flex items-center gap-1 font-bold"
+                        >
+                          <Trash2 className="h-3 w-3" /> Remove QR
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center space-y-2">
+                      <div className="h-12 w-12 rounded-full bg-purple-50 text-purple-500 mx-auto flex items-center justify-center">
+                        <QrCode className="h-6 w-6" />
+                      </div>
+                      <div className="text-xs font-bold text-slate-700">No QR Code Image</div>
+                      <p className="text-[10px] text-slate-400 max-w-[170px]">
+                        Upload your bank or Fonepay merchant QR code (PNG, JPG, WebP)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* QR Upload Controls & Merchant Details */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Upload className="h-3.5 w-3.5 text-purple-600" /> Upload New Merchant QR Image
+                    </Label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        type="file"
+                        id="merchant-qr-input"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        onChange={handleQrUpload}
+                        disabled={uploadingQr}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="merchant-qr-input"
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-bold cursor-pointer transition shadow-2xs ${
+                          uploadingQr
+                            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                            : "bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100"
+                        }`}
+                      >
+                        {uploadingQr ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600" />
+                            <span>Uploading QR Code...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-3.5 w-3.5 text-purple-600" />
+                            <span>{company.merchantQrUrl ? "Replace QR Image" : "Choose QR Image File"}</span>
+                          </>
+                        )}
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        Supports PNG, JPG, or WebP up to 10MB.
+                      </span>
+                    </div>
+                    {qrUploadError && (
+                      <p className="text-xs text-red-600 font-semibold">{qrUploadError}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700">Merchant UPI / Fonepay ID</Label>
+                      <Input
+                        value={company.upiId || ""}
+                        onChange={(e) => setCompany({ ...company, upiId: e.target.value })}
+                        placeholder="e.g. bageshwari@nicor or 9801234567"
+                        className="mt-1 h-8 text-xs font-mono font-bold"
+                      />
+                      <span className="text-[10px] text-slate-400">Shown alongside the QR code during payment</span>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700">QR Payment Instructions</Label>
+                      <Input
+                        value={company.paymentInstructions || ""}
+                        onChange={(e) => setCompany({ ...company, paymentInstructions: e.target.value })}
+                        placeholder="e.g. Enter Order Number as remarks while scanning QR."
+                        className="mt-1 h-8 text-xs"
+                      />
+                      <span className="text-[10px] text-slate-400">Displayed below the QR code to guide dealers</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card B: Official Bank Coordinates Card */}
           <Card className="shadow-xs">
             <CardHeader className="border-b pb-3">
               <CardTitle className="text-sm font-bold flex items-center gap-2 text-[#0b2d55]">
                 <CreditCard className="h-4 w-4 text-primary" /> Official Bank & Settlement Accounts
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                These banking coordinates appear on Proforma Invoices and Dealer payment instructions.
+                These banking coordinates appear on Proforma Invoices and Dealer payment instructions during bank wire checkout.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <Label className="text-xs font-semibold">Bank Name</Label>
                   <Input
@@ -528,6 +707,15 @@ export function AdminSettingsClient({
                     className="mt-1 h-8 text-xs font-bold"
                   />
                 </div>
+                <div>
+                  <Label className="text-xs font-semibold">Account Type</Label>
+                  <Input
+                    value={company.bankAccountType || ""}
+                    onChange={(e) => setCompany({ ...company, bankAccountType: e.target.value })}
+                    placeholder="e.g. Current Account"
+                    className="mt-1 h-8 text-xs font-semibold"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -537,6 +725,7 @@ export function AdminSettingsClient({
                     value={company.bankAccountNumber || ""}
                     onChange={(e) => setCompany({ ...company, bankAccountNumber: e.target.value })}
                     className="mt-1 h-8 text-xs font-mono font-bold"
+                    placeholder="e.g. 0194291823901928"
                   />
                 </div>
                 <div>
@@ -544,14 +733,16 @@ export function AdminSettingsClient({
                   <Input
                     value={company.bankBranch || ""}
                     onChange={(e) => setCompany({ ...company, bankBranch: e.target.value })}
+                    placeholder="e.g. Nepalgunj Main Branch"
                     className="mt-1 h-8 text-xs"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-semibold">SWIFT / IFSC Code</Label>
+                  <Label className="text-xs font-semibold">SWIFT / IFSC / Branch Code</Label>
                   <Input
                     value={company.bankSwiftCode || ""}
                     onChange={(e) => setCompany({ ...company, bankSwiftCode: e.target.value })}
+                    placeholder="e.g. NICA-NP"
                     className="mt-1 h-8 text-xs font-mono"
                   />
                 </div>

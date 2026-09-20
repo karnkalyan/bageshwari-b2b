@@ -23,42 +23,79 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
   if (!ctx.dealerId) redirect("/dealer/login");
 
   const { id } = await params;
-  const order = await prisma.order.findFirst({
-    where: {
-      sellerId: ctx.sellerId,
-      dealerId: ctx.dealerId,
-      OR: [{ id }, { orderNumber: id }],
-    },
-    include: {
-      dealer: {
-        include: {
-          creditProfile: true,
-          addresses: { where: { isDefault: true }, take: 1 },
+
+  const [order, companyRaw, seller] = await Promise.all([
+    prisma.order.findFirst({
+      where: {
+        sellerId: ctx.sellerId,
+        dealerId: ctx.dealerId,
+        OR: [{ id }, { orderNumber: id }],
+      },
+      include: {
+        dealer: {
+          include: {
+            creditProfile: true,
+            addresses: { where: { isDefault: true }, take: 1 },
+          },
         },
-      },
-      items: {
-        include: {
-          product: { select: { name: true, sku: true, unitCode: true } },
-          variant: { select: { mrp: true } },
+        items: {
+          include: {
+            product: { select: { name: true, sku: true, unitCode: true } },
+            variant: { select: { mrp: true } },
+          },
         },
+        revisions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: { items: true },
+        },
+        proformaInvoices: { orderBy: { createdAt: "desc" } },
+        finalInvoices: { orderBy: { createdAt: "desc" } },
+        shipments: {
+          orderBy: { createdAt: "desc" },
+          include: { transportCompany: true, driver: true, vehicle: true, packages: true },
+        },
+        payments: { orderBy: { createdAt: "desc" } },
+        statusHistory: { orderBy: { createdAt: "desc" } },
       },
-      revisions: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        include: { items: true },
+    }),
+    prisma.companyProfile.findFirst({
+      where: {
+        OR: [
+          ...(ctx.sellerId ? [{ sellerId: ctx.sellerId }] : []),
+          { id: "bageshwari-tractors" },
+        ],
       },
-      proformaInvoices: { orderBy: { createdAt: "desc" } },
-      finalInvoices: { orderBy: { createdAt: "desc" } },
-      shipments: {
-        orderBy: { createdAt: "desc" },
-        include: { transportCompany: true, driver: true, vehicle: true, packages: true },
-      },
-      payments: { orderBy: { createdAt: "desc" } },
-      statusHistory: { orderBy: { createdAt: "desc" } },
-    },
-  });
+    }).catch(() => null),
+    prisma.seller.findUnique({
+      where: { id: ctx.sellerId },
+    }).catch(() => null),
+  ]);
 
   if (!order) notFound();
+
+  const companyMeta = (() => {
+    if (companyRaw?.socialLinksJson) {
+      try {
+        return JSON.parse(companyRaw.socialLinksJson);
+      } catch {}
+    }
+    return {};
+  })();
+
+  const companyDetails = {
+    companyName: companyRaw?.companyName || seller?.legalName || "Bageshwari Tractors",
+    tradingName: companyRaw?.tradingName || seller?.tradingName || "Bageshwari Tractors",
+    bankName: companyRaw?.bankName || "NIC ASIA Bank Ltd.",
+    bankAccountName: companyRaw?.bankAccountName || companyRaw?.companyName || "Bageshwari Tractors",
+    bankAccountNumber: companyRaw?.bankAccountNumber || "0194291823901928",
+    bankBranch: companyRaw?.bankBranch || "Nepalgunj Main Branch",
+    bankSwiftCode: companyRaw?.bankSwiftCode || "NICA-NP",
+    bankAccountType: companyMeta.bankAccountType || "Current Account",
+    merchantQrUrl: companyMeta.merchantQrUrl || null,
+    upiId: companyMeta.upiId || null,
+    paymentInstructions: companyMeta.paymentInstructions || null,
+  };
 
   const isDraft = order.status === "DRAFT";
   const proforma = order.proformaInvoices[0];
@@ -258,6 +295,7 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
         creditLimit={order.dealer?.creditProfile ? Number(order.dealer.creditProfile.creditLimit) : 0}
         availableCredit={order.dealer?.creditProfile ? Number(order.dealer.creditProfile.availableCredit) : 0}
         creditPeriodDays={order.dealer?.creditProfile?.creditPeriodDays || 0}
+        company={companyDetails}
         proforma={proforma ? {
           id: proforma.id,
           proformaNumber: proforma.proformaNumber,

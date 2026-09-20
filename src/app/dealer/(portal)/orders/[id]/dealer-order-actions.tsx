@@ -23,10 +23,27 @@ import {
   FileUp,
   Upload,
   Paperclip,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+export interface CompanyBankAndQrDetails {
+  companyName: string;
+  tradingName: string;
+  bankName: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
+  bankBranch: string;
+  bankSwiftCode: string;
+  bankAccountType?: string;
+  merchantQrUrl?: string | null;
+  upiId?: string | null;
+  paymentInstructions?: string | null;
+}
 
 export interface DealerOrderActionsProps {
   orderId: string;
@@ -38,6 +55,7 @@ export interface DealerOrderActionsProps {
   creditPeriodDays?: number;
   creditEligible?: boolean;
   holdStatus?: boolean;
+  company?: CompanyBankAndQrDetails;
   proforma?: {
     id: string;
     proformaNumber: string;
@@ -74,10 +92,19 @@ export function DealerOrderActions({
   hasSubmittedPayment = false,
   pendingPayment = null,
   rejectedPaymentRemarks = null,
+  company,
 }: DealerOrderActionsProps) {
   const router = useRouter();
   const canUseCredit = Boolean(creditEligible && !holdStatus && creditLimit > 0);
   const [method, setMethod] = useState<PaymentOption>(canUseCredit ? "CREDIT" : "ONLINE");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, key: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
   const [transactionRef, setTransactionRef] = useState("");
   const [dealerRemarks, setDealerRemarks] = useState("");
   const [receiptUrl, setReceiptUrl] = useState<string>("");
@@ -585,6 +612,165 @@ export function DealerOrderActions({
               </button>
             </div>
           </div>
+
+          {/* DYNAMIC SETTLEMENT DISPLAY: COMPANY MERCHANT QR */}
+          {method === "ONLINE" && (
+            <div className="p-4 bg-gradient-to-br from-purple-50/80 via-white to-indigo-50/50 rounded-xl border-2 border-purple-200 shadow-xs space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-purple-600 shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900">
+                      {company?.tradingName || company?.companyName || "Merchant Payment"} - Fonepay / QR Transfer
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Scan using any Mobile Banking app, eSewa, Khalti, or Fonepay to pay instantly.
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-purple-600 text-white font-bold text-xs px-2.5 py-0.5">
+                  Payable: {formatCurrency(grandTotal)}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center bg-white p-3.5 rounded-lg border border-purple-100">
+                <div className="flex flex-col items-center justify-center">
+                  {company?.merchantQrUrl ? (
+                    <div className="text-center space-y-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={company.merchantQrUrl}
+                        alt="Company Merchant QR"
+                        className="h-44 w-44 object-contain rounded-lg border p-1 bg-white shadow-xs mx-auto"
+                      />
+                      <a
+                        href={company.merchantQrUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-purple-700 font-bold hover:underline inline-flex items-center gap-1 pt-1"
+                      >
+                        <ExternalLink className="h-3 w-3" /> View full QR image
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="h-44 w-44 rounded-lg bg-slate-50 border-2 border-dashed border-purple-200 flex flex-col items-center justify-center p-3 text-center">
+                      <QrCode className="h-10 w-10 text-purple-400 mb-1" />
+                      <span className="text-[11px] font-bold text-slate-700">Official Merchant QR</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">Fonepay / Direct Merchant</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2.5 text-xs text-slate-700">
+                  <div className="p-2.5 bg-purple-50/70 rounded-md border border-purple-100">
+                    <div className="text-[10px] text-purple-800 font-bold uppercase tracking-wider">Merchant Recipient</div>
+                    <div className="font-extrabold text-slate-900 text-sm">{company?.companyName || "Bageshwari Tractors Pvt. Ltd."}</div>
+                  </div>
+
+                  {company?.upiId && (
+                    <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-md border">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Merchant UPI / Fonepay ID</span>
+                        <span className="font-mono font-bold text-purple-900">{company.upiId}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(company.upiId!, "upi")}
+                        className="h-7 text-[10px] font-bold border-purple-200 hover:bg-purple-50"
+                      >
+                        {copiedKey === "upi" ? <Check className="h-3 w-3 text-emerald-600 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                        {copiedKey === "upi" ? "Copied" : "Copy ID"}
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-slate-600 space-y-1">
+                    <div className="font-semibold text-slate-800">Payment Guide:</div>
+                    <ol className="list-decimal pl-4 space-y-0.5 text-[11px] text-slate-600">
+                      <li>Scan the QR code using your mobile banking or wallet app.</li>
+                      <li>Verify recipient displays <strong>{company?.companyName || "Bageshwari Tractors"}</strong>.</li>
+                      <li>Enter amount: <strong>{formatCurrency(grandTotal)}</strong>.</li>
+                      <li>In Remarks/Narration, enter Order #: <strong>{orderNumber}</strong>.</li>
+                      <li>After payment, enter the Fonepay Trace ID and attach receipt below.</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DYNAMIC SETTLEMENT DISPLAY: OFFICIAL BANK COORDINATES */}
+          {method === "BANK_TRANSFER" && (
+            <div className="p-4 bg-gradient-to-br from-cyan-50/80 via-white to-blue-50/50 rounded-xl border-2 border-cyan-200 shadow-xs space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-cyan-700 shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900">Official Bank Account Details (NEFT / RTGS / IPS Transfer)</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Transfer funds directly to the company bank account and attach deposit slip below.
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-cyan-700 text-white font-bold text-xs px-2.5 py-0.5">
+                  Payable: {formatCurrency(grandTotal)}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-white p-3.5 rounded-lg border border-cyan-100 text-xs">
+                <div className="p-2.5 bg-slate-50 rounded-md border">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Bank Name</span>
+                  <strong className="text-slate-900 font-bold">{company?.bankName || "NIC ASIA Bank Ltd."}</strong>
+                </div>
+
+                <div className="p-2.5 bg-slate-50 rounded-md border">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Account Holder Name</span>
+                  <strong className="text-slate-900 font-bold">{company?.bankAccountName || company?.companyName || "Bageshwari Tractors Pvt. Ltd."}</strong>
+                </div>
+
+                <div className="p-2.5 bg-cyan-50/70 rounded-md border border-cyan-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-cyan-800 block font-bold uppercase">Account Number</span>
+                    <span className="text-cyan-950 font-mono font-black text-sm">{company?.bankAccountNumber || "0194291823901928"}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(company?.bankAccountNumber || "0194291823901928", "acc")}
+                    className="h-7 text-[10px] font-bold border-cyan-300 bg-white hover:bg-cyan-50"
+                  >
+                    {copiedKey === "acc" ? <Check className="h-3 w-3 text-emerald-600 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                    {copiedKey === "acc" ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+
+                <div className="p-2.5 bg-slate-50 rounded-md border">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Branch Name</span>
+                  <span className="text-slate-800 font-semibold">{company?.bankBranch || "Nepalgunj Main Branch"}</span>
+                </div>
+
+                <div className="p-2.5 bg-slate-50 rounded-md border">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">SWIFT / IFSC Code</span>
+                  <span className="text-slate-800 font-mono font-bold">{company?.bankSwiftCode || "NICA-NP"}</span>
+                </div>
+
+                <div className="p-2.5 bg-slate-50 rounded-md border">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Account Type</span>
+                  <span className="text-slate-800 font-semibold">{company?.bankAccountType || "Current Account"}</span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-cyan-900 bg-cyan-50/50 p-2.5 rounded-lg border border-cyan-100 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-cyan-700 shrink-0" />
+                <span>
+                  Important: Please mention <strong>Order #{orderNumber}</strong> in the transfer remarks and upload the deposit slip or screenshot below.
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

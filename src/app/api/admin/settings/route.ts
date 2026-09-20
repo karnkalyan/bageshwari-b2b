@@ -26,6 +26,10 @@ const updateSettingsSchema = z.object({
   bankAccountNumber: z.string().trim().max(50).optional().nullable(),
   bankBranch: z.string().trim().max(100).optional().nullable(),
   bankSwiftCode: z.string().trim().max(20).optional().nullable(),
+  bankAccountType: z.string().trim().max(50).optional().nullable(),
+  merchantQrUrl: z.string().trim().optional().nullable(),
+  upiId: z.string().trim().max(100).optional().nullable(),
+  paymentInstructions: z.string().trim().max(1000).optional().nullable(),
   enableDealerCredit: z.boolean().optional(),
   defaultCreditLimit: z.coerce.number().min(0).optional(),
   defaultCreditPeriodDays: z.coerce.number().int().min(0).max(365).optional(),
@@ -96,8 +100,25 @@ export async function GET() {
     `.catch(() => []);
   }
 
+  let meta: any = {};
+  if (company?.socialLinksJson) {
+    try {
+      meta = JSON.parse(company.socialLinksJson);
+    } catch {}
+  }
+
+  const enrichedCompany = company
+    ? {
+        ...company,
+        merchantQrUrl: meta.merchantQrUrl || null,
+        bankAccountType: meta.bankAccountType || "Current Account",
+        upiId: meta.upiId || null,
+        paymentInstructions: meta.paymentInstructions || null,
+      }
+    : null;
+
   return apiSuccess({
-    company,
+    company: enrichedCompany,
     categories: categories.map((c) => ({
       ...c,
       taxPercent: c.taxPercent !== null && c.taxPercent !== undefined ? Number(c.taxPercent) : null,
@@ -212,10 +233,31 @@ export async function PUT(request: Request) {
               ...(companyData.defaultCreditPeriodDays !== undefined ? { defaultCreditPeriodDays: companyData.defaultCreditPeriodDays } : {}),
               ...(companyData.maxCreditLimit !== undefined ? { maxCreditLimit: new Prisma.Decimal(companyData.maxCreditLimit) } : {}),
               ...(companyData.creditTermsPolicy !== undefined ? { creditTermsPolicy: companyData.creditTermsPolicy } : {}),
-              ...(companyData.themeConfig !== undefined ? { socialLinksJson: JSON.stringify(companyData.themeConfig) } : {}),
+              socialLinksJson: (() => {
+                let existingMeta: any = {};
+                try {
+                  existingMeta = existingProfile?.socialLinksJson ? JSON.parse(existingProfile.socialLinksJson) : {};
+                } catch {}
+                const merged = {
+                  ...existingMeta,
+                  ...(companyData.themeConfig || {}),
+                  ...(companyData.merchantQrUrl !== undefined ? { merchantQrUrl: companyData.merchantQrUrl } : {}),
+                  ...(companyData.bankAccountType !== undefined ? { bankAccountType: companyData.bankAccountType } : {}),
+                  ...(companyData.upiId !== undefined ? { upiId: companyData.upiId } : {}),
+                  ...(companyData.paymentInstructions !== undefined ? { paymentInstructions: companyData.paymentInstructions } : {}),
+                };
+                return JSON.stringify(merged);
+              })(),
             },
           });
         } else {
+          const newMeta = {
+            ...(companyData.themeConfig || {}),
+            merchantQrUrl: companyData.merchantQrUrl || null,
+            bankAccountType: companyData.bankAccountType || "Current Account",
+            upiId: companyData.upiId || null,
+            paymentInstructions: companyData.paymentInstructions || null,
+          };
           await (tx.companyProfile as any).create({
             data: {
               id: "bageshwari-tractors",
@@ -238,12 +280,13 @@ export async function PUT(request: Request) {
               bankAccountName: companyData.bankAccountName || "Bageshwari Tractors",
               bankAccountNumber: companyData.bankAccountNumber || "0194291823901928",
               bankBranch: companyData.bankBranch || "Nepalgunj Main Branch",
+              bankSwiftCode: companyData.bankSwiftCode || "NICA-NP",
               enableDealerCredit: companyData.enableDealerCredit ?? true,
               defaultCreditLimit: new Prisma.Decimal(companyData.defaultCreditLimit ?? 500000),
               defaultCreditPeriodDays: companyData.defaultCreditPeriodDays ?? 30,
               maxCreditLimit: new Prisma.Decimal(companyData.maxCreditLimit ?? 5000000),
               creditTermsPolicy: companyData.creditTermsPolicy || null,
-              socialLinksJson: companyData.themeConfig ? JSON.stringify(companyData.themeConfig) : null,
+              socialLinksJson: JSON.stringify(newMeta),
             },
           });
         }

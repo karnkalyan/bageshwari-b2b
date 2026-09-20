@@ -274,13 +274,27 @@ export async function GET(request: Request) {
   });
 }
 
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
+function getCellValueString(cellValue: any): string {
+  if (cellValue === null || cellValue === undefined) return "";
+  if (typeof cellValue === "object") {
+    if (cellValue.result !== undefined && cellValue.result !== null) return String(cellValue.result).trim();
+    if (cellValue.text !== undefined && cellValue.text !== null) return String(cellValue.text).trim();
+    if (Array.isArray(cellValue.richText)) {
+      return cellValue.richText.map((rt: any) => rt.text || "").join("").trim();
+    }
+  }
+  return String(cellValue).trim();
+}
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return apiError("UNAUTHORIZED", "Authentication required.", 401);
   }
 
-  // Authorize Admin and Accounts roles
   const userRoles = await prisma.userRole.findMany({
     where: { userId: session.user.id },
     include: { role: true },
@@ -315,7 +329,6 @@ export async function POST(request: Request) {
   if (!sellerId) return apiError("SELLER_NOT_FOUND", "Seller not configured.", 404);
 
   let rawItems: BulkProductItem[] = [];
-
   const contentType = request.headers.get("content-type") || "";
 
   if (contentType.includes("multipart/form-data")) {
@@ -334,20 +347,26 @@ export async function POST(request: Request) {
       if (worksheet) {
         let headers: string[] = [];
         worksheet.eachRow((row, rowNumber) => {
-          const rowVals = (row.values as any[]).slice(1);
+          const colCount = Math.max(row.cellCount || 0, 15);
+          const rowVals: string[] = [];
+          for (let c = 1; c <= colCount; c++) {
+            rowVals.push(getCellValueString(row.getCell(c).value));
+          }
+
           if (rowNumber === 1) {
-            headers = rowVals.map((v) => String(v ?? "").trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+            headers = rowVals.map((v) => v.toLowerCase().replace(/[^a-z0-9]/g, ""));
           } else {
             const item: any = {};
             headers.forEach((h, i) => {
-              const val = rowVals[i] !== undefined && rowVals[i] !== null ? String(rowVals[i]).trim() : "";
-              if (h.includes("sku") || h.includes("code")) item.sku = val;
-              else if (h.includes("name") || h.includes("title") || h.includes("product")) item.name = val;
+              const val = rowVals[i] || "";
+              if (!h) return;
+              if (h.includes("sku") || h.includes("code") || h.includes("partno") || h.includes("itemcode")) item.sku = val;
+              else if (h.includes("name") || h.includes("title") || h.includes("product") || h.includes("item")) item.name = val;
               else if (h.includes("cat")) item.category = val;
-              else if (h.includes("brand")) item.brand = val;
-              else if (h.includes("unit")) item.unitCode = val;
+              else if (h.includes("brand") || h.includes("mfg")) item.brand = val;
+              else if (h.includes("unit") || h.includes("uom")) item.unitCode = val;
               else if (h.includes("mrp") || h.includes("retail")) item.mrp = val;
-              else if (h.includes("dealer") || h.includes("dp") || h.includes("price") || h.includes("rate")) item.dealerPrice = val;
+              else if (h.includes("dealer") || h.includes("dp") || h.includes("price") || h.includes("rate") || h.includes("wholesale")) item.dealerPrice = val;
               else if (h.includes("vat") || h.includes("tax")) item.taxPercent = val;
               else if (h.includes("stock") || h.includes("qty") || h.includes("quantity")) item.stock = val;
               else if (h.includes("desc")) item.description = val;
@@ -380,7 +399,6 @@ export async function POST(request: Request) {
       rawItems = parseCsvToItems(body.csvContent);
     }
   } else {
-    // Assume CSV text
     const text = await request.text();
     rawItems = parseCsvToItems(text);
   }
@@ -411,7 +429,7 @@ export async function POST(request: Request) {
   let updatedCount = 0;
   const errors: Array<{ sku: string; error: string }> = [];
 
-  // Group items by unique SKU to prevent intra-file duplicates
+  // Group items by unique SKU to deduplicate within the file
   const seenSkus = new Map<string, BulkProductItem>();
   for (const item of rawItems) {
     const cleanSku = String(item.sku || "").trim().toUpperCase();
@@ -425,22 +443,12 @@ export async function POST(request: Request) {
   });
   const categoryMap = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c.id]));
 
-  for (const [sku, item] of seenSkus.entries()) {
-    try {
-      const mrpNum = Math.max(0, parseFloat(String(item.mrp || 0)) || 0);
-      const dpNum = Math.max(0, parseFloat(String(item.dealerPrice || 0)) || (mrpNum > 0 ? mrpNum * 0.85 : 0));
-      const stockNum = Math.max(0, parseInt(String(item.stock || 0), 10) || 0);
-      const taxNum = item.taxPercent !== undefined && item.taxPercent !== null && item.taxPercent !== ""
-        ? parseFloat(String(item.taxPercent))
-        : 13.0;
-
-      // Ensure category exists
-      let catId: string | null = null;
-      if (item.category && item.category.trim()) {
-        const catKey = item.category.trim().toLowerCase();
-        if (categoryMap.has(catKey)) {
-          catId = categoryMap.get(catKey)!;
-        } else {
+  // Ensure all categories needed exist up front
+  for (const item of seenSkus.values()) {
+    if (item.category && item.category.trim()) {
+      const catKey = item.category.trim().toLowerCase();
+      if (!categoryMap.has(catKey)) {
+        try {
           const catCode = item.category.trim().toUpperCase().replace(/[^A-Z0-9]/g, "_").slice(0, 20) + "_" + Date.now().toString().slice(-4);
           const catSlug = item.category.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30) + "-" + Date.now().toString().slice(-4);
           const newCat = await prisma.productCategory.create({
@@ -452,165 +460,197 @@ export async function POST(request: Request) {
             },
           });
           categoryMap.set(catKey, newCat.id);
-          catId = newCat.id;
+        } catch {
+          // If concurrent create happened, re-fetch
+          const existing = await prisma.productCategory.findFirst({
+            where: { sellerId, name: item.category.trim() },
+          });
+          if (existing) categoryMap.set(catKey, existing.id);
         }
       }
+    }
+  }
 
-      // Check for existing product by SKU
-      const existingProduct = await prisma.product.findUnique({
-        where: {
-          sellerId_sku: {
-            sellerId,
-            sku,
-          },
-        },
-        include: {
-          variants: { where: { isDefault: true }, take: 1 },
-          prices: { where: { priceType: "DEFAULT_DEALER" }, take: 1 },
-          inventories: { take: 1 },
-        },
-      });
+  // Process in batches of 100 for high performance and minimal latency
+  const allItems = Array.from(seenSkus.values());
+  const BATCH_SIZE = 100;
 
-      if (existingProduct) {
-        // DO NOT CREATE DUPLICATE! UPDATE AMOUNT, QTY, AND METADATA!
-        await prisma.$transaction(async (tx) => {
-          // 1. Update Product metadata
-          await tx.product.update({
-            where: { id: existingProduct.id },
-            data: {
-              name: item.name.trim(),
-              ...(catId ? { categoryId: catId } : {}),
-              ...(item.unitCode ? { unitCode: item.unitCode.trim().toUpperCase() } : {}),
-              ...(item.description ? { shortDescription: item.description.trim() } : {}),
-              taxPercent: new Prisma.Decimal(taxNum),
-            },
-          });
+  for (let b = 0; b < allItems.length; b += BATCH_SIZE) {
+    const batch = allItems.slice(b, b + BATCH_SIZE);
+    const batchSkus = batch.map((item) => item.sku);
 
-          // 2. Update default variant MRP
-          let variantId = existingProduct.variants[0]?.id;
-          if (variantId) {
-            await tx.productVariant.update({
-              where: { id: variantId },
-              data: {
-                mrp: new Prisma.Decimal(mrpNum),
-              },
-            });
-          } else {
-            const newVar = await tx.productVariant.create({
-              data: {
-                sellerId,
-                productId: existingProduct.id,
-                name: "Standard",
-                sku,
-                mrp: new Prisma.Decimal(mrpNum),
-                isDefault: true,
-              },
-            });
-            variantId = newVar.id;
+    // Preload existing products in this batch in 1 single query
+    const existingProducts = await prisma.product.findMany({
+      where: {
+        sellerId,
+        sku: { in: batchSkus },
+      },
+      include: {
+        variants: { where: { isDefault: true }, take: 1 },
+        prices: { where: { priceType: "DEFAULT_DEALER" }, take: 1 },
+        inventories: { take: 1 },
+      },
+    });
+
+    const existingMap = new Map(existingProducts.map((p) => [p.sku.toUpperCase(), p]));
+
+    // Execute updates/creates in concurrent sub-batches of 20
+    const CONCURRENCY = 20;
+    for (let i = 0; i < batch.length; i += CONCURRENCY) {
+      const chunk = batch.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        chunk.map(async (item) => {
+          const sku = item.sku;
+          try {
+            const mrpNum = Math.max(0, parseFloat(String(item.mrp || 0)) || 0);
+            const dpNum = Math.max(0, parseFloat(String(item.dealerPrice || 0)) || (mrpNum > 0 ? mrpNum * 0.85 : 0));
+            const stockNum = Math.max(0, parseInt(String(item.stock || 0), 10) || 0);
+            const taxNum = item.taxPercent !== undefined && item.taxPercent !== null && item.taxPercent !== ""
+              ? parseFloat(String(item.taxPercent))
+              : 13.0;
+
+            const catId = item.category?.trim() ? categoryMap.get(item.category.trim().toLowerCase()) || null : null;
+            const existingProduct = existingMap.get(sku);
+
+            if (existingProduct) {
+              // Smart Upsert: Update Product, Variant MRP, Dealer Price, Stock
+              await prisma.$transaction(async (tx) => {
+                await tx.product.update({
+                  where: { id: existingProduct.id },
+                  data: {
+                    name: item.name.trim(),
+                    ...(catId ? { categoryId: catId } : {}),
+                    ...(item.unitCode ? { unitCode: item.unitCode.trim().toUpperCase() } : {}),
+                    ...(item.description ? { shortDescription: item.description.trim() } : {}),
+                    taxPercent: new Prisma.Decimal(taxNum),
+                  },
+                });
+
+                let variantId = existingProduct.variants[0]?.id;
+                if (variantId) {
+                  await tx.productVariant.update({
+                    where: { id: variantId },
+                    data: {
+                      mrp: new Prisma.Decimal(mrpNum),
+                    },
+                  });
+                } else {
+                  const newVar = await tx.productVariant.create({
+                    data: {
+                      sellerId,
+                      productId: existingProduct.id,
+                      name: "Standard",
+                      sku,
+                      mrp: new Prisma.Decimal(mrpNum),
+                      isDefault: true,
+                    },
+                  });
+                  variantId = newVar.id;
+                }
+
+                const existingPrice = existingProduct.prices[0];
+                if (existingPrice) {
+                  await tx.productPrice.update({
+                    where: { id: existingPrice.id },
+                    data: {
+                      amount: new Prisma.Decimal(dpNum),
+                    },
+                  });
+                } else {
+                  await tx.productPrice.create({
+                    data: {
+                      sellerId,
+                      productId: existingProduct.id,
+                      variantId,
+                      priceType: "DEFAULT_DEALER",
+                      amount: new Prisma.Decimal(dpNum),
+                      currencyCode: "NPR",
+                    },
+                  });
+                }
+
+                const existingInv = existingProduct.inventories[0];
+                if (existingInv) {
+                  await tx.inventory.update({
+                    where: { id: existingInv.id },
+                    data: {
+                      availableQuantity: new Prisma.Decimal(stockNum),
+                    },
+                  });
+                } else {
+                  await tx.inventory.create({
+                    data: {
+                      sellerId,
+                      warehouseId: defaultWarehouseId!,
+                      productId: existingProduct.id,
+                      variantId: variantId!,
+                      availableQuantity: new Prisma.Decimal(stockNum),
+                    },
+                  });
+                }
+              });
+
+              updatedCount++;
+            } else {
+              // Create brand new product
+              const slug = sku.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 35) + "-" + Date.now().toString().slice(-6);
+
+              await prisma.$transaction(async (tx) => {
+                const product = await tx.product.create({
+                  data: {
+                    sellerId,
+                    name: item.name.trim(),
+                    sku,
+                    slug,
+                    categoryId: catId,
+                    unitCode: item.unitCode?.trim().toUpperCase() || "PCS",
+                    shortDescription: item.description?.trim() || null,
+                    taxPercent: new Prisma.Decimal(taxNum),
+                    status: "ACTIVE",
+                    publishStatus: "PUBLISHED",
+                  },
+                });
+
+                const variant = await tx.productVariant.create({
+                  data: {
+                    sellerId,
+                    productId: product.id,
+                    name: "Standard",
+                    sku,
+                    mrp: new Prisma.Decimal(mrpNum),
+                    isDefault: true,
+                  },
+                });
+
+                await tx.productPrice.create({
+                  data: {
+                    sellerId,
+                    productId: product.id,
+                    variantId: variant.id,
+                    priceType: "DEFAULT_DEALER",
+                    amount: new Prisma.Decimal(dpNum),
+                    currencyCode: "NPR",
+                  },
+                });
+
+                await tx.inventory.create({
+                  data: {
+                    sellerId,
+                    warehouseId: defaultWarehouseId!,
+                    productId: product.id,
+                    variantId: variant.id,
+                    availableQuantity: new Prisma.Decimal(stockNum),
+                  },
+                });
+              });
+
+              createdCount++;
+            }
+          } catch (err: any) {
+            errors.push({ sku, error: err?.message || "Failed to process item." });
           }
-
-          // 3. Update or create Dealer Price
-          const existingPrice = existingProduct.prices[0];
-          if (existingPrice) {
-            await tx.productPrice.update({
-              where: { id: existingPrice.id },
-              data: {
-                amount: new Prisma.Decimal(dpNum),
-              },
-            });
-          } else {
-            await tx.productPrice.create({
-              data: {
-                sellerId,
-                productId: existingProduct.id,
-                variantId,
-                priceType: "DEFAULT_DEALER",
-                amount: new Prisma.Decimal(dpNum),
-                currencyCode: "NPR",
-              },
-            });
-          }
-
-          // 4. Update or create Inventory stock
-          const existingInv = existingProduct.inventories[0];
-          if (existingInv) {
-            await tx.inventory.update({
-              where: { id: existingInv.id },
-              data: {
-                availableQuantity: new Prisma.Decimal(stockNum),
-              },
-            });
-          } else {
-            await tx.inventory.create({
-              data: {
-                sellerId,
-                warehouseId: defaultWarehouseId!,
-                productId: existingProduct.id,
-                variantId: variantId!,
-                availableQuantity: new Prisma.Decimal(stockNum),
-              },
-            });
-          }
-        });
-
-        updatedCount++;
-      } else {
-        // Create brand new product
-        const slug = sku.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now().toString().slice(-4);
-
-        await prisma.$transaction(async (tx) => {
-          const product = await tx.product.create({
-            data: {
-              sellerId,
-              name: item.name.trim(),
-              sku,
-              slug,
-              categoryId: catId,
-              unitCode: item.unitCode?.trim().toUpperCase() || "PCS",
-              shortDescription: item.description?.trim() || null,
-              taxPercent: new Prisma.Decimal(taxNum),
-              status: "ACTIVE",
-              publishStatus: "PUBLISHED",
-            },
-          });
-
-          const variant = await tx.productVariant.create({
-            data: {
-              sellerId,
-              productId: product.id,
-              name: "Standard",
-              sku,
-              mrp: new Prisma.Decimal(mrpNum),
-              isDefault: true,
-            },
-          });
-
-          await tx.productPrice.create({
-            data: {
-              sellerId,
-              productId: product.id,
-              variantId: variant.id,
-              priceType: "DEFAULT_DEALER",
-              amount: new Prisma.Decimal(dpNum),
-              currencyCode: "NPR",
-            },
-          });
-
-          await tx.inventory.create({
-            data: {
-              sellerId,
-              warehouseId: defaultWarehouseId!,
-              productId: product.id,
-              variantId: variant.id,
-              availableQuantity: new Prisma.Decimal(stockNum),
-            },
-          });
-        });
-
-        createdCount++;
-      }
-    } catch (err: any) {
-      errors.push({ sku, error: err?.message || "Failed to process item." });
+        })
+      );
     }
   }
 
@@ -619,7 +659,10 @@ export async function POST(request: Request) {
     totalProcessed: seenSkus.size,
     createdCount,
     updatedCount,
-    errors,
+    created: createdCount,
+    updated: updatedCount,
+    errorCount: errors.length,
+    errors: errors.slice(0, 50),
   });
 }
 

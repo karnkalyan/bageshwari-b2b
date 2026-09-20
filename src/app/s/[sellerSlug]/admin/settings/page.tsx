@@ -95,6 +95,42 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
     bankAccountNumber: companyRaw?.bankAccountNumber || "0194291823901928",
     bankBranch: companyRaw?.bankBranch || "Nepalgunj Main Branch",
     bankSwiftCode: companyRaw?.bankSwiftCode || "NICA-NP",
+    bankAccountType: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.bankAccountType) return parsed.bankAccountType;
+        } catch {}
+      }
+      return "Current Account";
+    })(),
+    merchantQrUrl: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.merchantQrUrl) return parsed.merchantQrUrl;
+        } catch {}
+      }
+      return null;
+    })(),
+    upiId: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.upiId) return parsed.upiId;
+        } catch {}
+      }
+      return null;
+    })(),
+    paymentInstructions: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.paymentInstructions) return parsed.paymentInstructions;
+        } catch {}
+      }
+      return null;
+    })(),
     enableDealerCredit: companyRaw?.enableDealerCredit !== undefined ? Boolean(companyRaw.enableDealerCredit) : true,
     defaultCreditLimit: companyRaw?.defaultCreditLimit ? Number(companyRaw.defaultCreditLimit) : 500000,
     defaultCreditPeriodDays: companyRaw?.defaultCreditPeriodDays ? Number(companyRaw.defaultCreditPeriodDays) : 30,

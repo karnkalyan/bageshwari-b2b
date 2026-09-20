@@ -171,13 +171,21 @@ export function BulkProductManagerModal({
           errors: [data.error || data.message || "Failed to process bulk import."],
         });
       } else {
+        const payload = data.data || data;
+        const totalReceived = payload.totalReceived || payload.totalProcessed || 0;
+        const created = payload.createdCount ?? payload.created ?? 0;
+        const updated = payload.updatedCount ?? payload.updated ?? 0;
+        const errList = Array.isArray(payload.errors)
+          ? payload.errors.map((e: any) => typeof e === "string" ? e : `${e.sku ? e.sku + ": " : ""}${e.error || JSON.stringify(e)}`)
+          : [];
+
         setImportResult({
           success: true,
-          totalReceived: data.data?.totalReceived ?? data.totalReceived,
-          created: data.data?.created ?? data.created,
-          updated: data.data?.updated ?? data.updated,
-          errors: data.data?.errors ?? data.errors,
-          message: data.data?.message ?? data.message,
+          totalReceived,
+          created,
+          updated,
+          errors: errList,
+          message: payload.message || `Successfully processed ${totalReceived} products (${created} added, ${updated} updated).`,
         });
         if (onImportSuccess) {
           onImportSuccess();
@@ -364,8 +372,8 @@ export function BulkProductManagerModal({
               <Button
                 size="sm"
                 onClick={handleExecuteImport}
-                disabled={!fileContent || isImporting}
-                className="font-bold"
+                disabled={(!selectedFile && !fileContent) || isImporting}
+                className="font-bold bg-[#092f5c] hover:bg-[#072447] text-white"
               >
                 {isImporting ? (
                   <>
