@@ -6,6 +6,7 @@ import { apiError, apiSuccess } from "@/lib/api-response";
 import { sendWorkflowNotification } from "@/services/notification.service";
 import { nextDocumentNumber } from "@/services/number-sequence.service";
 import { Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const reviewSchema = z.object({
   action: z.enum(["APPROVE", "REJECT"]),
@@ -14,6 +15,9 @@ const reviewSchema = z.object({
   creditPeriodDays: z.coerce.number().int().min(0).max(365).optional().default(30),
   dealerGroupId: z.string().optional().nullable(),
   pricingGroupId: z.string().optional().nullable(),
+  createCredentials: z.boolean().optional().default(true),
+  loginEmail: z.string().email().optional(),
+  loginPassword: z.string().min(6).optional(),
 });
 
 export async function POST(
@@ -42,7 +46,17 @@ export async function POST(
     return apiError("VALIDATION_ERROR", "Invalid review parameters.", 422, parsed.error.format());
   }
 
-  const { action, rejectionReason, creditLimit = 500000, creditPeriodDays = 30, dealerGroupId, pricingGroupId } = parsed.data;
+  const {
+    action,
+    rejectionReason,
+    creditLimit = 500000,
+    creditPeriodDays = 30,
+    dealerGroupId,
+    pricingGroupId,
+    createCredentials = true,
+    loginEmail,
+    loginPassword,
+  } = parsed.data;
 
   if (action === "REJECT" && !rejectionReason) {
     return apiError("VALIDATION_ERROR", "Rejection comments/reason is mandatory for rejected applications.", 422);
@@ -81,7 +95,7 @@ export async function POST(
           },
         });
 
-        return { application: updated, dealer: null };
+        return { application: updated, dealer: null, credentials: null };
       }
 
       // Action is APPROVE -> Convert to Dealer
@@ -135,6 +149,134 @@ export async function POST(
         },
       });
 
+      // Provision Dealer Portal Login Account
+      let credentialsInfo: { email: string; password: string; loginUrl: string } | null = null;
+      if (createCredentials) {
+        const email = (loginEmail || application.email || "").trim().toLowerCase();
+        if (email) {
+          let rawPassword = loginPassword?.trim();
+          if (!rawPassword) {
+            const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+            let randomStr = "";
+            for (let i = 0; i < 6; i++) {
+              randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            rawPassword = `Dealer#${randomStr}!`;
+          }
+
+          const passwordHash = await bcrypt.hash(rawPassword, 10);
+          let user = await tx.user.findUnique({ where: { email } });
+          if (user) {
+            user = await tx.user.update({
+              where: { id: user.id },
+              data: {
+                passwordHash,
+                status: "ACTIVE",
+                name: user.name || application.contactName || application.businessName,
+                phone: user.phone || application.phone,
+                emailVerified: user.emailVerified || new Date(),
+                loginAttempts: 0,
+                lockedUntil: null,
+              },
+            });
+          } else {
+            user = await tx.user.create({
+              data: {
+                email,
+                passwordHash,
+                name: application.contactName || application.businessName,
+                phone: application.phone || null,
+                status: "ACTIVE",
+                emailVerified: new Date(),
+              },
+            });
+          }
+
+          // Link UserSellerMembership with dealerId
+          await tx.userSellerMembership.upsert({
+            where: {
+              userId_sellerId: {
+                userId: user.id,
+                sellerId,
+              },
+            },
+            create: {
+              userId: user.id,
+              sellerId,
+              dealerId: createdDealer.id,
+              status: "active",
+              isDefault: true,
+            },
+            update: {
+              dealerId: createdDealer.id,
+              status: "active",
+            },
+          });
+
+          // Link DealerEmployee
+          await tx.dealerEmployee.upsert({
+            where: {
+              sellerId_dealerId_userId: {
+                sellerId,
+                dealerId: createdDealer.id,
+                userId: user.id,
+              },
+            },
+            create: {
+              sellerId,
+              dealerId: createdDealer.id,
+              userId: user.id,
+              designation: "Primary Dealer Admin",
+              isPrimary: true,
+              status: "active",
+            },
+            update: {
+              status: "active",
+              isPrimary: true,
+            },
+          });
+
+          // Link DEALER role
+          let dealerRole = await tx.role.findFirst({
+            where: { code: "DEALER", OR: [{ sellerId }, { sellerId: null }] },
+          });
+
+          if (!dealerRole) {
+            dealerRole = await tx.role.create({
+              data: {
+                code: "DEALER",
+                name: "Dealer Portal User",
+                sellerId,
+                systemRole: true,
+                description: "Authorized dealer portal access",
+              },
+            });
+          }
+
+          await tx.userRole.upsert({
+            where: {
+              userId_roleId_sellerId: {
+                userId: user.id,
+                roleId: dealerRole.id,
+                sellerId,
+              },
+            },
+            create: {
+              userId: user.id,
+              roleId: dealerRole.id,
+              sellerId,
+            },
+            update: {},
+          });
+
+          credentialsInfo = {
+            email,
+            password: rawPassword,
+            loginUrl: "/dealer/login",
+          };
+        }
+      }
+
       const updatedApp = await tx.dealerApplication.update({
         where: { id: application.id },
         data: {
@@ -151,12 +293,16 @@ export async function POST(
           action: "dealer.application.approved",
           entity: "DealerApplication",
           entityId: application.id,
-          newValue: JSON.stringify({ dealerId: createdDealer.id, code: dealerCode }),
+          newValue: JSON.stringify({
+            dealerId: createdDealer.id,
+            code: dealerCode,
+            credentialsCreated: Boolean(credentialsInfo),
+          }),
           severity: "LOW",
         },
       });
 
-      return { application: updatedApp, dealer: createdDealer };
+      return { application: updatedApp, dealer: createdDealer, credentials: credentialsInfo };
     });
 
     // Cross-role notifications
@@ -184,7 +330,8 @@ export async function POST(
       success: true,
       status: result.application.status,
       rejectionReason: result.application.rejectionReason,
-      dealer: result.dealer ? { id: result.dealer.id, code: result.dealer.code } : null,
+      dealer: result.dealer ? { id: result.dealer.id, code: result.dealer.code, name: result.dealer.legalName } : null,
+      credentials: result.credentials,
     });
   } catch (error: unknown) {
     console.error("Dealer application review error:", error);

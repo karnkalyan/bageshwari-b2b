@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Search,
   X,
+  Key,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -33,6 +34,7 @@ import {
   type PricingGroupOption,
 } from "./dealer-application-review-dialog";
 import { DealerCreditModal } from "./dealer-credit-modal";
+import { DealerCredentialsDialog } from "./dealer-credentials-dialog";
 
 export interface SerializedDealer {
   id: string;
@@ -54,6 +56,12 @@ export interface SerializedDealer {
     holdStatus: boolean;
   } | null;
   ordersCount: number;
+  hasPortalAccess?: boolean;
+  portalUser?: {
+    id: string;
+    email: string;
+    name?: string | null;
+  } | null;
 }
 
 interface DealersDirectoryClientProps {
@@ -85,6 +93,14 @@ export function DealersDirectoryClient({
   const [selectedApp, setSelectedApp] = useState<SerializedDealerApplication | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [creditModalDealer, setCreditModalDealer] = useState<SerializedDealer | null>(null);
+  const [credentialsModalDealer, setCredentialsModalDealer] = useState<{
+    id: string;
+    code?: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    hasPortalAccess?: boolean;
+  } | null>(null);
   const [dealerSearchQuery, setDealerSearchQuery] = useState("");
   const [appSearchQuery, setAppSearchQuery] = useState("");
 
@@ -218,6 +234,15 @@ export function DealersDirectoryClient({
                         <td className="px-4 py-3.5">
                           <div className="font-bold text-slate-900">{d.tradingName || d.legalName}</div>
                           <div className="text-[10px] text-slate-400">Code: {d.code}</div>
+                          {d.hasPortalAccess ? (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5 mt-1">
+                              <Key className="h-2.5 w-2.5 text-blue-600" /> Portal Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-1">
+                              No Portal Login
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="font-medium text-slate-900">{d.contactName || "—"}</div>
@@ -252,6 +277,29 @@ export function DealersDirectoryClient({
                         </td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                setCredentialsModalDealer({
+                                  id: d.id,
+                                  code: d.code,
+                                  name: d.tradingName || d.legalName,
+                                  email: d.email,
+                                  phone: d.phone,
+                                  hasPortalAccess: d.hasPortalAccess,
+                                })
+                              }
+                              className={`h-7 text-xs font-semibold flex items-center gap-1 ${
+                                d.hasPortalAccess
+                                  ? "border-blue-300 hover:bg-blue-50 text-blue-800"
+                                  : "border-amber-300 hover:bg-amber-50 text-amber-800"
+                              }`}
+                              title="Manage dealer portal login credentials"
+                            >
+                              <Key className="h-3 w-3 text-blue-600" />
+                              {d.hasPortalAccess ? "Credentials" : "Set Login"}
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -395,18 +443,46 @@ export function DealersDirectoryClient({
                             </td>
                             <td className="px-4 py-3.5 text-slate-500">{formatDate(app.createdAt)}</td>
                             <td className="px-4 py-3.5 text-right">
-                              <Button
-                                size="sm"
-                                onClick={() => handleReviewClick(app)}
-                                className={
-                                  app.status === "SUBMITTED" || app.status === "REVIEW_PENDING"
-                                    ? "h-7 text-xs bg-[#0b2d55] hover:bg-[#124177] text-white font-bold"
-                                    : "h-7 text-xs"
-                                }
-                                variant={app.status === "SUBMITTED" || app.status === "REVIEW_PENDING" ? "default" : "outline"}
-                              >
-                                {app.status === "SUBMITTED" || app.status === "REVIEW_PENDING" ? "Review & Verify" : "View & Edit"}
-                              </Button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {app.status === "APPROVED" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const matched = dealers.find(
+                                        (d) =>
+                                          (app.email && d.email?.toLowerCase() === app.email.toLowerCase()) ||
+                                          d.legalName.toLowerCase() === app.businessName.toLowerCase() ||
+                                          (d.tradingName && d.tradingName.toLowerCase() === app.businessName.toLowerCase())
+                                      );
+                                      setCredentialsModalDealer({
+                                        id: matched?.id || app.email,
+                                        code: matched?.code || subNo,
+                                        name: app.businessName,
+                                        email: app.email,
+                                        phone: app.phone,
+                                        hasPortalAccess: matched?.hasPortalAccess,
+                                      });
+                                    }}
+                                    className="h-7 text-xs border-blue-300 font-semibold flex items-center gap-1 hover:bg-blue-50 text-blue-800"
+                                    title="Set or reset dealer portal login credentials"
+                                  >
+                                    <Key className="h-3 w-3 text-blue-600" /> Login Access
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleReviewClick(app)}
+                                  className={
+                                    app.status === "SUBMITTED" || app.status === "REVIEW_PENDING"
+                                      ? "h-7 text-xs bg-[#0b2d55] hover:bg-[#124177] text-white font-bold"
+                                      : "h-7 text-xs"
+                                  }
+                                  variant={app.status === "SUBMITTED" || app.status === "REVIEW_PENDING" ? "default" : "outline"}
+                                >
+                                  {app.status === "SUBMITTED" || app.status === "REVIEW_PENDING" ? "Review & Verify" : "View & Edit"}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -438,6 +514,24 @@ export function DealersDirectoryClient({
         }}
         dealerGroups={dealerGroups}
         pricingGroups={pricingGroups}
+        matchedDealerId={
+          selectedApp
+            ? dealers.find(
+                (d) =>
+                  (selectedApp.email && d.email?.toLowerCase() === selectedApp.email.toLowerCase()) ||
+                  d.legalName.toLowerCase() === selectedApp.businessName.toLowerCase() ||
+                  (d.tradingName && d.tradingName.toLowerCase() === selectedApp.businessName.toLowerCase())
+              )?.id || selectedApp.email
+            : undefined
+        }
+      />
+
+      {/* Dealer Portal Credentials Management Modal */}
+      <DealerCredentialsDialog
+        isOpen={!!credentialsModalDealer}
+        dealer={credentialsModalDealer}
+        onClose={() => setCredentialsModalDealer(null)}
+        onSuccess={() => window.location.reload()}
       />
 
       {/* Dealer Credit Limit Management Modal */}

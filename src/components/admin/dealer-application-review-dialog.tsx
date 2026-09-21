@@ -33,8 +33,15 @@ import {
   Edit,
   Upload,
   Eye,
+  Key,
+  Copy,
+  Check,
+  RefreshCw,
+  EyeOff,
+  ShieldCheck,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { DealerCredentialsDialog } from "./dealer-credentials-dialog";
 
 export interface SerializedDealerApplication {
   id: string;
@@ -85,6 +92,7 @@ interface DealerApplicationReviewDialogProps {
   onClose: () => void;
   dealerGroups?: DealerGroupOption[];
   pricingGroups?: PricingGroupOption[];
+  matchedDealerId?: string | null;
 }
 
 export function DealerApplicationReviewDialog({
@@ -93,6 +101,7 @@ export function DealerApplicationReviewDialog({
   onClose,
   dealerGroups = [],
   pricingGroups = [],
+  matchedDealerId,
 }: DealerApplicationReviewDialogProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"VIEW" | "APPROVE" | "REJECT" | "EDIT">("VIEW");
@@ -103,6 +112,20 @@ export function DealerApplicationReviewDialog({
   const [pricingGroupId, setPricingGroupId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Portal credentials state
+  const [createCredentials, setCreateCredentials] = useState(true);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [approvalResultCredentials, setApprovalResultCredentials] = useState<{
+    email: string;
+    password: string;
+    loginUrl: string;
+    dealerName?: string;
+  } | null>(null);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
+  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
@@ -122,6 +145,15 @@ export function DealerApplicationReviewDialog({
 
   const [docsList, setDocsList] = useState<any[]>([]);
 
+  const generateRandomPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let randomStr = "";
+    for (let i = 0; i < 6; i++) {
+      randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `Dealer#${randomStr}!`;
+  };
+
   React.useEffect(() => {
     if (application) {
       setMode("VIEW");
@@ -131,6 +163,12 @@ export function DealerApplicationReviewDialog({
       setDealerGroupId("");
       setPricingGroupId("");
       setError(null);
+      setLoginEmail(application.email || "");
+      setLoginPassword(generateRandomPassword());
+      setCreateCredentials(true);
+      setApprovalResultCredentials(null);
+      setCopiedCredentials(false);
+      setIsCredentialsModalOpen(false);
 
       setEditFormData({
         businessName: application.businessName || "",
@@ -164,6 +202,18 @@ export function DealerApplicationReviewDialog({
   const submissionNumber =
     application.submissionNumber || `APP-${application.id.slice(-6).toUpperCase()}`;
 
+  const copyApprovalCredentials = () => {
+    if (!approvalResultCredentials) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const portalUrl = `${origin}${approvalResultCredentials.loginUrl}`;
+    const text = `*Bageshwari B2B Dealer Portal Credentials*\nDealer: ${approvalResultCredentials.dealerName || application.businessName}\nPortal Login: ${portalUrl}\nEmail: ${approvalResultCredentials.email}\nPassword: ${approvalResultCredentials.password}\n\nPlease keep these credentials secure and sign in to access wholesale pricing, catalogue ordering, and account statements.`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedCredentials(true);
+      setTimeout(() => setCopiedCredentials(false), 3000);
+    });
+  };
+
   const handleReviewAction = async (action: "APPROVE" | "REJECT") => {
     if (action === "REJECT" && !rejectionReason.trim()) {
       setError("Please provide specific rejection comments or feedback for the dealer.");
@@ -184,12 +234,26 @@ export function DealerApplicationReviewDialog({
           creditPeriodDays: action === "APPROVE" ? Number(creditPeriodDays) : undefined,
           dealerGroupId: dealerGroupId || undefined,
           pricingGroupId: pricingGroupId || undefined,
+          createCredentials: action === "APPROVE" ? createCredentials : undefined,
+          loginEmail: action === "APPROVE" && createCredentials ? loginEmail.trim() : undefined,
+          loginPassword: action === "APPROVE" && createCredentials ? loginPassword.trim() : undefined,
         }),
       });
 
       const json = await res.json();
       if (!res.ok || !json.success) {
         throw new Error(json?.message || "Failed to process application.");
+      }
+
+      if (action === "APPROVE" && json.data?.credentials) {
+        setApprovalResultCredentials({
+          email: json.data.credentials.email,
+          password: json.data.credentials.password,
+          loginUrl: json.data.credentials.loginUrl || "/dealer/login",
+          dealerName: application.businessName,
+        });
+        router.refresh();
+        return;
       }
 
       onClose();
@@ -452,6 +516,37 @@ export function DealerApplicationReviewDialog({
             </div>
           )}
 
+          {/* If Approved, show Portal Credentials Access card */}
+          {application.status === "APPROVED" && (
+            <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 shrink-0 mt-0.5">
+                  <Key className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                    Dealer Portal Login Account
+                    <Badge variant="outline" className="text-[10px] bg-white text-blue-800 border-blue-300 font-semibold">
+                      Approved Dealer
+                    </Badge>
+                  </div>
+                  <div className="text-[11px] text-blue-800 mt-0.5">
+                    Dealer Email: <span className="font-mono font-bold text-slate-900">{application.email}</span>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setIsCredentialsModalOpen(true)}
+                className="h-8 text-xs font-bold bg-[#0b2d55] hover:bg-[#124177] text-white gap-1.5 shrink-0 shadow-xs"
+              >
+                <Key className="h-3.5 w-3.5" /> Manage Portal Login
+              </Button>
+            </div>
+          )}
+
           {/* Attached Documents & Verification Section */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
@@ -623,6 +718,79 @@ export function DealerApplicationReviewDialog({
                     </select>
                   </div>
                 )}
+
+                {/* Dealer Portal Credentials Setup Section */}
+                <div className="pt-3 border-t border-emerald-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Key className="h-4 w-4 text-emerald-700" />
+                      <span className="font-bold text-slate-900 text-xs">
+                        Dealer Portal Login Account
+                      </span>
+                    </div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={createCredentials}
+                        onChange={(e) => setCreateCredentials(e.target.checked)}
+                        className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                      />
+                      Provision Login Now
+                    </label>
+                  </div>
+
+                  {createCredentials && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-emerald-200">
+                      <div>
+                        <Label htmlFor="loginEmail" className="text-[11px] font-bold text-slate-700">
+                          Login Email Address *
+                        </Label>
+                        <Input
+                          id="loginEmail"
+                          type="email"
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                          className="mt-1 h-8 text-xs font-semibold"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="loginPass" className="text-[11px] font-bold text-slate-700">
+                            Initial Password *
+                          </Label>
+                          <button
+                            type="button"
+                            onClick={() => setLoginPassword(generateRandomPassword())}
+                            className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5"
+                          >
+                            <RefreshCw className="h-2.5 w-2.5" /> Regenerate
+                          </button>
+                        </div>
+                        <div className="relative mt-1">
+                          <Input
+                            id="loginPass"
+                            type={showLoginPassword ? "text" : "password"}
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            className="h-8 text-xs font-mono font-bold pr-8"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowLoginPassword(!showLoginPassword)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showLoginPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="col-span-full text-[10px] text-slate-500">
+                        Login link: <code className="text-blue-700 font-bold">/dealer/login</code>. A secure password is generated automatically. You can copy it immediately after approval.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -651,10 +819,74 @@ export function DealerApplicationReviewDialog({
               </div>
             </div>
           )}
+
+          {/* If Approval with Credentials succeeded, show credentials summary */}
+          {approvalResultCredentials && (
+            <div className="p-4 bg-emerald-50/90 border border-emerald-300 rounded-xl space-y-3">
+              <div className="flex items-center gap-2 text-emerald-950 font-bold text-sm">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                Dealer Approved & Portal Login Credentials Created!
+              </div>
+              <p className="text-xs text-emerald-900">
+                New dealer <strong>{approvalResultCredentials.dealerName || application.businessName}</strong> is now active. Send these login credentials to the dealer so they can sign in:
+              </p>
+
+              <div className="bg-white border border-emerald-200 rounded-lg p-3 space-y-2 text-xs font-mono">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-sans uppercase font-bold">Portal URL</span>
+                  <span className="text-blue-700 font-semibold flex items-center gap-1">
+                    {typeof window !== "undefined" ? window.location.origin : ""}{approvalResultCredentials.loginUrl}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-sans uppercase font-bold">Login Email</span>
+                  <span className="font-bold text-slate-900">{approvalResultCredentials.email}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-sans uppercase font-bold">Initial Password</span>
+                  <span className="font-bold text-emerald-900 bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                    {approvalResultCredentials.password}
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={copyApprovalCredentials}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 gap-1.5 shadow-sm"
+              >
+                {copiedCredentials ? (
+                  <>
+                    <Check className="h-4 w-4 text-white" /> Copied to Clipboard!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" /> Copy Credentials (WhatsApp / Email)
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="border-t pt-3 flex flex-row items-center justify-between gap-2">
-          {mode === "VIEW" ? (
+          {approvalResultCredentials ? (
+            <div className="w-full flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">
+                Credentials saved. Manage or reset anytime from the Active Dealers list.
+              </span>
+              <Button
+                type="button"
+                onClick={() => {
+                  setApprovalResultCredentials(null);
+                  onClose();
+                }}
+                className="bg-[#0b2d55] text-white font-bold text-xs"
+              >
+                Done
+              </Button>
+            </div>
+          ) : mode === "VIEW" ? (
             <>
               <div className="flex items-center gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs">
@@ -743,6 +975,17 @@ export function DealerApplicationReviewDialog({
           )}
         </DialogFooter>
       </DialogContent>
+
+      <DealerCredentialsDialog
+        dealerId={matchedDealerId || application.id}
+        dealerName={application.businessName}
+        defaultEmail={application.email}
+        isOpen={isCredentialsModalOpen}
+        onClose={() => setIsCredentialsModalOpen(false)}
+        onSuccess={() => {
+          router.refresh();
+        }}
+      />
     </Dialog>
   );
 }

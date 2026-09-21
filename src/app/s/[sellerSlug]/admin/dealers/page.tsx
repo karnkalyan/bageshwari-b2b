@@ -44,6 +44,23 @@ export default async function AdminDealersPage({ params, searchParams }: Dealers
         dealerGroup: true,
         pricingGroup: true,
         creditProfile: true,
+        memberships: {
+          where: { status: "active" },
+          include: {
+            user: {
+              select: { id: true, email: true, name: true, status: true },
+            },
+          },
+          take: 1,
+        },
+        employees: {
+          include: {
+            user: {
+              select: { id: true, email: true, name: true, status: true },
+            },
+          },
+          take: 1,
+        },
         _count: { select: { orders: true } },
       },
     }),
@@ -65,29 +82,34 @@ export default async function AdminDealersPage({ params, searchParams }: Dealers
     }),
   ]);
 
-  const serializedDealers = dealers.map((d) => ({
-    id: d.id,
-    code: d.code,
-    legalName: d.legalName,
-    tradingName: d.tradingName,
-    contactName: d.contactName,
-    email: d.email,
-    phone: d.phone,
-    status: d.status,
-    creditEligible: d.creditEligible,
-    dealerGroup: d.dealerGroup ? { name: d.dealerGroup.name, code: d.dealerGroup.code } : null,
-    pricingGroup: d.pricingGroup ? { name: d.pricingGroup.name, code: d.pricingGroup.code } : null,
-    creditProfile: d.creditProfile
-      ? {
-          creditLimit: Number(d.creditProfile.creditLimit),
-          availableCredit: Number(d.creditProfile.availableCredit),
-          currentOutstanding: Number(d.creditProfile.currentOutstanding),
-          creditPeriodDays: d.creditProfile.creditPeriodDays,
-          holdStatus: d.creditProfile.holdStatus,
-        }
-      : null,
-    ordersCount: d._count.orders,
-  }));
+  const serializedDealers = dealers.map((d) => {
+    const portalUser = d.memberships[0]?.user || d.employees[0]?.user || null;
+    return {
+      id: d.id,
+      code: d.code,
+      legalName: d.legalName,
+      tradingName: d.tradingName,
+      contactName: d.contactName,
+      email: d.email,
+      phone: d.phone,
+      status: d.status,
+      creditEligible: d.creditEligible,
+      portalUser: portalUser ? { id: portalUser.id, email: portalUser.email, name: portalUser.name } : null,
+      hasPortalAccess: Boolean(portalUser),
+      dealerGroup: d.dealerGroup ? { name: d.dealerGroup.name, code: d.dealerGroup.code } : null,
+      pricingGroup: d.pricingGroup ? { name: d.pricingGroup.name, code: d.pricingGroup.code } : null,
+      creditProfile: d.creditProfile
+        ? {
+            creditLimit: Number(d.creditProfile.creditLimit),
+            availableCredit: Number(d.creditProfile.availableCredit),
+            currentOutstanding: Number(d.creditProfile.currentOutstanding),
+            creditPeriodDays: d.creditProfile.creditPeriodDays,
+            holdStatus: d.creditProfile.holdStatus,
+          }
+        : null,
+      ordersCount: d._count.orders,
+    };
+  });
 
   const serializedApplications = applications.map((a) => {
     let parsedDocs: any = { submissionNumber: `APP-${a.id.slice(-6).toUpperCase()}`, documents: [] };
