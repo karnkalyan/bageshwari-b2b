@@ -117,7 +117,8 @@ export function ProductsTableClient({
             {products.map((p) => {
               const primaryImage = p.images?.find((img) => img.isPrimary) || p.images?.[0];
               const vatRate = p.effectiveVatPercent;
-              const mrpGross = p.mrp * (1 + vatRate / 100);
+              const mrpGross = p.mrp;
+              const mrpBase = vatRate > 0 ? p.mrp / (1 + vatRate / 100) : p.mrp;
               const dealerGross = p.dealerPrice * (1 + vatRate / 100);
 
               const hasCustomTax = p.taxPercent !== null && p.taxPercent !== undefined;
@@ -154,7 +155,7 @@ export function ProductsTableClient({
                     </Badge>
                   </td>
                   <td className="px-4 py-3.5">{p.categoryName || "General"}</td>
-                  <td className="px-4 py-3.5 text-right font-medium text-slate-500">{formatCurrency(p.mrp)}</td>
+                  <td className="px-4 py-3.5 text-right font-medium text-slate-500">{formatCurrency(mrpBase)}</td>
                   <td className="px-4 py-3.5 text-right font-bold text-slate-900">
                     <div>{formatCurrency(mrpGross)}</div>
                     <span className="text-[9px] text-slate-400 font-normal">Incl. {vatRate}% VAT</span>

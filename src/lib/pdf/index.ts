@@ -563,7 +563,8 @@ export async function generateProductBarcodeLabelPdf(
       : globalVat;
   const vatPercent = rawVatPercent > 0 && rawVatPercent <= 1.0 ? rawVatPercent * 100 : rawVatPercent;
 
-  const mrpInclVat = mrp * (1 + vatPercent / 100);
+  // MRP is legally and standardly VAT-inclusive in Nepal; do not double-compound VAT on MRP
+  const mrpInclVat = mrp;
 
   return renderProductBarcodeLabelPdf(
     {

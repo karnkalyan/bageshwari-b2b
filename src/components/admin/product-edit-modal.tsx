@@ -99,7 +99,9 @@ export function ProductEditModal({
 
   const effectiveVatPercent = normProductTax !== null ? normProductTax : normCatTax !== null ? normCatTax : (globalVatPercent || 13.0);
 
-  const mrpGross = formData.mrp * (1 + effectiveVatPercent / 100);
+  // MRP is legally and standardly VAT-inclusive in Nepal. Do not compound VAT on top of MRP.
+  const mrpGross = formData.mrp;
+  const mrpBase = effectiveVatPercent > 0 ? formData.mrp / (1 + effectiveVatPercent / 100) : formData.mrp;
   const dealerGross = formData.dealerPrice * (1 + effectiveVatPercent / 100);
 
   // 1. Handle Direct File Upload

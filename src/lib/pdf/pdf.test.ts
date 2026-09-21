@@ -208,6 +208,38 @@ describe("PDF Template Renderers", () => {
     expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
   });
 
+  it("renders 32x20 micro thermal sticker without overlapping for TYRPAT7-03678", async () => {
+    const bytes = await renderProductBarcodeLabelPdf({
+      name: "TYRE PATCH 7 NO",
+      sku: "TYRPAT7-03678",
+      barcode: "TYRPAT7-03678",
+      mrp: 500,
+      vatPercent: 13,
+      companyName: "BAGESHWARI TRACTORS",
+      stickerSize: "32x20",
+    });
+
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(1000);
+    expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+  });
+
+  it("renders 32x20 micro thermal sticker gracefully with long SKU (stacked layout)", async () => {
+    const bytes = await renderProductBarcodeLabelPdf({
+      name: "Swaraj 735 FE Heavy Duty Clutch Plate Assembly",
+      sku: "SWARAJ-735-FE-CLUTCH-PLATE-01",
+      barcode: "SWARAJ-735-FE-CLUTCH-PLATE-01",
+      mrp: 14500,
+      vatPercent: 13,
+      companyName: "BAGESHWARI TRACTORS, NEPALGUNJ",
+      stickerSize: "32x20",
+    });
+
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(1000);
+    expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+  });
+
   it("renders Detailed Packaging List PDF bytes with carton manifest successfully", async () => {
     const bytes = await renderPackingListPdf({
       packingListNumber: "PKL-2026-00018",
