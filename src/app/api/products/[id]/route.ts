@@ -40,7 +40,7 @@ export async function GET(
   const sellerId = session.sellerId;
 
   const product = await prisma.product.findFirst({
-    where: { id, sellerId },
+    where: { id, sellerId, deletedAt: null },
     include: {
       category: true,
       brand: true,
@@ -80,7 +80,7 @@ export async function PUT(
   try {
     const updated = await prisma.$transaction(async (tx) => {
       const existing = await tx.product.findFirst({
-        where: { id, sellerId },
+        where: { id, sellerId, deletedAt: null },
         include: {
           variants: { where: { isDefault: true }, take: 1 },
           prices: { where: { priceType: "DEFAULT_DEALER" }, take: 1 },
@@ -90,7 +90,7 @@ export async function PUT(
 
       if (!existing) throw new Error("PRODUCT_NOT_FOUND");
 
-      // 1. Update Product core fields (including taxPercent)
+      // 1. Update Product core fields (including categoryId, brandId, taxPercent)
       const product = await tx.product.update({
         where: { id: existing.id },
         data: {
@@ -98,8 +98,8 @@ export async function PUT(
           ...(productFields.sku ? { sku: productFields.sku } : {}),
           ...(productFields.shortDescription !== undefined ? { shortDescription: productFields.shortDescription } : {}),
           ...(productFields.description !== undefined ? { description: productFields.description } : {}),
-          ...(productFields.categoryId !== undefined ? { categoryId: productFields.categoryId } : {}),
-          ...(productFields.brandId !== undefined ? { brandId: productFields.brandId } : {}),
+          ...(productFields.categoryId !== undefined ? { categoryId: productFields.categoryId || null } : {}),
+          ...(productFields.brandId !== undefined ? { brandId: productFields.brandId || null } : {}),
           ...(productFields.status ? { status: productFields.status } : {}),
           ...(productFields.unitCode ? { unitCode: productFields.unitCode } : {}),
           ...(productFields.minimumOrderQuantity !== undefined ? { minimumOrderQuantity: productFields.minimumOrderQuantity } : {}),
@@ -206,4 +206,82 @@ export async function PUT(
     const message = error instanceof Error ? error.message : "Failed to update product.";
     return apiError("PRODUCT_UPDATE_FAILED", message, 500);
   }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.sellerId) {
+    return apiError("UNAUTHORIZED", "Authentication required.", 401);
+  }
+
+  const { id } = await params;
+  const sellerId = session.sellerId;
+
+  const existing = await prisma.product.findFirst({
+    where: { id, sellerId, deletedAt: null },
+  });
+  if (!existing) {
+    return apiError("PRODUCT_NOT_FOUND", "Product not found.", 404);
+  }
+
+  const body = await request.json().catch(() => null);
+  const newStatus = body?.status || (existing.status === "ACTIVE" ? "INACTIVE" : "ACTIVE");
+
+  const updated = await prisma.product.update({
+    where: { id },
+    data: { status: newStatus },
+  });
+
+  return apiSuccess(updated);
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.sellerId) {
+    return apiError("UNAUTHORIZED", "Authentication required.", 401);
+  }
+
+  const { id } = await params;
+  const sellerId = session.sellerId;
+
+  const existing = await prisma.product.findFirst({
+    where: { id, sellerId, deletedAt: null },
+    include: {
+      orderItems: { take: 1 },
+    },
+  });
+
+  if (!existing) {
+    return apiError("PRODUCT_NOT_FOUND", "Product not found.", 404);
+  }
+
+  // If product is used in orders, soft delete by marking deletedAt and INACTIVE
+  if (existing.orderItems.length > 0) {
+    const updated = await prisma.product.update({
+      where: { id },
+      data: {
+        status: "INACTIVE",
+        deletedAt: new Date(),
+      },
+    });
+    return apiSuccess({ deleted: true, softDeleted: true, id: updated.id });
+  }
+
+  // Otherwise, delete relations and product safely in a transaction
+  await prisma.$transaction(async (tx) => {
+    await tx.productImage.deleteMany({ where: { productId: id } });
+    await tx.productPrice.deleteMany({ where: { productId: id } });
+    await tx.inventory.deleteMany({ where: { productId: id } });
+    await tx.productVariant.deleteMany({ where: { productId: id } });
+    await tx.productDocument.deleteMany({ where: { productId: id } });
+    await tx.product.delete({ where: { id } });
+  });
+
+  return apiSuccess({ deleted: true, id });
 }

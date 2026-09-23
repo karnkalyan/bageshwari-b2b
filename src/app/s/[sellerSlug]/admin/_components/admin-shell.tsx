@@ -103,6 +103,28 @@ const navigationGroups: NavGroup[] = [
         allowedPermissions: ["product.manage", "product.view"],
       },
       {
+        label: "Categories",
+        segment: "/categories",
+        icon: Boxes,
+        color: "text-indigo-500",
+        allowedRoles: [
+          ...ALL_PRIVILEGED_ROLES,
+          "PRODUCT_MANAGER", "SALES_MANAGER", "ACCOUNTANT", "ACCOUNTS_MANAGER",
+        ],
+        allowedPermissions: ["product.manage", "seller.manage", "system.manage"],
+      },
+      {
+        label: "Brands",
+        segment: "/brands",
+        icon: Store,
+        color: "text-purple-500",
+        allowedRoles: [
+          ...ALL_PRIVILEGED_ROLES,
+          "PRODUCT_MANAGER", "SALES_MANAGER", "ACCOUNTANT", "ACCOUNTS_MANAGER",
+        ],
+        allowedPermissions: ["product.manage", "seller.manage", "system.manage"],
+      },
+      {
         label: "Warehouse Operations",
         segment: "/warehouse",
         icon: Warehouse,

@@ -11,14 +11,14 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: "light",
+  theme: "system",
   setTheme: () => {},
   resolvedTheme: "light",
 });
 
 export function ThemeProvider({
   children,
-  defaultTheme = "light",
+  defaultTheme = "system",
   storageKey = "theme",
 }: {
   children: React.ReactNode;
@@ -45,16 +45,30 @@ export function ThemeProvider({
     if (!mounted) return;
     const root = document.documentElement;
 
-    const applyTheme = () => {
-      setResolvedTheme("light");
-      root.classList.remove("dark");
+    const applyTheme = (currentTheme: Theme) => {
+      let resolved: "light" | "dark" = "light";
+      if (currentTheme === "dark") {
+        resolved = "dark";
+      } else if (currentTheme === "light") {
+        resolved = "light";
+      } else {
+        const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        resolved = isDark ? "dark" : "light";
+      }
+
+      setResolvedTheme(resolved);
+      if (resolved === "dark") {
+        root.classList.add("dark");
+      } else {
+        root.classList.remove("dark");
+      }
     };
 
-    applyTheme();
+    applyTheme(theme);
 
     if (theme === "system") {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = () => applyTheme();
+      const handler = () => applyTheme("system");
       mediaQuery.addEventListener("change", handler);
       return () => mediaQuery.removeEventListener("change", handler);
     }
@@ -79,3 +93,4 @@ export function ThemeProvider({
 export function useTheme() {
   return useContext(ThemeContext);
 }
+

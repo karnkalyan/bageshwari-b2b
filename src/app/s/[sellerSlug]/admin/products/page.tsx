@@ -5,6 +5,7 @@ import { ProductsTableClient, type SerializedProduct } from "./products-table-cl
 import { Pagination } from "@/components/ui/pagination";
 import { buildProductSearchFilter } from "@/lib/search-utils";
 import { LiveSearchInput } from "@/components/search/live-search-input";
+import { Package } from "lucide-react";
 
 interface AdminProductsProps {
   params: Promise<{ sellerSlug: string }>;
@@ -23,10 +24,11 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
   const searchFilter = buildProductSearchFilter(search);
   const where: any = {
     sellerId: ctx.sellerId,
+    deletedAt: null,
     ...(searchFilter ? searchFilter : {}),
   };
 
-  const [products, totalCount, companyRows, categoryRows] = await Promise.all([
+  const [products, totalCount, companyRows, categoryRows, brandRows] = await Promise.all([
     prisma.product.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -34,7 +36,7 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
       take: pageSize,
       include: {
         category: { select: { id: true, name: true } },
-        brand: { select: { name: true } },
+        brand: { select: { id: true, name: true } },
         images: { orderBy: { displayOrder: "asc" } },
         variants: { where: { isDefault: true }, take: 1 },
         prices: { where: { priceType: "DEFAULT_DEALER" }, take: 1 },
@@ -45,24 +47,33 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
     prisma.$queryRaw<any[]>`
       SELECT defaultVatPercent FROM CompanyProfile WHERE id = 'bageshwari-tractors' LIMIT 1
     `.catch(() => []),
-    prisma.$queryRaw<any[]>`
-      SELECT id, name, taxPercent FROM ProductCategory WHERE sellerId = ${ctx.sellerId} ORDER BY name ASC
-    `.catch(() => []),
+    prisma.productCategory.findMany({
+      where: { sellerId: ctx.sellerId, deletedAt: null },
+      select: { id: true, name: true, taxPercent: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.productBrand.findMany({
+      where: { sellerId: ctx.sellerId, deletedAt: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const globalVat = companyRows?.[0]?.defaultVatPercent ? Number(companyRows[0].defaultVatPercent) : 13.0;
   const categoryTaxMap = new Map<string, number | null>();
   const categoriesList: { id: string; name: string }[] = [];
-  if (Array.isArray(categoryRows)) {
-    for (const cat of categoryRows) {
-      if (cat.taxPercent !== null && cat.taxPercent !== undefined) {
-        categoryTaxMap.set(cat.id, Number(cat.taxPercent));
-      }
-      if (cat.id && cat.name) {
-        categoriesList.push({ id: String(cat.id), name: String(cat.name) });
-      }
+  
+  for (const cat of categoryRows) {
+    if (cat.taxPercent !== null && cat.taxPercent !== undefined) {
+      categoryTaxMap.set(cat.id, Number(cat.taxPercent));
     }
+    categoriesList.push({ id: cat.id, name: cat.name });
   }
+
+  const brandsList: { id: string; name: string }[] = brandRows.map((b) => ({
+    id: b.id,
+    name: b.name,
+  }));
 
   // Convert Decimal and complex Prisma fields to plain JSON-serializable primitives for Client Components
   const plainProducts: SerializedProduct[] = products.map((p: any) => {
@@ -81,6 +92,8 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
       slug: p.slug,
       status: p.status,
       unitCode: p.unitCode || "PCS",
+      categoryId: p.categoryId || null,
+      brandId: p.brandId || null,
       taxPercent: customTax,
       categoryTaxPercent: catTax,
       effectiveVatPercent: customTax !== null ? customTax : (catTax !== null ? catTax : globalVat),
@@ -104,15 +117,17 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="section-kicker">Catalog Operations</div>
-          <h1 className="text-2xl font-black text-foreground">Product Catalogue, Pricing & VAT Manager</h1>
+          <div className="section-kicker flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
+            <Package className="h-3.5 w-3.5" /> Catalog Operations
+          </div>
+          <h1 className="text-2xl font-black text-foreground mt-1">Product Catalogue, Pricing & VAT Manager</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage catalogue items, set individual & category VAT % rates, upload product photos, and print barcode price stickers with VAT included.
           </p>
         </div>
       </div>
 
-      <Card>
+      <Card className="border-border">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <LiveSearchInput
             placeholder="Search products by SKU or name..."
@@ -124,13 +139,14 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-border">
         <CardContent className="p-0">
           <ProductsTableClient
             products={plainProducts}
             sellerSlug={sellerSlug}
             globalVatPercent={globalVat}
             categories={categoriesList}
+            brands={brandsList}
           />
           {Math.ceil(totalCount / pageSize) > 1 && (
             <div className="p-4 border-t border-border bg-muted/20">

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Image as ImageIcon,
@@ -29,6 +30,8 @@ import {
   Percent,
   Calculator,
   Printer,
+  Boxes,
+  Store,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -41,6 +44,8 @@ export interface ProductEditData {
   stock: number;
   status: string;
   unitCode: string;
+  categoryId?: string | null;
+  brandId?: string | null;
   taxPercent?: number | null;
   categoryTaxPercent?: number | null;
   shortDescription?: string | null;
@@ -60,6 +65,8 @@ interface ProductEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  categories?: Array<{ id: string; name: string }>;
+  brands?: Array<{ id: string; name: string }>;
   globalVatPercent?: number;
 }
 
@@ -68,6 +75,8 @@ export function ProductEditModal({
   isOpen,
   onClose,
   onSuccess,
+  categories = [],
+  brands = [],
   globalVatPercent = 13.0,
 }: ProductEditModalProps) {
   const [formData, setFormData] = useState<ProductEditData | null>(null);
@@ -81,12 +90,14 @@ export function ProductEditModal({
     if (product) {
       setFormData({
         ...product,
+        categoryId: product.categoryId || (categories.find(c => c.name === product.categoryName)?.id || ""),
+        brandId: product.brandId || (brands.find(b => b.name === product.brandName)?.id || ""),
         images: product.images ? [...product.images] : [],
       });
       setError(null);
       setNewImageUrl("");
     }
-  }, [product, isOpen]);
+  }, [product, isOpen, categories, brands]);
 
   if (!product || !formData) return null;
 
@@ -99,7 +110,7 @@ export function ProductEditModal({
 
   const effectiveVatPercent = normProductTax !== null ? normProductTax : normCatTax !== null ? normCatTax : (globalVatPercent || 13.0);
 
-  // MRP is legally and standardly VAT-inclusive in Nepal. Do not compound VAT on top of MRP.
+  // MRP is legally VAT-inclusive in Nepal
   const mrpGross = formData.mrp;
   const mrpBase = effectiveVatPercent > 0 ? formData.mrp / (1 + effectiveVatPercent / 100) : formData.mrp;
   const dealerGross = formData.dealerPrice * (1 + effectiveVatPercent / 100);
@@ -196,6 +207,8 @@ export function ProductEditModal({
         body: JSON.stringify({
           name: formData.name,
           sku: formData.sku,
+          categoryId: formData.categoryId || null,
+          brandId: formData.brandId || null,
           mrp: formData.mrp,
           dealerPrice: formData.dealerPrice,
           stock: formData.stock,
@@ -225,23 +238,23 @@ export function ProductEditModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-6">
         <DialogHeader className="border-b pb-3">
-          <DialogTitle className="text-lg font-bold flex items-center gap-2 text-[#0b2d55]">
-            <Package className="h-5 w-5 text-primary" /> Edit Product, VAT & Images
+          <DialogTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
+            <Package className="h-5 w-5 text-primary" /> Edit Product, Category, Brand & VAT
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
-            Configure product metadata, pricing, individual VAT % override, and manage product photos.
+          <DialogDescription className="text-xs text-muted-foreground">
+            Configure product metadata, category & brand linkage, pricing, VAT % override, and manage product photos.
           </DialogDescription>
         </DialogHeader>
 
         {error && (
-          <div className="p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-xs flex items-center gap-2">
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 rounded-lg border border-red-200 dark:border-red-900 text-xs flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         <div className="space-y-6 pt-2">
-          {/* 1. Core Fields */}
+          {/* 1. Core Fields: Name & SKU */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label className="text-xs font-semibold">Product Name</Label>
@@ -261,13 +274,83 @@ export function ProductEditModal({
             </div>
           </div>
 
-          {/* 2. Pricing & VAT Configuration */}
-          <div className="p-4 bg-slate-50 border rounded-xl space-y-3">
+          {/* 2. Category, Brand, Unit Code & Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div>
+              <Label className="text-xs font-semibold flex items-center gap-1">
+                <Boxes className="h-3 w-3 text-primary" /> Category
+              </Label>
+              <select
+                value={formData.categoryId || ""}
+                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value || null })}
+                className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">-- No Category --</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold flex items-center gap-1">
+                <Store className="h-3 w-3 text-purple-500" /> Brand
+              </Label>
+              <select
+                value={formData.brandId || ""}
+                onChange={(e) => setFormData({ ...formData, brandId: e.target.value || null })}
+                className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">-- No Brand --</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Unit of Measure</Label>
+              <select
+                value={formData.unitCode || "PCS"}
+                onChange={(e) => setFormData({ ...formData, unitCode: e.target.value })}
+                className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="PCS">PCS (Pieces)</option>
+                <option value="SET">SET (Set)</option>
+                <option value="PKT">PKT (Packet)</option>
+                <option value="LTR">LTR (Litre)</option>
+                <option value="KG">KG (Kilogram)</option>
+                <option value="PAIR">PAIR (Pair)</option>
+                <option value="MTR">MTR (Meter)</option>
+              </select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Status</Label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring font-semibold"
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="DISCONTINUED">Discontinued</option>
+                <option value="OUT_OF_STOCK">Out of Stock</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 3. Pricing & VAT Configuration */}
+          <div className="p-4 bg-muted/40 border border-border rounded-xl space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                 <Percent className="h-4 w-4 text-emerald-600" /> Pricing & VAT Taxation
               </span>
-              <Badge variant="outline" className="text-[10px] bg-white font-semibold">
+              <Badge variant="outline" className="text-[10px] font-semibold">
                 Effective VAT: {effectiveVatPercent}%{" "}
                 {formData.taxPercent !== null && formData.taxPercent !== undefined
                   ? "(Custom Product Rate)"
@@ -279,29 +362,29 @@ export function ProductEditModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
-                <Label className="text-[11px] font-semibold text-slate-700">MRP (VAT Included)</Label>
+                <Label className="text-[11px] font-semibold text-foreground">MRP (VAT Included)</Label>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={formData.mrp}
                   onChange={(e) => setFormData({ ...formData, mrp: parseFloat(e.target.value) || 0 })}
-                  className="mt-1 h-8 text-xs font-bold bg-white"
+                  className="mt-1 h-8 text-xs font-bold"
                 />
               </div>
               <div>
-                <Label className="text-[11px] font-semibold text-slate-700">Dealer Price (Net)</Label>
+                <Label className="text-[11px] font-semibold text-foreground">Dealer Price (Net)</Label>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={formData.dealerPrice}
                   onChange={(e) => setFormData({ ...formData, dealerPrice: parseFloat(e.target.value) || 0 })}
-                  className="mt-1 h-8 text-xs font-bold bg-white text-emerald-700"
+                  className="mt-1 h-8 text-xs font-bold text-emerald-600 dark:text-emerald-400"
                 />
               </div>
               <div>
-                <Label className="text-[11px] font-semibold text-slate-700">Product VAT % Override</Label>
+                <Label className="text-[11px] font-semibold text-foreground">Product VAT % Override</Label>
                 <Input
                   type="number"
                   min="0"
@@ -316,36 +399,36 @@ export function ProductEditModal({
                       taxPercent: val === "" ? null : parseFloat(val) || 0,
                     });
                   }}
-                  className="mt-1 h-8 text-xs bg-white font-bold"
+                  className="mt-1 h-8 text-xs font-bold"
                 />
               </div>
               <div>
-                <Label className="text-[11px] font-semibold text-slate-700">Available Stock</Label>
+                <Label className="text-[11px] font-semibold text-foreground">Available Stock</Label>
                 <Input
                   type="number"
                   min="0"
                   value={formData.stock}
                   onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value, 10) || 0 })}
-                  className="mt-1 h-8 text-xs bg-white font-bold"
+                  className="mt-1 h-8 text-xs font-bold"
                 />
               </div>
             </div>
 
             {/* Live Gross Calculation Preview & Quick Print */}
-            <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <Calculator className="h-4 w-4 text-emerald-700" />
-                  <span className="font-semibold text-emerald-950">
+                  <Calculator className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                  <span className="font-semibold text-emerald-950 dark:text-emerald-200">
                     Label Price Preview (Incl. {effectiveVatPercent}% VAT):
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-[11px]">
                   <span>
-                    MRP Incl. VAT: <strong className="text-emerald-900">{formatCurrency(mrpGross)}</strong>
+                    MRP Incl. VAT: <strong className="text-emerald-900 dark:text-emerald-300">{formatCurrency(mrpGross)}</strong>
                   </span>
                   <span>
-                    Dealer Rate Incl. VAT: <strong className="text-emerald-900">{formatCurrency(dealerGross)}</strong>
+                    Dealer Rate Incl. VAT: <strong className="text-emerald-900 dark:text-emerald-300">{formatCurrency(dealerGross)}</strong>
                   </span>
                 </div>
               </div>
@@ -363,129 +446,168 @@ export function ProductEditModal({
             </div>
           </div>
 
-          {/* 3. Photos / Images Management */}
-          <div className="space-y-3">
+          {/* 4. Description */}
+          <div>
+            <Label className="text-xs font-semibold">Short Description / Fitment Notes</Label>
+            <Textarea
+              value={formData.shortDescription || ""}
+              onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
+              placeholder="e.g. For Swaraj 735/855/935 tractors. Made from high carbon steel."
+              className="mt-1 text-xs"
+              rows={2}
+            />
+          </div>
+
+          {/* 5. Product Images Management */}
+          <div className="space-y-3 border-t border-border pt-4">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-bold text-slate-900">Product Photos ({formData.images.length})</Label>
-              <span className="text-[11px] text-slate-400">First/starred image will be the primary catalog thumbnail</span>
+              <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <ImageIcon className="h-4 w-4 text-primary" /> Product Photos ({formData.images.length})
+              </Label>
+              <span className="text-[11px] text-muted-foreground">First or starred image will be catalog cover photo</span>
             </div>
 
-            {/* Image Preview Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-              {formData.images.map((img, idx) => (
-                <div
-                  key={img.url + idx}
-                  className={`relative group rounded-xl border p-1 bg-white flex flex-col items-center justify-between transition-all ${
-                    img.isPrimary ? "ring-2 ring-primary border-primary bg-blue-50/20" : "hover:border-slate-300"
-                  }`}
-                >
-                  <div className="relative w-full h-24 flex items-center justify-center overflow-hidden rounded-lg bg-slate-50">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={img.altText || "Product"} className="max-h-full max-w-full object-contain" />
-                    {img.isPrimary && (
-                      <Badge className="absolute top-1 left-1 text-[9px] bg-primary text-white px-1.5 py-0">
-                        Primary
-                      </Badge>
-                    )}
-                  </div>
+            {/* Upload Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept="image/*"
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="h-8 text-xs font-semibold gap-1.5"
+              >
+                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                Upload from Computer
+              </Button>
 
-                  <div className="flex items-center justify-between w-full mt-2 pt-1 border-t px-1">
-                    {!img.isPrimary && (
-                      <button
-                        type="button"
-                        onClick={() => handleSetPrimary(idx)}
-                        className="text-[10px] text-slate-500 hover:text-primary flex items-center gap-0.5"
-                      >
-                        <Star className="h-3 w-3" /> Set Primary
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      className="text-slate-400 hover:text-red-600 p-1 ml-auto"
-                      aria-label="Remove image"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Upload or Add by URL */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              <div className="p-3 border border-dashed rounded-xl bg-slate-50/50 flex items-center justify-between gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <div>
-                  <div className="text-xs font-bold text-slate-800">Upload New Photo</div>
-                  <div className="text-[10px] text-slate-400">JPG, PNG, WebP up to 5MB</div>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={uploading}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-8 text-xs font-semibold"
-                >
-                  {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
-                  Browse
-                </Button>
-              </div>
-
-              <div className="p-3 border rounded-xl bg-slate-50/50 flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-1 min-w-[240px]">
                 <Input
-                  placeholder="Or paste direct image URL..."
+                  placeholder="Or paste image URL (https://...)"
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
-                  className="h-8 text-xs bg-white"
+                  className="h-8 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddImageUrl();
+                    }
+                  }}
                 />
                 <Button
                   type="button"
+                  variant="secondary"
                   size="sm"
                   onClick={handleAddImageUrl}
-                  disabled={!newImageUrl.trim()}
                   className="h-8 text-xs font-semibold shrink-0"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add URL
                 </Button>
               </div>
             </div>
+
+            {/* Image Grid */}
+            {formData.images.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 pt-2">
+                {formData.images.map((img, idx) => (
+                  <div
+                    key={idx}
+                    className={`relative group rounded-lg border-2 p-1 bg-card transition-all ${
+                      img.isPrimary ? "border-primary shadow-sm" : "border-border hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div className="aspect-square w-full rounded overflow-hidden bg-muted flex items-center justify-center relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.url}
+                        alt={img.altText || `Photo ${idx + 1}`}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+
+                      {img.isPrimary && (
+                        <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                          Cover
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-1 flex items-center justify-between gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleSetPrimary(idx)}
+                        className={`h-6 px-1.5 text-[10px] ${
+                          img.isPrimary ? "text-amber-500 font-bold" : "text-muted-foreground hover:text-amber-500"
+                        }`}
+                        title="Set as Primary Cover Photo"
+                      >
+                        <Star className={`h-3 w-3 ${img.isPrimary ? "fill-amber-400 text-amber-500" : ""}`} />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="h-6 px-1.5 text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50"
+                        title="Remove Photo"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 border border-dashed border-border rounded-xl text-center bg-muted/30">
+                <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground/50 mb-1" />
+                <p className="text-xs font-semibold text-muted-foreground">No photos attached yet</p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  Upload photos so dealers and customers can view the parts clearly.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
-        <DialogFooter className="border-t pt-4 mt-2 flex items-center justify-between sm:justify-between">
-          <div>
+        <DialogFooter className="border-t border-border pt-4 flex items-center justify-between sm:justify-between">
+          <div className="flex items-center gap-2">
             {formData.id && (
               <a
                 href={`/api/products/${formData.id}/label`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 hover:bg-amber-100 transition"
               >
-                <Printer className="h-3.5 w-3.5 text-amber-600" /> Print Label Sticker
+                <Printer className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" /> Label
               </a>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="text-xs">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
             <Button
               type="button"
+              size="sm"
               onClick={handleSave}
               disabled={saving}
-              className="bg-[#0b2d55] hover:bg-[#124177] text-white font-bold text-xs shadow-sm flex items-center gap-1.5"
+              className="gap-1.5 font-bold shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-              Save Product & Pricing
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save Changes
             </Button>
           </div>
         </DialogFooter>

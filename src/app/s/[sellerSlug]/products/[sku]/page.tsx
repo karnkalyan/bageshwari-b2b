@@ -58,7 +58,7 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
     isDealer ? getDealerCartItemCount(seller.id, session?.dealerId) : Promise.resolve(0),
   ]);
 
-  if (!product) notFound();
+  if (!product || (product.status !== "ACTIVE" && !isStaff)) notFound();
 
   const defaultVariant = product.variants.find((v: any) => v.isDefault) || product.variants[0];
   const mrp = defaultVariant ? Number(defaultVariant.mrp) : 0;
