@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { apiError } from "@/lib/api-response";
-import { generateProductBarcodeLabelPdf } from "@/lib/pdf";
+import { generateProductBarcodeLabelPdf, convertPdfToJpeg, parsePaperSize } from "@/lib/pdf";
 import { prisma } from "@/lib/db";
 
 export async function GET(
@@ -37,19 +37,44 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const count = parseInt(searchParams.get("count") || "1", 10);
-  const sizeParam = searchParams.get("size") === "standard" ? "standard" : "32x20";
+  const rawSize = searchParams.get("size")?.toLowerCase();
+  const rawPaper = searchParams.get("pageSize") || searchParams.get("paperSize");
+  const paperSize = parsePaperSize(rawPaper || (rawSize === "a4_sheet" ? "A4" : rawSize === "a5_sheet" ? "A5" : undefined));
+
+  let stickerSize: "32x20" | "standard" | "a4_sheet" | "a5_sheet" = "32x20";
+  if (rawSize === "standard") stickerSize = "standard";
+  else if (rawSize === "a4_sheet" || (rawPaper && parsePaperSize(rawPaper) === "A4" && rawSize !== "standard" && rawSize !== "32x20")) stickerSize = "a4_sheet";
+  else if (rawSize === "a5_sheet" || (rawPaper && parsePaperSize(rawPaper) === "A5" && rawSize !== "standard" && rawSize !== "32x20")) stickerSize = "a5_sheet";
+
   const isDownload = searchParams.get("download") === "1" || searchParams.get("download") === "true";
   const disposition = isDownload ? "attachment" : "inline";
 
-  const bytes = await generateProductBarcodeLabelPdf(product.id, sellerId, count, sizeParam);
+  const bytes = await generateProductBarcodeLabelPdf(product.id, sellerId, count, stickerSize, paperSize);
   if (!bytes) {
     return apiError("DOCUMENT_UNAVAILABLE", "Barcode data is unavailable.", 404);
   }
 
-  return new Response(new Uint8Array(bytes).buffer, {
+  const formatParam = searchParams.get("format")?.toLowerCase();
+  const isJpeg = formatParam === "jpeg" || formatParam === "jpg";
+  const ext = isJpeg ? "jpg" : "pdf";
+  const filename = `${product.sku}-barcode.${ext}`;
+
+  let responseBytes = bytes;
+  let contentType = "application/pdf";
+
+  if (isJpeg) {
+    try {
+      responseBytes = await convertPdfToJpeg(bytes, { scale: 3, quality: 95 });
+      contentType = "image/jpeg";
+    } catch (e: any) {
+      console.error("Failed to convert product barcode PDF to JPEG:", e);
+    }
+  }
+
+  return new Response(new Uint8Array(responseBytes).buffer, {
     headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `${disposition}; filename="${product.sku}-barcode.pdf"`,
+      "Content-Type": contentType,
+      "Content-Disposition": `${disposition}; filename="${filename}"`,
       "Cache-Control": "private, no-store",
     },
   });

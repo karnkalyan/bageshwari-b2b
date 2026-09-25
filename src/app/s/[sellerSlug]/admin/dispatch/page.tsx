@@ -19,6 +19,7 @@ import {
   Building2,
   Phone,
   User,
+  FileImage,
 } from "lucide-react";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
@@ -443,50 +444,94 @@ export default async function DispatchPortalPage({ params, searchParams }: Dispa
                           </Badge>
                         </td>
                         <td className="px-4 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* 1. Tax Invoice */}
-                            <a
-                              href={`/api/orders/${o.id}/documents/tax-invoice`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-indigo-500 transition-colors shadow-2xs"
-                              title="Tax Invoice"
-                            >
-                              <ShieldCheck className="h-3 w-3" /> Invoice
-                            </a>
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            {/* 1. Tax Invoice (PDF & JPEG) */}
+                            <div className="inline-flex items-center rounded-lg border border-border bg-card shadow-2xs overflow-hidden">
+                              <a
+                                href={`/api/orders/${o.id}/documents/final-invoice`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold hover:bg-accent text-indigo-600 transition-colors"
+                                title="Tax Invoice (PDF)"
+                              >
+                                <ShieldCheck className="h-3 w-3" /> Invoice
+                              </a>
+                              <a
+                                href={`/api/orders/${o.id}/documents/final-invoice?format=jpeg&download=1`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-1.5 py-1 text-[11px] font-semibold hover:bg-accent text-indigo-600 border-l border-border transition-colors"
+                                title="Download Tax Invoice as JPEG"
+                              >
+                                <FileImage className="h-2.5 w-2.5" />
+                              </a>
+                            </div>
 
-                            {/* 2. Packaging List */}
-                            <a
-                              href={`/api/orders/${o.id}/documents/packing-list`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-emerald-500 transition-colors shadow-2xs"
-                              title="Packing List"
-                            >
-                              <PackageCheck className="h-3 w-3" /> Packing List
-                            </a>
+                            {/* 2. Packaging List (PDF & JPEG) */}
+                            <div className="inline-flex items-center rounded-lg border border-border bg-card shadow-2xs overflow-hidden">
+                              <a
+                                href={`/api/orders/${o.id}/documents/packing-list`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold hover:bg-accent text-emerald-600 transition-colors"
+                                title="Packing List (PDF)"
+                              >
+                                <PackageCheck className="h-3 w-3" /> Packing List
+                              </a>
+                              <a
+                                href={`/api/orders/${o.id}/documents/packing-list?format=jpeg&download=1`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-1.5 py-1 text-[11px] font-semibold hover:bg-accent text-emerald-600 border-l border-border transition-colors"
+                                title="Download Packing List as JPEG"
+                              >
+                                <FileImage className="h-2.5 w-2.5" />
+                              </a>
+                            </div>
 
-                            {/* 3. Carton Labels */}
-                            <a
-                              href={`/api/orders/${o.id}/documents/package-labels`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-amber-500 transition-colors shadow-2xs"
-                              title="Carton Labels"
-                            >
-                              <Tag className="h-3 w-3" /> Labels
-                            </a>
+                            {/* 3. Carton Labels (PDF & JPEG) */}
+                            <div className="inline-flex items-center rounded-lg border border-border bg-card shadow-2xs overflow-hidden">
+                              <a
+                                href={`/api/orders/${o.id}/documents/package-labels`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold hover:bg-accent text-amber-600 transition-colors"
+                                title="Carton Labels (PDF)"
+                              >
+                                <Tag className="h-3 w-3" /> Labels
+                              </a>
+                              <a
+                                href={`/api/orders/${o.id}/documents/package-labels?format=jpeg&download=1`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-1.5 py-1 text-[11px] font-semibold hover:bg-accent text-amber-600 border-l border-border transition-colors"
+                                title="Download Carton Labels as JPEG"
+                              >
+                                <FileImage className="h-2.5 w-2.5" />
+                              </a>
+                            </div>
 
-                            {/* 4. Delivery Challan */}
-                            <a
-                              href={`/api/orders/${o.id}/documents/dispatch-challan`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-border bg-card hover:bg-accent text-blue-500 transition-colors shadow-2xs"
-                              title="Delivery Challan"
-                            >
-                              <Truck className="h-3 w-3" /> Challan
-                            </a>
+                            {/* 4. Delivery Challan (PDF & JPEG) */}
+                            <div className="inline-flex items-center rounded-lg border border-border bg-card shadow-2xs overflow-hidden">
+                              <a
+                                href={`/api/orders/${o.id}/documents/dispatch-challan`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold hover:bg-accent text-blue-600 transition-colors"
+                                title="Delivery Challan (PDF)"
+                              >
+                                <Truck className="h-3 w-3" /> Challan
+                              </a>
+                              <a
+                                href={`/api/orders/${o.id}/documents/dispatch-challan?format=jpeg&download=1`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-1.5 py-1 text-[11px] font-semibold hover:bg-accent text-blue-600 border-l border-border transition-colors"
+                                title="Download Delivery Challan as JPEG"
+                              >
+                                <FileImage className="h-2.5 w-2.5" />
+                              </a>
+                            </div>
 
                             {/* 5. Edit Challan & Transport Details */}
                             {shipment && (

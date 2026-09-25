@@ -1,6 +1,8 @@
 import { PDFFont } from "pdf-lib";
 import {
   COLORS,
+  PaperSize,
+  getPageDimensions,
   createPdfContext,
   drawText,
   drawRightText,
@@ -25,7 +27,8 @@ export interface ProductLabelData {
   unitCode?: string | null;
   origin?: string | null;
   companyName?: string | null;
-  stickerSize?: "32x20" | "standard";
+  stickerSize?: "32x20" | "standard" | "a4_sheet" | "a5_sheet";
+  paperSize?: PaperSize;
 }
 
 /**
@@ -56,21 +59,147 @@ function fitText(
   return { text: truncated.length < text.length ? truncated + "..." : truncated, size: minSize };
 }
 
+async function drawBarcodeStickerCell(
+  page: any,
+  pdf: any,
+  fonts: { regular: PDFFont; bold: PDFFont },
+  data: ProductLabelData,
+  box: { x: number; y: number; width: number; height: number },
+  mrpGross: number,
+  vatRate: number,
+  barcodeValue: string
+) {
+  const { regular, bold } = fonts;
+  // Border
+  drawBox(page, box.x, box.y, box.width, box.height, {
+    borderColor: COLORS.border,
+    borderWidth: 0.6,
+    color: COLORS.white,
+  });
+
+  const pad = 4;
+  const topY = box.y + box.height - pad;
+  const w = box.width - pad * 2;
+
+  // 1. Company Name Header
+  const sellerTitle = (data.companyName || "BAGESHWARI TRACTOR, NEPALGUNJ").toUpperCase();
+  const fittedSeller = fitText(sellerTitle, bold, 5.5, w);
+  drawCenteredText(page, fittedSeller.text, box.x + box.width / 2, topY - 6, bold, {
+    size: fittedSeller.size,
+    color: COLORS.primary,
+  });
+
+  // 2. Product Name
+  const fittedName = fitText(data.name, bold, 6.2, w);
+  drawCenteredText(page, fittedName.text, box.x + box.width / 2, topY - 14, bold, {
+    size: fittedName.size,
+    color: COLORS.black,
+  });
+
+  // 3. SKU and MRP
+  const skuText = `SKU: ${data.sku}`;
+  const mrpText = `MRP: ${formatNpr(mrpGross)}`;
+  drawText(page, skuText, box.x + pad + 2, topY - 24, {
+    size: 5.5,
+    font: bold,
+    color: COLORS.primary,
+  });
+  drawRightText(page, mrpText, box.x + box.width - pad - 2, topY - 24, bold, {
+    size: 6.2,
+    color: COLORS.primary,
+  });
+
+  // 4. Barcode
+  const barcodeHeight = Math.max(16, box.height * 0.28);
+  const barcodeY = box.y + 16;
+  const barcodeImg = await generateBarcodeImage(pdf, barcodeValue, { height: 12, scale: 2 });
+  if (barcodeImg) {
+    page.drawImage(barcodeImg, {
+      x: box.x + pad + 6,
+      y: barcodeY,
+      width: w - 12,
+      height: barcodeHeight,
+    });
+  }
+
+  // 5. Barcode text & VAT
+  const botText = `${barcodeValue} • (Incl. ${vatRate}% VAT)`;
+  const fittedBot = fitText(botText, regular, 5.0, w);
+  drawCenteredText(page, fittedBot.text, box.x + box.width / 2, box.y + 5, regular, {
+    size: fittedBot.size,
+    color: COLORS.secondary,
+  });
+}
+
 export async function renderProductBarcodeLabelPdf(data: ProductLabelData, labelCount = 1): Promise<Uint8Array> {
   const ctx = await createPdfContext();
   const { pdf, regular, bold } = ctx;
-
-  const isThermal32x20 = data.stickerSize === "32x20" || !data.stickerSize; // default to 32x20mm as requested
-  const LABEL_WIDTH = isThermal32x20 ? 91 : 216; // 32mm = ~90.7pt, 3 inch = 216pt
-  const LABEL_HEIGHT = isThermal32x20 ? 57 : 144; // 20mm = ~56.7pt, 2 inch = 144pt
-  const MARGIN = isThermal32x20 ? 3 : 8;
-  const CONTENT_WIDTH = LABEL_WIDTH - MARGIN * 2;
 
   const barcodeValue = data.barcode || data.sku;
   const rawVat = data.vatPercent !== undefined ? Number(data.vatPercent) : 13;
   const vatRate = rawVat > 0 && rawVat <= 1.0 ? Number((rawVat * 100).toFixed(2)) : rawVat;
   // MRP is legally and standardly VAT-inclusive in Nepal; do not double-compound
   const mrpGross = data.mrpInclVat !== undefined ? data.mrpInclVat : data.mrp;
+
+  const isSheet =
+    data.paperSize === "A4" ||
+    data.paperSize === "A5" ||
+    data.paperSize === "Letter" ||
+    data.paperSize === "Legal" ||
+    data.stickerSize === "a4_sheet" ||
+    data.stickerSize === "a5_sheet";
+
+  if (isSheet) {
+    const targetPaper = data.paperSize || (data.stickerSize === "a5_sheet" ? "A5" : "A4");
+    const { width: PAGE_WIDTH, height: PAGE_HEIGHT } = getPageDimensions(targetPaper);
+    const isA5 = targetPaper === "A5";
+
+    const cols = isA5 ? 2 : 3;
+    const rows = isA5 ? 6 : (targetPaper === "Legal" ? 10 : 8);
+    const stickersPerPage = cols * rows;
+
+    const marginX = isA5 ? 14 : 16;
+    const marginY = isA5 ? 16 : 20;
+    const gutterX = 8;
+    const gutterY = 8;
+
+    const cellW = (PAGE_WIDTH - marginX * 2 - gutterX * (cols - 1)) / cols;
+    const cellH = (PAGE_HEIGHT - marginY * 2 - gutterY * (rows - 1)) / rows;
+
+    const totalToPrint = Math.max(1, labelCount);
+
+    for (let offset = 0; offset < totalToPrint; offset += stickersPerPage) {
+      const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      const currentBatch = Math.min(stickersPerPage, totalToPrint - offset);
+
+      for (let idx = 0; idx < currentBatch; idx++) {
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+
+        const cellX = marginX + col * (cellW + gutterX);
+        const cellY = PAGE_HEIGHT - marginY - (row + 1) * cellH - row * gutterY;
+
+        await drawBarcodeStickerCell(
+          page,
+          pdf,
+          { regular, bold },
+          data,
+          { x: cellX, y: cellY, width: cellW, height: cellH },
+          mrpGross,
+          vatRate,
+          barcodeValue
+        );
+      }
+    }
+
+    return pdf.save();
+  }
+
+  const isThermal32x20 = data.stickerSize === "32x20" || !data.stickerSize; // default to 32x20mm as requested
+  const LABEL_WIDTH = isThermal32x20 ? 91 : 216; // 32mm = ~90.7pt, 3 inch = 216pt
+  const LABEL_HEIGHT = isThermal32x20 ? 57 : 144; // 20mm = ~56.7pt, 2 inch = 144pt
+  const MARGIN = isThermal32x20 ? 3 : 8;
+  const CONTENT_WIDTH = LABEL_WIDTH - MARGIN * 2;
 
   for (let i = 0; i < Math.max(1, labelCount); i++) {
     const page = pdf.addPage([LABEL_WIDTH, LABEL_HEIGHT]);

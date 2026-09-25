@@ -85,6 +85,8 @@ interface SalesOrderCreatorProps {
   isDealer?: boolean;
   initialCategories?: string[];
   vatPercent?: number;
+  initialOrderItems?: SalesOrderItem[];
+  initialNotes?: string;
 }
 
 export function SalesOrderCreator({
@@ -95,6 +97,8 @@ export function SalesOrderCreator({
   isDealer = false,
   initialCategories = [],
   vatPercent = 13.0,
+  initialOrderItems = [],
+  initialNotes = "",
 }: SalesOrderCreatorProps) {
   const router = useRouter();
 
@@ -115,9 +119,41 @@ export function SalesOrderCreator({
   const [toast, setToast] = useState<{ message: string; id: number } | null>(null);
   const [isCartBouncing, setIsCartBouncing] = useState(false);
 
-  const [orderItems, setOrderItems] = useState<SalesOrderItem[]>([]);
-  const [orderNotes, setOrderNotes] = useState("");
+  const storageKey = `b2b_draft_cart_${isDealer ? "dealer" : "sales"}_${selectedDealerId || initialDealerId || "default"}`;
+  const [orderItems, setOrderItems] = useState<SalesOrderItem[]>(initialOrderItems && initialOrderItems.length > 0 ? initialOrderItems : []);
+  const [orderNotes, setOrderNotes] = useState(initialNotes || "");
   const [freightTotal, setFreightTotal] = useState<number>(0);
+  const [draftSavedTime, setDraftSavedTime] = useState<string | null>(null);
+
+  // Restore draft from localStorage on mount if no initial items provided
+  useEffect(() => {
+    if (initialOrderItems && initialOrderItems.length > 0) return;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+          setOrderItems(parsed.items);
+          if (parsed.notes) setOrderNotes(parsed.notes);
+          setDraftSavedTime("Restored from draft");
+        }
+      }
+    } catch {}
+  }, [storageKey, initialOrderItems]);
+
+  // Persist cart items & notes to localStorage whenever changed
+  useEffect(() => {
+    if (orderItems.length > 0 || orderNotes.trim().length > 0) {
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({ items: orderItems, notes: orderNotes, updatedAt: Date.now() })
+        );
+        const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        setDraftSavedTime(`Saved at ${timeStr}`);
+      } catch {}
+    }
+  }, [orderItems, orderNotes, storageKey]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -404,6 +440,16 @@ export function SalesOrderCreator({
       if (!res.ok || !json.success) {
         throw new Error(json?.message || json?.error?.message || "Failed to create order.");
       }
+
+      if (!submitForReview) {
+        showToast("Draft order saved to account!");
+        setDraftSavedTime("Draft synced to server");
+        return;
+      }
+
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {}
 
       const targetRedirect = isDealer
         ? `/dealer/orders/${json.data.orderId}`
@@ -772,9 +818,17 @@ export function SalesOrderCreator({
               </div>
 
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-bold flex items-center gap-2 text-white">
-                  <ShoppingCart className="h-4 w-4 text-emerald-400" /> Sales Order Cart
-                </CardTitle>
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-white">
+                    <ShoppingCart className="h-4 w-4 text-emerald-400" /> Sales Order Cart
+                  </CardTitle>
+                  {draftSavedTime && (
+                    <div className="text-[10px] text-emerald-300 font-medium flex items-center gap-1 mt-0.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{draftSavedTime}</span>
+                    </div>
+                  )}
+                </div>
                 <Badge className="bg-emerald-500 text-slate-950 font-extrabold text-xs px-2 py-0.5">
                   {totalItemUnits} units • {orderItems.length} items
                 </Badge>

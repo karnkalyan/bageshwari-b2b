@@ -47,6 +47,7 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
         variants: { where: { isDefault: true }, take: 1 },
         prices: { where: { active: true } },
         inventories: { select: { availableQuantity: true } },
+        images: { where: { isPrimary: true }, take: 1, select: { url: true } },
       },
     }),
     prisma.dealer.findFirst({
@@ -156,14 +157,29 @@ export default async function DealerProductsPage({ params, searchParams }: Deale
           return (
             <Card key={p.id} className="hover:border-emerald-500/50 hover:shadow-lg transition-all duration-300 flex flex-col justify-between">
               <CardContent className="p-5 space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-slate-400">{p.category?.name} • SKU: {p.sku}</span>
-                    {discountPercent > 0 && (
-                      <Badge className="bg-emerald-600 text-white text-[10px]">{discountPercent}% Dealer Discount</Badge>
+                <div className="flex gap-3 items-start">
+                  <div className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center p-1">
+                    {p.images?.[0]?.url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={p.images[0].url}
+                        alt={p.name}
+                        className="h-full w-full object-contain"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-bold">No Image</span>
                     )}
                   </div>
-                  <h3 className="font-bold text-sm text-slate-900 line-clamp-2">{p.name}</h3>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <span className="text-[10px] text-slate-400 truncate">{p.category?.name} • SKU: {p.sku}</span>
+                      {discountPercent > 0 && (
+                        <Badge className="bg-emerald-600 text-white text-[9px] shrink-0">{discountPercent}% DP</Badge>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-900 line-clamp-2">{p.name}</h3>
+                  </div>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-lg space-y-1.5 border border-slate-200">

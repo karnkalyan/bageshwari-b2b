@@ -4,10 +4,11 @@ import { useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DealerChangePasswordDialog } from "./dealer-change-password-dialog";
 
 type CredentialsLoginFormProps = {
   scope: "staff" | "dealer";
@@ -29,6 +30,7 @@ export function CredentialsLoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(
     searchParams.get("error") === "CredentialsSignin"
@@ -105,7 +107,20 @@ export function CredentialsLoginForm({
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between"><Label htmlFor={`${scope}-password`}>Password</Label><span className="text-[10px] font-semibold text-slate-400">Secure access</span></div>
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`${scope}-password`}>Password</Label>
+          {scope === "dealer" ? (
+            <button
+              type="button"
+              onClick={() => setShowChangePassword(true)}
+              className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1"
+            >
+              <KeyRound className="h-3 w-3" /> Change / Update password?
+            </button>
+          ) : (
+            <span className="text-[10px] font-semibold text-slate-400">Secure access</span>
+          )}
+        </div>
         <div className="relative">
           <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input id={`${scope}-password`} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} className="h-11 px-10" placeholder="Enter your password" autoComplete="current-password" minLength={6} required disabled={isLoading} />
@@ -118,7 +133,20 @@ export function CredentialsLoginForm({
       </Button>
 
       {scope === "dealer" && (
-        <p className="text-center text-xs text-slate-500">Need a dealer account? <Link href="/request-dealership" className="font-bold text-red-600 hover:underline">Request dealership</Link></p>
+        <div className="space-y-2 pt-1 text-center text-xs text-slate-500">
+          <p>
+            Need a dealer account?{" "}
+            <Link href="/request-dealership" className="font-bold text-red-600 hover:underline">
+              Request dealership
+            </Link>
+          </p>
+          <DealerChangePasswordDialog
+            open={showChangePassword}
+            onOpenChange={setShowChangePassword}
+            defaultEmail={email}
+            isLoggedIn={false}
+          />
+        </div>
       )}
     </form>
   );

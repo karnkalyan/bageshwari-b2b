@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { apiError } from "@/lib/api-response";
-import { generateOrderPdf, type OrderDocumentKind } from "@/lib/pdf";
+import { generateOrderPdf, convertPdfToJpeg, type OrderDocumentKind, parsePaperSize } from "@/lib/pdf";
 import { prisma } from "@/lib/db";
 
 const kinds = new Set<string>([
@@ -34,7 +34,13 @@ export async function GET(
   }
 
   const { id, kind } = await params;
-  if (!kinds.has(kind)) {
+  let normalizedKind = kind;
+  if (kind === "tax-invoice" || kind === "invoice") normalizedKind = "final-invoice";
+  if (kind === "challan") normalizedKind = "dispatch-challan";
+  if (kind === "carton-labels" || kind === "carton-label" || kind === "cartons") normalizedKind = "package-labels";
+  if (kind === "packaging-list") normalizedKind = "packing-list";
+
+  if (!kinds.has(normalizedKind)) {
     return apiError("DOCUMENT_TYPE_INVALID", "Unsupported document type.", 404);
   }
 
@@ -88,7 +94,7 @@ export async function GET(
     "COMPLETED",
   ].includes(allowed.status);
 
-  if (kind === "sales-order" && !isSentToWarehouse) {
+  if (normalizedKind === "sales-order" && !isSentToWarehouse) {
     return apiError(
       "ORDER_NOT_RELEASED_TO_WAREHOUSE",
       "Sales Order document is available only after the order is released to warehouse for fulfillment.",
@@ -126,19 +132,40 @@ export async function GET(
     );
   }
 
-  const bytes = await generateOrderPdf(allowed.id, sellerId, kind as OrderDocumentKind);
+  const { searchParams } = new URL(request.url);
+  const rawLayout = searchParams.get("layout");
+  const layout = (rawLayout === "a4_4" || rawLayout === "a4_2" || rawLayout === "a4_1" || rawLayout === "thermal") ? rawLayout : "a4_4";
+  const paperSize = parsePaperSize(searchParams.get("pageSize") || searchParams.get("paperSize") || searchParams.get("size"));
+
+  const bytes = await generateOrderPdf(allowed.id, sellerId, normalizedKind as OrderDocumentKind, { layout, paperSize });
   if (!bytes) {
     return apiError("DOCUMENT_UNAVAILABLE", "Document data is unavailable.", 404);
   }
 
-  const { searchParams } = new URL(request.url);
   const isDownload = searchParams.get("download") === "1" || searchParams.get("download") === "true";
   const disposition = isDownload ? "attachment" : "inline";
 
-  return new Response(new Uint8Array(bytes).buffer, {
+  const formatParam = searchParams.get("format")?.toLowerCase();
+  const isJpeg = formatParam === "jpeg" || formatParam === "jpg";
+
+  let responseBytes = bytes;
+  let contentType = "application/pdf";
+  let extension = "pdf";
+
+  if (isJpeg) {
+    try {
+      responseBytes = await convertPdfToJpeg(bytes, { scale: 2, quality: 92 });
+      contentType = "image/jpeg";
+      extension = "jpg";
+    } catch (e: any) {
+      console.error("Failed to convert document PDF to JPEG:", e);
+    }
+  }
+
+  return new Response(new Uint8Array(responseBytes).buffer, {
     headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `${disposition}; filename="${allowed.orderNumber}-${kind}.pdf"`,
+      "Content-Type": contentType,
+      "Content-Disposition": `${disposition}; filename="${allowed.orderNumber}-${normalizedKind}.${extension}"`,
       "Cache-Control": "private, no-store",
     },
   });

@@ -113,6 +113,27 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
       }
       return null;
     })(),
+    merchantQrs: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (Array.isArray(parsed.merchantQrs)) return parsed.merchantQrs;
+          if (parsed.merchantQrUrl) {
+            return [
+              {
+                id: "default-qr",
+                title: "Primary Merchant QR",
+                qrUrl: parsed.merchantQrUrl,
+                accountName: companyRaw.companyName || "Bageshwari Tractors",
+                accountNumber: parsed.upiId || "",
+                isActive: true,
+              },
+            ];
+          }
+        } catch {}
+      }
+      return [];
+    })(),
     upiId: (() => {
       if (companyRaw?.socialLinksJson) {
         try {

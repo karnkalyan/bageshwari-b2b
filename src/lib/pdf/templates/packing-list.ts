@@ -1,6 +1,8 @@
 import { CompanyInfo, DealerInfo } from "../types";
 import {
   COLORS,
+  PaperSize,
+  getPageDimensions,
   createPdfContext,
   drawText,
   drawRightText,
@@ -49,29 +51,31 @@ export interface PackingListData {
   driverName?: string;
   vehicleNumber?: string;
   notes?: string | null;
+  paperSize?: PaperSize;
 }
 
 export async function renderPackingListPdf(data: PackingListData): Promise<Uint8Array> {
   const ctx = await createPdfContext();
   const { pdf, regular, bold, oblique } = ctx;
 
-  const PAGE_WIDTH = 595.28; // A4
-  const PAGE_HEIGHT = 841.89;
-  const MARGIN = 36;
+  const { width: PAGE_WIDTH, height: PAGE_HEIGHT } = getPageDimensions(data.paperSize);
+  const isA5 = data.paperSize === "A5";
+  const MARGIN = isA5 ? 20 : 36;
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
   let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN;
 
   // 1. Header Banner
-  drawBox(page, MARGIN, y - 64, CONTENT_WIDTH, 64, {
+  const bannerH = isA5 ? 54 : 64;
+  drawBox(page, MARGIN, y - bannerH, CONTENT_WIDTH, bannerH, {
     color: COLORS.bgLight,
     borderColor: COLORS.primary,
     borderWidth: 1,
   });
 
-  drawText(page, (data.company.tradingName || data.company.legalName || "BAGESHWARI TRACTORS").toUpperCase(), MARGIN + 12, y - 18, {
-    size: 13,
+  drawText(page, (data.company.tradingName || data.company.legalName || "BAGESHWARI TRACTORS").toUpperCase(), MARGIN + (isA5 ? 8 : 12), y - (isA5 ? 14 : 18), {
+    size: isA5 ? 10.5 : 13,
     font: bold,
     color: COLORS.primary,
   });
@@ -84,51 +88,51 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
   );
   drawText(
     page,
-    `${companyAddress} | PAN: ${data.company.panNumber || data.company.vatNumber || "302918239"} | Ph: ${data.company.phone || "+977-81-520123"}`,
-    MARGIN + 12,
-    y - 32,
-    { size: 7.5, font: regular, color: COLORS.secondary }
+    `${companyAddress} | Ph: ${data.company.phone || "+977-81-520123"}`,
+    MARGIN + (isA5 ? 8 : 12),
+    y - (isA5 ? 25 : 32),
+    { size: isA5 ? 6.8 : 7.5, font: regular, color: COLORS.secondary, maxWidth: isA5 ? CONTENT_WIDTH * 0.55 : undefined }
   );
 
-  drawText(page, "CENTRAL WAREHOUSE FULFILLMENT & PACKAGING DEPARTMENT", MARGIN + 12, y - 46, {
-    size: 7.5,
+  drawText(page, "CENTRAL WAREHOUSE FULFILLMENT", MARGIN + (isA5 ? 8 : 12), y - (isA5 ? 36 : 46), {
+    size: isA5 ? 6.8 : 7.5,
     font: bold,
     color: COLORS.primary,
   });
 
-  drawText(page, `Warehouse: ${data.warehouseName || "Nepalgunj Distribution Center Hub"}`, MARGIN + 12, y - 57, {
-    size: 7,
+  drawText(page, `Depot: ${data.warehouseName || "Nepalgunj Distribution Center"}`, MARGIN + (isA5 ? 8 : 12), y - (isA5 ? 46 : 57), {
+    size: isA5 ? 6.2 : 7,
     font: oblique,
     color: COLORS.muted,
   });
 
   // Title on Right
-  drawRightText(page, "PACKAGING LIST", MARGIN + CONTENT_WIDTH - 12, y - 20, bold, {
-    size: 14,
+  drawRightText(page, "PACKAGING LIST", MARGIN + CONTENT_WIDTH - (isA5 ? 8 : 12), y - (isA5 ? 14 : 20), bold, {
+    size: isA5 ? 11 : 14,
     color: COLORS.primary,
   });
-  drawRightText(page, "(CARTON MANIFEST & CONTENTS)", MARGIN + CONTENT_WIDTH - 12, y - 32, bold, {
-    size: 7,
+  drawRightText(page, "(CARTON MANIFEST & CONTENTS)", MARGIN + CONTENT_WIDTH - (isA5 ? 8 : 12), y - (isA5 ? 24 : 32), bold, {
+    size: isA5 ? 6 : 7,
     color: COLORS.danger,
   });
   const cleanPackingListNo = (data.packingListNumber || "").replace(/--+/g, "-");
-  drawRightText(page, `Packing List #: ${cleanPackingListNo}`, MARGIN + CONTENT_WIDTH - 12, y - 44, bold, {
-    size: 8.5,
+  drawRightText(page, `PL #: ${cleanPackingListNo}`, MARGIN + CONTENT_WIDTH - (isA5 ? 8 : 12), y - (isA5 ? 34 : 44), bold, {
+    size: isA5 ? 7.5 : 8.5,
     color: COLORS.primary,
   });
   drawRightText(
     page,
     `Date: ${new Date(data.packingDate).toISOString().slice(0, 10)}`,
-    MARGIN + CONTENT_WIDTH - 12,
-    y - 56,
+    MARGIN + CONTENT_WIDTH - (isA5 ? 8 : 12),
+    y - (isA5 ? 44 : 56),
     regular,
-    { size: 7.5, color: COLORS.secondary }
+    { size: isA5 ? 6.5 : 7.5, color: COLORS.secondary }
   );
 
-  y -= 74;
+  y -= bannerH + (isA5 ? 8 : 10);
 
   // 2. Metadata Information Block
-  const infoHeight = 82;
+  const infoHeight = isA5 ? 74 : 82;
   drawBox(page, MARGIN, y - infoHeight, CONTENT_WIDTH, infoHeight, {
     color: COLORS.white,
     borderColor: COLORS.border,
@@ -143,74 +147,78 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
   });
 
   // Left: Consignee / Dealer
-  const leftX = MARGIN + 8;
-  drawText(page, "CONSIGNEE (DESTINATION DEALER)", leftX, y - 12, { size: 7, font: bold, color: COLORS.muted });
-  drawText(page, data.dealer.tradingName || data.dealer.legalName, leftX, y - 24, { size: 9, font: bold, color: COLORS.primary });
+  const leftX = MARGIN + 6;
+  const colHalfW = CONTENT_WIDTH / 2 - 12;
+  drawText(page, "CONSIGNEE (DESTINATION DEALER)", leftX, y - (isA5 ? 11 : 12), { size: isA5 ? 6.5 : 7, font: bold, color: COLORS.muted });
+  drawText(page, data.dealer.tradingName || data.dealer.legalName, leftX, y - (isA5 ? 22 : 24), { size: isA5 ? 8 : 9, font: bold, color: COLORS.primary, maxWidth: colHalfW });
   drawText(
     page,
-    `Destination: ${data.dealer.addressLine1 || ""}, ${data.dealer.city || ""}, ${data.dealer.district || ""}`,
+    `Dest: ${data.dealer.addressLine1 || ""}, ${data.dealer.city || ""}`,
     leftX,
-    y - 36,
-    { size: 7.5, font: regular, color: COLORS.secondary, maxWidth: 240 }
+    y - (isA5 ? 33 : 36),
+    { size: isA5 ? 6.8 : 7.5, font: regular, color: COLORS.secondary, maxWidth: colHalfW }
   );
-  drawText(page, `Dealer Code: ${data.dealer.code} | PAN/VAT: ${data.dealer.taxNumber}`, leftX, y - 48, {
-    size: 7.5,
+  drawText(page, `Code: ${data.dealer.code} | PAN: ${data.dealer.taxNumber}`, leftX, y - (isA5 ? 44 : 48), {
+    size: isA5 ? 6.8 : 7.5,
     font: regular,
     color: COLORS.secondary,
   });
-  drawText(page, `Contact: ${data.dealer.contactName || "Proprietor"} (Ph: ${data.dealer.phone || "N/A"})`, leftX, y - 60, {
-    size: 7.5,
+  drawText(page, `Contact: ${data.dealer.contactName || "Proprietor"} (Ph: ${data.dealer.phone || "N/A"})`, leftX, y - (isA5 ? 54 : 60), {
+    size: isA5 ? 6.8 : 7.5,
     font: regular,
     color: COLORS.secondary,
+    maxWidth: colHalfW,
   });
-  drawText(page, `Order Ref: ${data.orderNumber} | Tax Invoice: ${data.invoiceNumber || "Enclosed"}`, leftX, y - 72, {
-    size: 7.5,
+  drawText(page, `Order Ref: ${data.orderNumber} | Inv: ${data.invoiceNumber || "Enclosed"}`, leftX, y - (isA5 ? 64 : 72), {
+    size: isA5 ? 6.8 : 7.5,
     font: bold,
     color: COLORS.primary,
+    maxWidth: colHalfW,
   });
 
   // Right: Logistics & Packaging Summary
-  const rightColX = MARGIN + CONTENT_WIDTH / 2 + 8;
-  drawText(page, "PACKAGING & DISPATCH SPECIFICATIONS", rightColX, y - 12, { size: 7, font: bold, color: COLORS.muted });
-  drawText(page, `Carrier: ${data.transporterName || "Dedicated Logistics Transporter"}`, rightColX, y - 24, {
-    size: 8.5,
+  const rightColX = MARGIN + CONTENT_WIDTH / 2 + 6;
+  drawText(page, "PACKAGING & DISPATCH SPECIFICATIONS", rightColX, y - (isA5 ? 11 : 12), { size: isA5 ? 6.5 : 7, font: bold, color: COLORS.muted });
+  drawText(page, `Carrier: ${data.transporterName || "Dedicated Logistics"}`, rightColX, y - (isA5 ? 22 : 24), {
+    size: isA5 ? 7.5 : 8.5,
     font: bold,
     color: COLORS.primary,
+    maxWidth: colHalfW,
   });
   drawText(
     page,
-    `Vehicle No: ${data.vehicleNumber || "N/A"} | Driver: ${data.driverName || "N/A"}`,
+    `Vehicle: ${data.vehicleNumber || "N/A"} | Driver: ${data.driverName || "N/A"}`,
     rightColX,
-    y - 36,
-    { size: 8, font: bold, color: COLORS.danger }
+    y - (isA5 ? 33 : 36),
+    { size: isA5 ? 7.2 : 8, font: bold, color: COLORS.danger, maxWidth: colHalfW }
   );
-  drawText(page, `Challan Ref: ${data.challanNumber || data.shipmentNumber || "Enclosed"}`, rightColX, y - 48, {
-    size: 7.5,
+  drawText(page, `Challan Ref: ${data.challanNumber || data.shipmentNumber || "Enclosed"}`, rightColX, y - (isA5 ? 44 : 48), {
+    size: isA5 ? 6.8 : 7.5,
     font: regular,
     color: COLORS.secondary,
   });
-  drawText(page, `Packed By: ${data.packedByName || "Lead Warehouse Specialist"}`, rightColX, y - 60, {
-    size: 7.5,
+  drawText(page, `Packed By: ${data.packedByName || "Lead Specialist"}`, rightColX, y - (isA5 ? 54 : 60), {
+    size: isA5 ? 6.8 : 7.5,
     font: regular,
     color: COLORS.secondary,
   });
   drawText(
     page,
-    `Total: ${data.totalCartons} Box(es) | Total Gross Weight: ${Number(data.totalWeight).toFixed(2)} KG`,
+    `Boxes: ${data.totalCartons} | Gross Wt: ${Number(data.totalWeight).toFixed(2)} KG`,
     rightColX,
-    y - 72,
-    { size: 8, font: bold, color: COLORS.primary }
+    y - (isA5 ? 64 : 72),
+    { size: isA5 ? 7.2 : 8, font: bold, color: COLORS.primary }
   );
 
-  y -= infoHeight + 12;
+  y -= infoHeight + (isA5 ? 8 : 12);
 
   // 3. Package Manifest Table
   const colX = {
     box: MARGIN,
-    pkgNum: MARGIN + 52,
-    typeDim: MARGIN + 110,
-    weight: MARGIN + 255,
-    contents: MARGIN + 315,
+    pkgNum: MARGIN + (isA5 ? 36 : 52),
+    typeDim: MARGIN + (isA5 ? 78 : 110),
+    weight: MARGIN + CONTENT_WIDTH - (isA5 ? 175 : 240),
+    contents: MARGIN + CONTENT_WIDTH - (isA5 ? 120 : 175),
     check: MARGIN + CONTENT_WIDTH,
   };
 
@@ -221,12 +229,12 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
     borderWidth: 0.75,
   });
 
-  drawText(page, "BOX #", colX.box + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawText(page, "CARTON NO", colX.pkgNum + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawText(page, "TYPE & DIMENSIONS", colX.typeDim + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawRightText(page, "GROSS WT", colX.weight + 52, y - 12, bold, { size: 7.5, color: COLORS.primary });
-  drawText(page, "PACKED ITEMS / CONTENTS", colX.contents + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-  drawRightText(page, "STATUS", colX.check - 6, y - 12, bold, { size: 7.5, color: COLORS.primary });
+  drawText(page, "BOX #", colX.box + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "CARTON NO", colX.pkgNum + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "TYPE & DIM", colX.typeDim + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawRightText(page, "GROSS WT", colX.contents - 6, y - 12, bold, { size: isA5 ? 6.5 : 7.5, color: COLORS.primary });
+  drawText(page, "CONTENTS", colX.contents + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawRightText(page, "STATUS", colX.check - 6, y - 12, bold, { size: isA5 ? 6.5 : 7.5, color: COLORS.primary });
 
   y -= headerH;
 
@@ -399,11 +407,12 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
   // Barcode on Right of Summary Box
   const barcodeImg = await generateBarcodeImage(pdf, data.packingListNumber || data.orderNumber, { height: 12 });
   if (barcodeImg) {
+    const barW = isA5 ? 100 : 135;
     page.drawImage(barcodeImg, {
-      x: MARGIN + CONTENT_WIDTH - 145,
+      x: MARGIN + CONTENT_WIDTH - barW - 8,
       y: y - 42,
-      width: 135,
-      height: 30,
+      width: barW,
+      height: isA5 ? 24 : 30,
     });
   }
 

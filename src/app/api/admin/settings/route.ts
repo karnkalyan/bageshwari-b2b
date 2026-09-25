@@ -28,6 +28,17 @@ const updateSettingsSchema = z.object({
   bankSwiftCode: z.string().trim().max(20).optional().nullable(),
   bankAccountType: z.string().trim().max(50).optional().nullable(),
   merchantQrUrl: z.string().trim().optional().nullable(),
+  merchantQrs: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string().trim().min(1),
+      qrUrl: z.string().trim().min(1),
+      accountName: z.string().trim().optional().nullable(),
+      accountNumber: z.string().trim().optional().nullable(),
+      isActive: z.boolean().default(true),
+      createdAt: z.string().optional(),
+    })
+  ).optional(),
   upiId: z.string().trim().max(100).optional().nullable(),
   paymentInstructions: z.string().trim().max(1000).optional().nullable(),
   enableDealerCredit: z.boolean().optional(),
@@ -111,6 +122,20 @@ export async function GET() {
     ? {
         ...company,
         merchantQrUrl: meta.merchantQrUrl || null,
+        merchantQrs: Array.isArray(meta.merchantQrs)
+          ? meta.merchantQrs
+          : meta.merchantQrUrl
+          ? [
+              {
+                id: "default-qr",
+                title: "Primary Merchant QR",
+                qrUrl: meta.merchantQrUrl,
+                accountName: company.companyName || "Bageshwari Tractors",
+                accountNumber: meta.upiId || "",
+                isActive: true,
+              },
+            ]
+          : [],
         bankAccountType: meta.bankAccountType || "Current Account",
         upiId: meta.upiId || null,
         paymentInstructions: meta.paymentInstructions || null,
@@ -238,10 +263,13 @@ export async function PUT(request: Request) {
                 try {
                   existingMeta = existingProfile?.socialLinksJson ? JSON.parse(existingProfile.socialLinksJson) : {};
                 } catch {}
+                const activeQr = companyData.merchantQrs?.find((q: any) => q.isActive);
+                const primaryQr = activeQr?.qrUrl || companyData.merchantQrUrl || companyData.merchantQrs?.[0]?.qrUrl || null;
                 const merged = {
                   ...existingMeta,
                   ...(companyData.themeConfig || {}),
-                  ...(companyData.merchantQrUrl !== undefined ? { merchantQrUrl: companyData.merchantQrUrl } : {}),
+                  ...(companyData.merchantQrUrl !== undefined ? { merchantQrUrl: primaryQr } : {}),
+                  ...(companyData.merchantQrs !== undefined ? { merchantQrs: companyData.merchantQrs, merchantQrUrl: primaryQr } : {}),
                   ...(companyData.bankAccountType !== undefined ? { bankAccountType: companyData.bankAccountType } : {}),
                   ...(companyData.upiId !== undefined ? { upiId: companyData.upiId } : {}),
                   ...(companyData.paymentInstructions !== undefined ? { paymentInstructions: companyData.paymentInstructions } : {}),
@@ -251,9 +279,19 @@ export async function PUT(request: Request) {
             },
           });
         } else {
+          const activeQr = companyData.merchantQrs?.find((q: any) => q.isActive);
+          const primaryQr = activeQr?.qrUrl || companyData.merchantQrUrl || companyData.merchantQrs?.[0]?.qrUrl || null;
           const newMeta = {
             ...(companyData.themeConfig || {}),
-            merchantQrUrl: companyData.merchantQrUrl || null,
+            merchantQrUrl: primaryQr,
+            merchantQrs: companyData.merchantQrs || (primaryQr ? [{
+              id: "default-qr",
+              title: "Primary Merchant QR",
+              qrUrl: primaryQr,
+              accountName: companyData.companyName || "Bageshwari Tractors",
+              accountNumber: companyData.upiId || "",
+              isActive: true,
+            }] : []),
             bankAccountType: companyData.bankAccountType || "Current Account",
             upiId: companyData.upiId || null,
             paymentInstructions: companyData.paymentInstructions || null,

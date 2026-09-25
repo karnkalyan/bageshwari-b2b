@@ -8,15 +8,19 @@ import {
   renderPickListPdf,
   renderSalesOrderPdf,
   renderPackageLabelPdf,
+  renderPackageLabelsPdf,
+  type CartonLabelLayout,
   renderDispatchChallanPdf,
   renderPackingListPdf,
   renderProductBarcodeLabelPdf,
 } from "./templates";
 import { CompanyInfo, DealerInfo, LineItemDto } from "./types";
+import { PaperSize } from "./helpers";
 
 export * from "./templates";
 export * from "./types";
 export * from "./helpers";
+export * from "./pdf-to-jpeg";
 
 export type OrderDocumentKind =
   | "sales-order"
@@ -119,7 +123,8 @@ async function getCompanyProfileSafe(sellerId?: string): Promise<{ profile: any;
 export async function generateOrderPdf(
   orderId: string,
   sellerId: string,
-  kind: OrderDocumentKind
+  kind: OrderDocumentKind,
+  options?: { layout?: CartonLabelLayout; paperSize?: PaperSize }
 ): Promise<Uint8Array | null> {
   const [order, companyMeta] = await Promise.all([
     prisma.order.findFirst({
@@ -195,6 +200,7 @@ export async function generateOrderPdf(
       grandTotal,
       paymentTerms: finalInv?.paymentTerms || "Credit 30 Days",
       remarks: finalInv?.remarks || order.dealerNotes,
+      paperSize: options?.paperSize,
     });
   }
 
@@ -237,6 +243,7 @@ export async function generateOrderPdf(
       grandTotal: Number(order.grandTotal),
       paymentTerms: proforma?.paymentTerms || "100% Advance Bank Transfer or Approved Credit Limit",
       creditTerms: proforma?.creditTerms || "30 Days Dealer Credit terms",
+      paperSize: options?.paperSize,
     });
   }
 
@@ -275,6 +282,7 @@ export async function generateOrderPdf(
       assignedPickerName: pickerName,
       items,
       notes: pickList?.notes || null,
+      paperSize: options?.paperSize,
     });
   }
 
@@ -350,6 +358,7 @@ export async function generateOrderPdf(
       driverName: shipment?.driverName || shipment?.driver?.name,
       vehicleNumber: shipment?.vehicleNumber || shipment?.vehicle?.vehicleNumber,
       notes: order.dealerNotes,
+      paperSize: options?.paperSize,
     });
   }
 
@@ -399,57 +408,52 @@ export async function generateOrderPdf(
       driverPhone: shipment?.driverPhone || shipment?.driver?.phone,
       vehicleNumber: shipment?.vehicleNumber || shipment?.vehicle?.vehicleNumber,
       remarks: shipment?.remarks || order.dealerNotes,
+      paperSize: options?.paperSize,
     });
   }
 
-  // 6. PACKAGE LABELS (MULTI-PAGE FOR ALL CARTONS)
+  // 6. PACKAGE LABELS (A4 4-UP PRINTABLE GRID OR ADJUSTABLE LAYOUT)
   if (kind === "package-labels" || kind === "shipping-label") {
     const shipment = order.shipments[0];
     const packages = orderPackages;
+    const layout = options?.layout || "a4_4";
 
     if (!packages || packages.length === 0) {
-      return renderPackageLabelPdf({
-        packageNumber: `PKG-${order.orderNumber.slice(-5)}-01`,
-        cartonIndex: 1,
-        totalCartons: 1,
-        orderNumber: order.orderNumber,
-        shipmentNumber: shipment?.shipmentNumber,
-        challanNumber: shipment?.challanNumber,
-        weight: 0,
-        company,
-        dealer,
-        transporterName: shipment?.transporter || shipment?.transportCompany?.name || "",
-      });
+      return renderPackageLabelsPdf([
+        {
+          packageNumber: `PKG-${order.orderNumber.slice(-5)}-01`,
+          cartonIndex: 1,
+          totalCartons: 1,
+          orderNumber: order.orderNumber,
+          shipmentNumber: shipment?.shipmentNumber,
+          challanNumber: shipment?.challanNumber,
+          weight: 0,
+          company,
+          dealer,
+          transporterName: shipment?.transporter || shipment?.transportCompany?.name || "",
+        },
+      ], layout, options?.paperSize);
     }
 
-    // Merge multiple package labels into a single PDF
-    const mergedPdf = await PDFDocument.create();
-    for (let i = 0; i < packages.length; i++) {
-      const pkg = packages[i];
-      const singleBytes = await renderPackageLabelPdf({
-        packageNumber: pkg.packageNumber,
-        cartonIndex: i + 1,
-        totalCartons: packages.length,
-        orderNumber: order.orderNumber,
-        shipmentNumber: shipment?.shipmentNumber,
-        challanNumber: shipment?.challanNumber,
-        weight: Number(pkg.weight),
-        length: pkg.length ? Number(pkg.length) : null,
-        width: pkg.width ? Number(pkg.width) : null,
-        height: pkg.height ? Number(pkg.height) : null,
-        packageType: pkg.packageType,
-        handlingInstructions: pkg.handlingInstructions,
-        company,
-        dealer,
-        transporterName: shipment?.transporter || shipment?.transportCompany?.name,
-      });
+    const labelsData = packages.map((pkg, i) => ({
+      packageNumber: pkg.packageNumber,
+      cartonIndex: i + 1,
+      totalCartons: packages.length,
+      orderNumber: order.orderNumber,
+      shipmentNumber: shipment?.shipmentNumber,
+      challanNumber: shipment?.challanNumber,
+      weight: Number(pkg.weight),
+      length: pkg.length ? Number(pkg.length) : null,
+      width: pkg.width ? Number(pkg.width) : null,
+      height: pkg.height ? Number(pkg.height) : null,
+      packageType: pkg.packageType,
+      handlingInstructions: pkg.handlingInstructions,
+      company,
+      dealer,
+      transporterName: shipment?.transporter || shipment?.transportCompany?.name,
+    }));
 
-      const singleDoc = await PDFDocument.load(singleBytes);
-      const copiedPages = await mergedPdf.copyPages(singleDoc, singleDoc.getPageIndices());
-      copiedPages.forEach((p) => mergedPdf.addPage(p));
-    }
-
-    return mergedPdf.save();
+    return renderPackageLabelsPdf(labelsData, layout, options?.paperSize);
   }
 
   // DEFAULT: SALES ORDER
@@ -479,10 +483,16 @@ export async function generateOrderPdf(
     grandTotal: Number(order.grandTotal),
     dealerNotes: order.dealerNotes,
     accountsNotes: order.accountsNotes,
+    paperSize: options?.paperSize,
   });
 }
 
-export async function generatePackageLabelPdf(packageId: string, sellerId: string): Promise<Uint8Array | null> {
+export async function generatePackageLabelPdf(
+  packageId: string,
+  sellerId: string,
+  layout: CartonLabelLayout = "a4_4",
+  paperSize: PaperSize = "A4"
+): Promise<Uint8Array | null> {
   const [pkg, companyMeta] = await Promise.all([
     prisma.package.findFirst({
       where: { id: packageId, sellerId },
@@ -506,30 +516,33 @@ export async function generatePackageLabelPdf(packageId: string, sellerId: strin
   const totalCartons = pkg.shipment?.packages?.length || 1;
   const cartonIndex = pkg.shipment?.packages?.findIndex((p) => p.id === pkg.id) ?? 0;
 
-  return renderPackageLabelPdf({
-    packageNumber: pkg.packageNumber,
-    cartonIndex: cartonIndex + 1,
-    totalCartons,
-    orderNumber: pkg.order.orderNumber,
-    shipmentNumber: pkg.shipment?.shipmentNumber,
-    challanNumber: pkg.shipment?.challanNumber,
-    weight: Number(pkg.weight),
-    length: pkg.length ? Number(pkg.length) : null,
-    width: pkg.width ? Number(pkg.width) : null,
-    height: pkg.height ? Number(pkg.height) : null,
-    packageType: pkg.packageType,
-    handlingInstructions: pkg.handlingInstructions,
-    company,
-    dealer,
-    transporterName: pkg.shipment?.transporter || pkg.shipment?.transportCompany?.name || pkg.order.shipments[0]?.transportCompany?.name,
-  });
+  return renderPackageLabelsPdf([
+    {
+      packageNumber: pkg.packageNumber,
+      cartonIndex: cartonIndex + 1,
+      totalCartons,
+      orderNumber: pkg.order.orderNumber,
+      shipmentNumber: pkg.shipment?.shipmentNumber,
+      challanNumber: pkg.shipment?.challanNumber,
+      weight: Number(pkg.weight),
+      length: pkg.length ? Number(pkg.length) : null,
+      width: pkg.width ? Number(pkg.width) : null,
+      height: pkg.height ? Number(pkg.height) : null,
+      packageType: pkg.packageType,
+      handlingInstructions: pkg.handlingInstructions,
+      company,
+      dealer,
+      transporterName: pkg.shipment?.transporter || pkg.shipment?.transportCompany?.name || pkg.order.shipments[0]?.transportCompany?.name,
+    },
+  ], layout, paperSize);
 }
 
 export async function generateProductBarcodeLabelPdf(
   productIdOrSku: string,
   sellerId: string,
   count = 1,
-  stickerSize: "32x20" | "standard" = "32x20"
+  stickerSize: "32x20" | "standard" | "a4_sheet" | "a5_sheet" = "32x20",
+  paperSize?: PaperSize
 ): Promise<Uint8Array | null> {
   const [product, companyMeta] = await Promise.all([
     prisma.product.findFirst({
@@ -579,6 +592,7 @@ export async function generateProductBarcodeLabelPdf(
       unitCode: product.unitCode,
       companyName: companyMeta.profile?.companyName || companyMeta.profile?.tradingName || companyMeta.seller?.tradingName || companyMeta.seller?.companyName || "BAGESHWARI TRACTOR, NEPALGUNJ",
       stickerSize,
+      paperSize,
     },
     count
   );

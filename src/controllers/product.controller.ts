@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { productService } from "@/services/product.service";
+import { recordSearchQuery } from "@/services/search-analytics.service";
 
 const querySchema = z.object({
   search: z.string().trim().max(100).optional(),
@@ -19,6 +20,17 @@ export async function listProducts(request: Request) {
   const session = await auth();
   try {
     const result = await productService.list(parsed.data, { dealerId: session?.dealerId });
+
+    if (parsed.data.search && parsed.data.search.trim().length >= 2) {
+      recordSearchQuery({
+        query: parsed.data.search.trim(),
+        sellerId: session?.sellerId || null,
+        userId: session?.user?.id || null,
+        source: session?.dealerId ? "DEALER_PORTAL" : session?.user ? "STAFF_PORTAL" : "PUBLIC_CATALOGUE",
+        resultCount: result.total,
+      }).catch(() => {});
+    }
+
     return apiSuccess(result);
   } catch (error) {
     if (error instanceof Error && error.message === "COMPANY_NOT_CONFIGURED") {

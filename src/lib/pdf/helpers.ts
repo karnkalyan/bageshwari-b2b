@@ -18,6 +18,29 @@ export const COLORS = {
   black: rgb(0.08, 0.08, 0.08),
 };
 
+export type PaperSize = "A4" | "A5" | "Letter" | "Legal";
+
+export const PAPER_SIZES: Record<PaperSize, { width: number; height: number }> = {
+  A4: { width: 595.28, height: 841.89 },
+  A5: { width: 419.53, height: 595.28 },
+  Letter: { width: 612.0, height: 792.0 },
+  Legal: { width: 612.0, height: 1008.0 },
+};
+
+export function parsePaperSize(size?: string | null): PaperSize {
+  if (!size) return "A4";
+  const s = size.trim().toUpperCase();
+  if (s === "A5") return "A5";
+  if (s === "LETTER") return "Letter";
+  if (s === "LEGAL") return "Legal";
+  return "A4";
+}
+
+export function getPageDimensions(size?: string | null): { width: number; height: number; name: PaperSize } {
+  const name = parsePaperSize(size);
+  return { ...PAPER_SIZES[name], name };
+}
+
 export interface PdfContext {
   pdf: PDFDocument;
   regular: PDFFont;

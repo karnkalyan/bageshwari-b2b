@@ -127,31 +127,65 @@ export async function createSalesOrderForDealer(input: CreateSalesOrderInput) {
       ? "PENDING_ACCOUNTS_REVIEW"
       : "DRAFT";
 
-    // 4. Create Order
-    const order = await tx.order.create({
-      data: {
-        sellerId: input.sellerId,
-        dealerId: input.dealerId,
-        orderNumber,
-        source: input.source || OrderSource.SALESPERSON_PORTAL,
-        status: initialStatus,
-        currencyCode: "NPR",
-        subtotal: new Prisma.Decimal(subtotal),
-        discountTotal: new Prisma.Decimal(discountTotal),
-        taxTotal: new Prisma.Decimal(taxTotal),
-        freightTotal: new Prisma.Decimal(freightTotal),
-        grandTotal: new Prisma.Decimal(grandTotal),
-        salespersonNotes: input.notes,
-        createdById: input.createdById,
-        items: {
-          create: processedItems,
-        },
-      },
-      include: {
-        dealer: true,
-        items: true,
-      },
+    // 4. Create or Update Existing Draft Order
+    const existingDraft = await tx.order.findFirst({
+      where: { sellerId: input.sellerId, dealerId: input.dealerId, status: "DRAFT" },
+      orderBy: { createdAt: "desc" },
     });
+
+    let order: any;
+
+    if (existingDraft) {
+      // Clear previous draft items and recreate updated lines
+      await tx.orderItem.deleteMany({ where: { orderId: existingDraft.id } });
+
+      order = await tx.order.update({
+        where: { id: existingDraft.id },
+        data: {
+          status: initialStatus,
+          subtotal: new Prisma.Decimal(subtotal),
+          discountTotal: new Prisma.Decimal(discountTotal),
+          taxTotal: new Prisma.Decimal(taxTotal),
+          freightTotal: new Prisma.Decimal(freightTotal),
+          grandTotal: new Prisma.Decimal(grandTotal),
+          salespersonNotes: input.notes,
+          dealerNotes: input.notes,
+          items: {
+            create: processedItems,
+          },
+        },
+        include: {
+          dealer: true,
+          items: true,
+        },
+      });
+    } else {
+      order = await tx.order.create({
+        data: {
+          sellerId: input.sellerId,
+          dealerId: input.dealerId,
+          orderNumber,
+          source: input.source || OrderSource.SALESPERSON_PORTAL,
+          status: initialStatus,
+          currencyCode: "NPR",
+          subtotal: new Prisma.Decimal(subtotal),
+          discountTotal: new Prisma.Decimal(discountTotal),
+          taxTotal: new Prisma.Decimal(taxTotal),
+          freightTotal: new Prisma.Decimal(freightTotal),
+          grandTotal: new Prisma.Decimal(grandTotal),
+          salespersonNotes: input.notes,
+          dealerNotes: input.notes,
+          createdById: input.createdById,
+          items: {
+            create: processedItems,
+          },
+        },
+        include: {
+          dealer: true,
+          items: true,
+        },
+      });
+    }
 
     // 5. Record History
     await tx.orderStatusHistory.create({
@@ -161,8 +195,8 @@ export async function createSalesOrderForDealer(input: CreateSalesOrderInput) {
         toStatus: initialStatus,
         changedById: input.createdById,
         remarks: input.submitForReview
-          ? "Sales order created and submitted for Accounts review by sales representative."
-          : "Sales order created as draft by sales representative.",
+          ? "Sales order submitted for Accounts review."
+          : "Sales order saved as draft.",
       },
     });
 

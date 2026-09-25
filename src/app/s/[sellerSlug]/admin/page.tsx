@@ -22,6 +22,7 @@ import {
   CreditCard,
   Building2,
   Eye,
+  Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,6 +119,7 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
     { icon: Truck, label: "Dispatch Logistics", href: "/dispatch", color: "text-sky-500", desc: "Delivery challans & tracking" },
     { icon: Users, label: "Dealer Network", href: "/dealers", color: "text-pink-500", desc: "Accounts & Credit limits" },
     { icon: Package, label: "Product Catalog", href: "/products", color: "text-violet-500", desc: "Manage SKUs & pricing" },
+    { icon: Search, label: "Search Analytics", href: "/search-analytics", color: "text-rose-500", desc: "Top searched products & demand" },
   ];
 
   return (

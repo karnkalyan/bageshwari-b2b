@@ -31,6 +31,16 @@ import { formatCurrency } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+export interface MerchantQrItem {
+  id: string;
+  title: string;
+  qrUrl: string;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  isActive: boolean;
+  isDefault?: boolean;
+}
+
 export interface CompanyBankAndQrDetails {
   companyName: string;
   tradingName: string;
@@ -43,6 +53,7 @@ export interface CompanyBankAndQrDetails {
   merchantQrUrl?: string | null;
   upiId?: string | null;
   paymentInstructions?: string | null;
+  merchantQrs?: MerchantQrItem[];
 }
 
 export interface DealerOrderActionsProps {
@@ -98,6 +109,25 @@ export function DealerOrderActions({
   const canUseCredit = Boolean(creditEligible && !holdStatus && creditLimit > 0);
   const [method, setMethod] = useState<PaymentOption>(canUseCredit ? "CREDIT" : "ONLINE");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const activeQrs: MerchantQrItem[] = (company?.merchantQrs && company.merchantQrs.length > 0)
+    ? company.merchantQrs.filter((q) => q.isActive)
+    : (company?.merchantQrUrl ? [{
+        id: "legacy_default",
+        title: "Official Merchant QR",
+        qrUrl: company.merchantQrUrl,
+        accountName: company.companyName,
+        accountNumber: company.upiId,
+        isActive: true,
+        isDefault: true,
+      }] : []);
+
+  const [selectedQrId, setSelectedQrId] = useState<string | null>(null);
+  const currentQr = 
+    activeQrs.find((q) => q.id === selectedQrId) ||
+    activeQrs.find((q) => q.isDefault) ||
+    activeQrs[0] ||
+    null;
 
   const copyToClipboard = (text: string, key: string) => {
     if (!text) return;
@@ -621,7 +651,7 @@ export function DealerOrderActions({
                   <QrCode className="h-5 w-5 text-purple-600 shrink-0" />
                   <div>
                     <h4 className="text-xs font-black text-slate-900">
-                      {company?.tradingName || company?.companyName || "Merchant Payment"} - Fonepay / QR Transfer
+                      {currentQr?.title || company?.tradingName || company?.companyName || "Merchant Payment"} - Direct QR Scan & Pay
                     </h4>
                     <p className="text-[11px] text-slate-500">
                       Scan using any Mobile Banking app, eSewa, Khalti, or Fonepay to pay instantly.
@@ -633,18 +663,42 @@ export function DealerOrderActions({
                 </Badge>
               </div>
 
+              {/* MULTIPLE ACTIVE QRs SELECTOR */}
+              {activeQrs.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-purple-100">
+                  <span className="text-[11px] font-bold text-purple-900 shrink-0">Available QRs:</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {activeQrs.map((qr) => (
+                      <button
+                        key={qr.id}
+                        type="button"
+                        onClick={() => setSelectedQrId(qr.id)}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 ${
+                          currentQr?.id === qr.id
+                            ? "bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-600/20"
+                            : "bg-white text-slate-700 border-purple-200 hover:bg-purple-50"
+                        }`}
+                      >
+                        <QrCode className="h-3.5 w-3.5" />
+                        <span>{qr.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center bg-white p-3.5 rounded-lg border border-purple-100">
                 <div className="flex flex-col items-center justify-center">
-                  {company?.merchantQrUrl ? (
+                  {currentQr?.qrUrl ? (
                     <div className="text-center space-y-1">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={company.merchantQrUrl}
-                        alt="Company Merchant QR"
+                        src={currentQr.qrUrl}
+                        alt={currentQr.title || "Company Merchant QR"}
                         className="h-44 w-44 object-contain rounded-lg border p-1 bg-white shadow-xs mx-auto"
                       />
                       <a
-                        href={company.merchantQrUrl}
+                        href={currentQr.qrUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[10px] text-purple-700 font-bold hover:underline inline-flex items-center gap-1 pt-1"
@@ -664,20 +718,22 @@ export function DealerOrderActions({
                 <div className="space-y-2.5 text-xs text-slate-700">
                   <div className="p-2.5 bg-purple-50/70 rounded-md border border-purple-100">
                     <div className="text-[10px] text-purple-800 font-bold uppercase tracking-wider">Merchant Recipient</div>
-                    <div className="font-extrabold text-slate-900 text-sm">{company?.companyName || "Bageshwari Tractors Pvt. Ltd."}</div>
+                    <div className="font-extrabold text-slate-900 text-sm">
+                      {currentQr?.accountName || company?.companyName || "Bageshwari Tractors Pvt. Ltd."}
+                    </div>
                   </div>
 
-                  {company?.upiId && (
+                  {(currentQr?.accountNumber || company?.upiId) && (
                     <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-md border">
                       <div>
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Merchant UPI / Fonepay ID</span>
-                        <span className="font-mono font-bold text-purple-900">{company.upiId}</span>
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Merchant UPI / Account / Fonepay ID</span>
+                        <span className="font-mono font-bold text-purple-900">{currentQr?.accountNumber || company?.upiId}</span>
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => copyToClipboard(company.upiId!, "upi")}
+                        onClick={() => copyToClipboard((currentQr?.accountNumber || company?.upiId)!, "upi")}
                         className="h-7 text-[10px] font-bold border-purple-200 hover:bg-purple-50"
                       >
                         {copiedKey === "upi" ? <Check className="h-3 w-3 text-emerald-600 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
@@ -689,11 +745,11 @@ export function DealerOrderActions({
                   <div className="text-[11px] text-slate-600 space-y-1">
                     <div className="font-semibold text-slate-800">Payment Guide:</div>
                     <ol className="list-decimal pl-4 space-y-0.5 text-[11px] text-slate-600">
-                      <li>Scan the QR code using your mobile banking or wallet app.</li>
-                      <li>Verify recipient displays <strong>{company?.companyName || "Bageshwari Tractors"}</strong>.</li>
+                      <li>Scan the QR code above using your mobile banking or wallet app.</li>
+                      <li>Verify recipient displays <strong>{currentQr?.accountName || company?.companyName || "Bageshwari Tractors"}</strong>.</li>
                       <li>Enter amount: <strong>{formatCurrency(grandTotal)}</strong>.</li>
                       <li>In Remarks/Narration, enter Order #: <strong>{orderNumber}</strong>.</li>
-                      <li>After payment, enter the Fonepay Trace ID and attach receipt below.</li>
+                      <li>After payment, enter the Reference/Trace ID and attach receipt below.</li>
                     </ol>
                   </div>
                 </div>

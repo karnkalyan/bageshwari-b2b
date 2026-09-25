@@ -34,6 +34,8 @@ import {
   AlertTriangle,
   Scale,
   Maximize2,
+  FileImage,
+  Download,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -130,6 +132,8 @@ export function CartonPackingDialog({
   const [cartons, setCartons] = useState<LocalCarton[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loadingPackages, setLoadingPackages] = useState(false);
+  const [labelLayout, setLabelLayout] = useState<"a4_4" | "a4_2" | "a4_1" | "thermal">("a4_4");
+  const [paperSize, setPaperSize] = useState<"A4" | "A5" | "Letter" | "Legal">("A4");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -910,23 +914,75 @@ export function CartonPackingDialog({
                 Sealing packages will generate multi-carton labels and finalize the official Packaging List.
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <a
-                href={`/api/orders/${orderId}/documents/packing-list`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 hover:bg-teal-800 text-white"
-              >
-                <PackageCheck className="h-3.5 w-3.5" /> Print Packaging List (PDF)
-              </a>
-              <a
-                href={`/api/orders/${orderId}/documents/package-labels`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                <Tag className="h-3.5 w-3.5" /> Print Carton Labels (PDF)
-              </a>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Paper Size selector */}
+              <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg px-2 py-0.5" title="Document Paper Size">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Size:</span>
+                <select
+                  value={paperSize}
+                  onChange={(e) => setPaperSize(e.target.value as any)}
+                  className="bg-transparent text-[11px] font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  aria-label="Paper Size"
+                >
+                  <option value="A4">A4</option>
+                  <option value="A5">A5</option>
+                  <option value="Letter">Letter</option>
+                  <option value="Legal">Legal</option>
+                </select>
+              </div>
+
+              <div className="inline-flex items-center rounded-lg border border-teal-700 overflow-hidden shadow-xs">
+                <a
+                  href={`/api/orders/${orderId}/documents/packing-list?pageSize=${paperSize}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white"
+                >
+                  <PackageCheck className="h-3.5 w-3.5" /> Packing List ({paperSize})
+                </a>
+                <a
+                  href={`/api/orders/${orderId}/documents/packing-list?pageSize=${paperSize}&format=jpeg&download=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-teal-100 border-l border-teal-600"
+                  title="Download Packaging List as JPEG image"
+                >
+                  <FileImage className="h-3.5 w-3.5" /> JPEG
+                </a>
+              </div>
+
+              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-lg p-0.5">
+                <select
+                  value={labelLayout}
+                  onChange={(e) => setLabelLayout(e.target.value as any)}
+                  className="bg-transparent text-[11px] font-medium text-amber-950 focus:outline-none px-1.5 py-1 cursor-pointer"
+                  title="Select A4 Grid or Print Layout"
+                >
+                  <option value="a4_4">4 Labels / Sheet (2x2)</option>
+                  <option value="a4_2">2 Labels / Sheet</option>
+                  <option value="a4_1">1 Label / Sheet</option>
+                  <option value="thermal">Thermal Roll (100mm)</option>
+                </select>
+
+                <a
+                  href={`/api/orders/${orderId}/documents/package-labels?layout=${labelLayout}&pageSize=${paperSize}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <Tag className="h-3.5 w-3.5" /> PDF
+                </a>
+
+                <a
+                  href={`/api/orders/${orderId}/documents/package-labels?layout=${labelLayout}&pageSize=${paperSize}&format=jpeg&download=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md bg-white hover:bg-amber-100 text-amber-900 border border-amber-300"
+                  title="Download Carton Labels as JPEG image"
+                >
+                  <FileImage className="h-3.5 w-3.5" /> JPEG
+                </a>
+              </div>
             </div>
           </div>
         </div>

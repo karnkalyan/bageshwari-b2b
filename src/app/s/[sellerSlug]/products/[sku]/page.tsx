@@ -47,6 +47,7 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
         brand: true,
         variants: true,
         prices: { where: { active: true } },
+        images: { orderBy: { isPrimary: "desc" } },
       },
     }),
     isDealer
@@ -138,8 +139,17 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* Image Gallery */}
           <div className="space-y-4">
-            <div className="relative flex aspect-[4/3] items-center justify-center rounded-2xl border bg-[radial-gradient(circle_at_center,#fff,#eef3f8)] p-8 shadow-sm">
-              <Package className="h-40 w-40 text-gray-300" />
+            <div className="relative flex aspect-[4/3] items-center justify-center rounded-2xl border bg-[radial-gradient(circle_at_center,#fff,#eef3f8)] p-6 shadow-sm overflow-hidden">
+              {product.images?.[0]?.url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={product.images[0].url}
+                  alt={product.name}
+                  className="h-full w-full object-contain max-h-[360px]"
+                />
+              ) : (
+                <Package className="h-40 w-40 text-gray-300" />
+              )}
               <div className="absolute top-4 left-4 flex flex-col gap-1">
                 {product.featured && <Badge className="bg-red-500 text-white">Featured</Badge>}
                 {product.newArrival && <Badge className="bg-emerald-500 text-white">New Arrival</Badge>}
@@ -150,6 +160,17 @@ export default async function ProductDetailsPage({ params }: ProductDetailsProps
                 )}
               </div>
             </div>
+
+            {product.images && product.images.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {product.images.map((img: any, idx: number) => (
+                  <div key={idx} className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-white p-1 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.url} alt={`${product.name} ${idx + 1}`} className="h-full w-full object-contain" />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Details */}

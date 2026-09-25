@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ArrowUpRight, Boxes, CircleUserRound, FileText, LayoutDashboard, LogOut, Menu, Search, ShoppingBag, ShoppingCart, Store, Truck, WalletCards, X } from "lucide-react";
+import { ArrowUpRight, Boxes, CircleUserRound, FileText, KeyRound, LayoutDashboard, LogOut, Menu, Search, ShoppingBag, ShoppingCart, Store, Truck, WalletCards, X } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { LiveSearchInput } from "@/components/search/live-search-input";
+import { DealerChangePasswordDialog } from "@/components/auth/dealer-change-password-dialog";
 
 interface DealerShellProps {
   sellerSlug: string;
@@ -18,6 +19,7 @@ interface DealerShellProps {
 
 export function DealerShell({ sellerSlug, sellerName, user, children }: DealerShellProps) {
   const [open, setOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const pathname = usePathname();
   const base = "/dealer";
   const links = [
@@ -42,8 +44,37 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
         })}
       </nav>
       <div className="border-t border-white/10 p-3">
-        <Link href="/" className="mb-3 flex items-center justify-between rounded-lg bg-white/8 px-3 py-2.5 text-xs font-semibold"><span className="flex items-center gap-2"><Store className="h-4 w-4 text-red-400" />Storefront</span><ArrowUpRight className="h-3.5 w-3.5" /></Link>
-        <div className="flex items-center gap-2 rounded-xl bg-[#052546] p-3"><CircleUserRound className="h-7 w-7 text-blue-200" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold">{user?.name || "Dealer User"}</div><div className="truncate text-[9px] text-blue-200/70">{user?.email}</div></div><button aria-label="Sign out" onClick={() => signOut({ callbackUrl: window.location.origin + "/dealer/login" })}><LogOut className="h-4 w-4 text-blue-200" /></button></div>
+        <div className="flex items-center gap-2 rounded-xl bg-[#052546] p-3">
+          <CircleUserRound className="h-7 w-7 text-blue-200" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs font-bold">{user?.name || "Dealer User"}</div>
+            <div className="truncate text-[9px] text-blue-200/70">{user?.email}</div>
+          </div>
+          <button
+            type="button"
+            aria-label="Change Password"
+            title="Change Password"
+            onClick={() => setShowChangePassword(true)}
+            className="p-1 rounded-md text-blue-200/80 hover:text-white hover:bg-white/10 transition"
+          >
+            <KeyRound className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            onClick={() => signOut({ callbackUrl: window.location.origin + "/dealer/login" })}
+            className="p-1 rounded-md text-blue-200/80 hover:text-white hover:bg-white/10 transition"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+        <DealerChangePasswordDialog
+          open={showChangePassword}
+          onOpenChange={setShowChangePassword}
+          defaultEmail={user?.email || ""}
+          isLoggedIn={true}
+        />
       </div>
     </aside>
   );

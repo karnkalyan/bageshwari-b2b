@@ -74,9 +74,19 @@ export function FeaturedProducts({
                 <div>
                   <Link
                     href={`${base}/products/${product.sku}`}
-                    className="relative grid aspect-square place-items-center bg-gradient-to-br from-slate-50 to-slate-100"
+                    className="relative grid aspect-square place-items-center overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100"
                   >
-                    <Package className="h-12 w-12 text-slate-300 transition-transform group-hover:scale-105" />
+                    {product.images?.[0]?.url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={product.images[0].url}
+                        alt={product.name}
+                        className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Package className="h-12 w-12 text-slate-300 transition-transform group-hover:scale-105" />
+                    )}
                     {(product.newArrival || product.featured) && (
                       <span className="absolute left-2 top-2 rounded bg-red-600 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-xs">
                         {product.newArrival ? "New" : "Featured"}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { resolveDealerPrice } from "@/services/pricing.service";
 import { getCompanyVatSetting } from "@/services/vat.service";
+import { getDealerCart } from "@/services/cart.service";
 import {
   SalesOrderCreator,
   SerializedDealer,
@@ -17,7 +18,7 @@ export default async function DealerNewOrderPage() {
     redirect("/dealer/login");
   }
 
-  const [dealer, products, categories, companyVat] = await Promise.all([
+  const [dealer, products, categories, companyVat, draftCart] = await Promise.all([
     prisma.dealer.findUnique({
       where: { id: ctx.dealerId },
       include: {
@@ -44,6 +45,7 @@ export default async function DealerNewOrderPage() {
       orderBy: { displayOrder: "asc" },
     }),
     getCompanyVatSetting(),
+    getDealerCart(ctx.sellerId, ctx.dealerId),
   ]);
 
   if (!dealer) {
@@ -96,6 +98,19 @@ export default async function DealerNewOrderPage() {
     };
   });
 
+  const initialOrderItems = (draftCart?.items || []).map((it) => ({
+    productId: it.productId,
+    variantId: it.variantId || null,
+    sku: it.sku,
+    productName: it.productName,
+    variantName: it.variantName || null,
+    quantity: Number(it.originalQuantity || it.approvedQuantity || 1),
+    unitPrice: Number(it.dealerPrice),
+    mrp: Number(it.mrp || it.dealerPrice),
+    discountAmount: Number(it.discountAmount || 0),
+    remarks: it.accountsRemarks || undefined,
+  }));
+
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-4 sm:space-y-6 p-3 sm:p-7">
       <div className="hidden sm:block">
@@ -109,7 +124,7 @@ export default async function DealerNewOrderPage() {
         <div className="section-kicker">Dealer Direct Bulk Order</div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-[#0b2d55]">Create Sales Order</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-[#0b2d55]">Create Sales Order (Quick Order)</h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Quickly select products, customize quantities with your unlocked dealer rates, and submit directly for Accounts review.
             </p>
@@ -125,6 +140,8 @@ export default async function DealerNewOrderPage() {
         isDealer={true}
         initialCategories={categories.map((c) => c.name)}
         vatPercent={companyVat.defaultVatPercent}
+        initialOrderItems={initialOrderItems}
+        initialNotes={draftCart?.dealerNotes || draftCart?.salespersonNotes || ""}
       />
     </div>
   );

@@ -48,6 +48,16 @@ export interface ThemeSettingsConfig {
   tableDensity?: string;
 }
 
+export interface MerchantQrItem {
+  id: string;
+  title: string;
+  qrUrl: string;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+}
+
 export interface SerializedCompanyProfile {
   companyName: string;
   tradingName: string;
@@ -72,6 +82,7 @@ export interface SerializedCompanyProfile {
   bankSwiftCode?: string | null;
   bankAccountType?: string | null;
   merchantQrUrl?: string | null;
+  merchantQrs?: MerchantQrItem[];
   upiId?: string | null;
   paymentInstructions?: string | null;
   // Master Dealer Credit Configuration
@@ -132,6 +143,9 @@ export function AdminSettingsClient({
 
   const [uploadingQr, setUploadingQr] = useState(false);
   const [qrUploadError, setQrUploadError] = useState<string | null>(null);
+  const [newQrTitle, setNewQrTitle] = useState("");
+  const [newQrAccountName, setNewQrAccountName] = useState("");
+  const [newQrAccountNumber, setNewQrAccountNumber] = useState("");
 
   const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -166,12 +180,69 @@ export function AdminSettingsClient({
         throw new Error(json.error || "Failed to upload QR code image.");
       }
 
-      setCompany((prev) => ({ ...prev, merchantQrUrl: json.url }));
+      const newQrItem: MerchantQrItem = {
+        id: `qr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        title: newQrTitle.trim() || `Merchant QR #${(company.merchantQrs?.length || 0) + 1}`,
+        qrUrl: json.url,
+        accountName: newQrAccountName.trim() || company.companyName || "",
+        accountNumber: newQrAccountNumber.trim() || company.upiId || "",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      setCompany((prev) => {
+        const existing = prev.merchantQrs || [];
+        const updated = [...existing, newQrItem];
+        return {
+          ...prev,
+          merchantQrs: updated,
+          merchantQrUrl: prev.merchantQrUrl || json.url,
+        };
+      });
+
+      setNewQrTitle("");
+      setNewQrAccountName("");
+      setNewQrAccountNumber("");
     } catch (err: any) {
       setQrUploadError(err.message || "Failed to upload image.");
     } finally {
       setUploadingQr(false);
     }
+  };
+
+  const handleToggleQrStatus = (id: string) => {
+    setCompany((prev) => {
+      const updated = (prev.merchantQrs || []).map((q) =>
+        q.id === id ? { ...q, isActive: !q.isActive } : q
+      );
+      const activeQr = updated.find((q) => q.isActive);
+      return {
+        ...prev,
+        merchantQrs: updated,
+        merchantQrUrl: activeQr ? activeQr.qrUrl : null,
+      };
+    });
+  };
+
+  const handleDeleteQr = (id: string) => {
+    setCompany((prev) => {
+      const updated = (prev.merchantQrs || []).filter((q) => q.id !== id);
+      const activeQr = updated.find((q) => q.isActive);
+      return {
+        ...prev,
+        merchantQrs: updated,
+        merchantQrUrl: activeQr ? activeQr.qrUrl : null,
+      };
+    });
+  };
+
+  const handleUpdateQrTitle = (id: string, title: string) => {
+    setCompany((prev) => ({
+      ...prev,
+      merchantQrs: (prev.merchantQrs || []).map((q) =>
+        q.id === id ? { ...q, title } : q
+      ),
+    }));
   };
 
   const handleCategoryTaxChange = (id: string, value: string) => {
@@ -551,127 +622,219 @@ export function AdminSettingsClient({
 
         {/* 3. BANK & SETTLEMENT INFO TAB */}
         <TabsContent value="bank" className="space-y-6">
-          {/* Card A: Company Merchant QR Code Configuration */}
+          {/* Card A: Multi-Merchant QR Codes Management */}
           <Card className="shadow-xs border-purple-200 bg-gradient-to-br from-purple-50/40 via-white to-blue-50/20">
             <CardHeader className="border-b pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <CardTitle className="text-sm font-bold flex items-center gap-2 text-[#0b2d55]">
-                    <QrCode className="h-4 w-4 text-purple-600" /> Company Merchant QR Code (Fonepay / Digital Settlement)
+                    <QrCode className="h-4 w-4 text-purple-600" /> Merchant QR Codes (Multi-QR Support)
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Upload your official Merchant QR code image. This QR will be prominently shown to dealers during the order payment process.
+                    Upload and manage multiple bank, Fonepay, eSewa, or digital wallet QR codes. Enable or disable individual QR codes to control which ones appear in order payment screens.
                   </CardDescription>
                 </div>
-                <Badge className="bg-purple-600 text-white font-black text-xs px-2.5 py-1 w-fit">
-                  {company.merchantQrUrl ? "Merchant QR Active" : "No QR Uploaded"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-purple-600 text-white font-black text-xs px-2.5 py-1">
+                    {(company.merchantQrs || []).filter((q) => q.isActive).length} Active / {(company.merchantQrs || []).length} Total QRs
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="p-5 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-start">
-                {/* QR Preview Box */}
-                <div className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-purple-200 bg-white shadow-2xs">
-                  {company.merchantQrUrl ? (
-                    <div className="relative group flex flex-col items-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={company.merchantQrUrl}
-                        alt="Merchant QR Code"
-                        className="h-44 w-44 object-contain rounded-lg border p-1 bg-white shadow-xs"
-                      />
-                      <div className="mt-2 flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setCompany({ ...company, merchantQrUrl: null })}
-                          className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 flex items-center gap-1 font-bold"
-                        >
-                          <Trash2 className="h-3 w-3" /> Remove QR
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center space-y-2">
-                      <div className="h-12 w-12 rounded-full bg-purple-50 text-purple-500 mx-auto flex items-center justify-center">
-                        <QrCode className="h-6 w-6" />
-                      </div>
-                      <div className="text-xs font-bold text-slate-700">No QR Code Image</div>
-                      <p className="text-[10px] text-slate-400 max-w-[170px]">
-                        Upload your bank or Fonepay merchant QR code (PNG, JPG, WebP)
-                      </p>
-                    </div>
-                  )}
+            <CardContent className="p-5 space-y-6">
+              {/* List of Existing QRs */}
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Uploaded Merchant QR Codes:</span>
+                  <span className="text-[11px] font-normal text-slate-400">Dealers will see all Active QRs during payment</span>
                 </div>
 
-                {/* QR Upload Controls & Merchant Details */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Upload className="h-3.5 w-3.5 text-purple-600" /> Upload New Merchant QR Image
-                    </Label>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <input
-                        type="file"
-                        id="merchant-qr-input"
-                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                        onChange={handleQrUpload}
-                        disabled={uploadingQr}
-                        className="hidden"
-                      />
-                      <label
-                        htmlFor="merchant-qr-input"
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-bold cursor-pointer transition shadow-2xs ${
-                          uploadingQr
-                            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                            : "bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100"
+                {(!company.merchantQrs || company.merchantQrs.length === 0) ? (
+                  <div className="p-8 border-2 border-dashed border-purple-200 rounded-xl text-center space-y-2 bg-white">
+                    <QrCode className="h-10 w-10 text-purple-300 mx-auto" />
+                    <div className="text-xs font-bold text-slate-700">No Merchant QR Codes Uploaded Yet</div>
+                    <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                      Use the upload form below to add your primary bank, Fonepay, or eSewa merchant QR codes.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {company.merchantQrs.map((qr, index) => (
+                      <div
+                        key={qr.id}
+                        className={`rounded-xl border p-4 bg-white shadow-2xs space-y-3 transition-all ${
+                          qr.isActive
+                            ? "border-purple-300 ring-2 ring-purple-100"
+                            : "border-slate-200 opacity-60 bg-slate-50/50"
                         }`}
                       >
-                        {uploadingQr ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600" />
-                            <span>Uploading QR Code...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="h-3.5 w-3.5 text-purple-600" />
-                            <span>{company.merchantQrUrl ? "Replace QR Image" : "Choose QR Image File"}</span>
-                          </>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <input
+                              type="text"
+                              value={qr.title}
+                              onChange={(e) => handleUpdateQrTitle(qr.id, e.target.value)}
+                              className="text-xs font-bold text-slate-900 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:outline-none w-full bg-transparent"
+                              placeholder="QR Name / Label"
+                            />
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {qr.accountName || company.companyName || "Merchant"}
+                            </div>
+                          </div>
+                          <Badge
+                            className={`text-[9px] font-bold ${
+                              qr.isActive ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+                            }`}
+                          >
+                            {qr.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+
+                        {/* Image Preview */}
+                        <div className="relative aspect-square max-h-48 w-full rounded-lg border border-slate-100 bg-slate-50 flex items-center justify-center p-2 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={qr.qrUrl}
+                            alt={qr.title}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+
+                        {qr.accountNumber && (
+                          <div className="text-[11px] font-mono font-bold text-purple-900 truncate bg-purple-50 px-2 py-1 rounded border border-purple-100">
+                            {qr.accountNumber}
+                          </div>
                         )}
-                      </label>
-                      <span className="text-[11px] text-slate-500">
-                        Supports PNG, JPG, or WebP up to 10MB.
-                      </span>
-                    </div>
-                    {qrUploadError && (
-                      <p className="text-xs text-red-600 font-semibold">{qrUploadError}</p>
+
+                        {/* Controls */}
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={qr.isActive ? "outline" : "default"}
+                            onClick={() => handleToggleQrStatus(qr.id)}
+                            className={`h-7 text-[11px] font-bold px-2.5 ${
+                              qr.isActive
+                                ? "border-amber-200 text-amber-700 hover:bg-amber-50"
+                                : "bg-purple-600 text-white hover:bg-purple-700"
+                            }`}
+                          >
+                            {qr.isActive ? "Set Inactive" : "Set Active"}
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteQr(qr.id)}
+                            className="h-7 text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 font-bold px-2 flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3 w-3" /> Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Upload New QR Box */}
+              <div className="p-4 rounded-xl border border-purple-200 bg-white shadow-2xs space-y-3">
+                <div className="text-xs font-bold text-[#0b2d55] flex items-center gap-1.5">
+                  <Upload className="h-3.5 w-3.5 text-purple-600" /> Upload &amp; Add New Merchant QR
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-[11px] font-semibold text-slate-700">QR Name / Provider Label</Label>
+                    <Input
+                      value={newQrTitle}
+                      onChange={(e) => setNewQrTitle(e.target.value)}
+                      placeholder="e.g. Fonepay - NIC Asia Bank"
+                      className="mt-1 h-8 text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] font-semibold text-slate-700">Account / Merchant Name</Label>
+                    <Input
+                      value={newQrAccountName}
+                      onChange={(e) => setNewQrAccountName(e.target.value)}
+                      placeholder="e.g. Bageshwari Tractors Pvt. Ltd."
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] font-semibold text-slate-700">Account # / UPI / Phone</Label>
+                    <Input
+                      value={newQrAccountNumber}
+                      onChange={(e) => setNewQrAccountNumber(e.target.value)}
+                      placeholder="e.g. 0194291823901928 or 9801234567"
+                      className="mt-1 h-8 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <input
+                    type="file"
+                    id="merchant-qr-input-multiple"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={handleQrUpload}
+                    disabled={uploadingQr}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="merchant-qr-input-multiple"
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-bold cursor-pointer transition shadow-2xs ${
+                      uploadingQr
+                        ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                        : "bg-purple-600 text-white border-purple-700 hover:bg-purple-700"
+                    }`}
+                  >
+                    {uploadingQr ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                        <span>Uploading QR Code...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3.5 w-3.5 text-white" />
+                        <span>Choose QR Image File &amp; Add</span>
+                      </>
                     )}
-                  </div>
+                  </label>
+                  <span className="text-[11px] text-slate-500">
+                    Supports PNG, JPG, or WebP up to 10MB. Each uploaded QR can be toggled active or inactive individually.
+                  </span>
+                </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <Label className="text-xs font-semibold text-slate-700">Merchant UPI / Fonepay ID</Label>
-                      <Input
-                        value={company.upiId || ""}
-                        onChange={(e) => setCompany({ ...company, upiId: e.target.value })}
-                        placeholder="e.g. bageshwari@nicor or 9801234567"
-                        className="mt-1 h-8 text-xs font-mono font-bold"
-                      />
-                      <span className="text-[10px] text-slate-400">Shown alongside the QR code during payment</span>
-                    </div>
+                {qrUploadError && (
+                  <p className="text-xs text-red-600 font-semibold">{qrUploadError}</p>
+                )}
+              </div>
 
-                    <div>
-                      <Label className="text-xs font-semibold text-slate-700">QR Payment Instructions</Label>
-                      <Input
-                        value={company.paymentInstructions || ""}
-                        onChange={(e) => setCompany({ ...company, paymentInstructions: e.target.value })}
-                        placeholder="e.g. Enter Order Number as remarks while scanning QR."
-                        className="mt-1 h-8 text-xs"
-                      />
-                      <span className="text-[10px] text-slate-400">Displayed below the QR code to guide dealers</span>
-                    </div>
-                  </div>
+              {/* Global Payment Instructions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-purple-100">
+                <div>
+                  <Label className="text-xs font-semibold text-slate-700">Default Merchant UPI / Fonepay ID</Label>
+                  <Input
+                    value={company.upiId || ""}
+                    onChange={(e) => setCompany({ ...company, upiId: e.target.value })}
+                    placeholder="e.g. bageshwari@nicor or 9801234567"
+                    className="mt-1 h-8 text-xs font-mono font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400">Shown alongside QR codes during checkout/payment</span>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-semibold text-slate-700">QR Payment Instructions</Label>
+                  <Input
+                    value={company.paymentInstructions || ""}
+                    onChange={(e) => setCompany({ ...company, paymentInstructions: e.target.value })}
+                    placeholder="e.g. Enter Order Number as remarks while scanning QR."
+                    className="mt-1 h-8 text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400">Displayed below QR codes to guide dealers</span>
                 </div>
               </div>
             </CardContent>

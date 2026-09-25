@@ -31,6 +31,7 @@ import {
   Store,
   Loader2,
   ExternalLink,
+  FileImage,
 } from "lucide-react";
 import { ProductEditModal, type ProductEditData } from "@/components/admin/product-edit-modal";
 import { ProductCreateModal } from "@/components/admin/product-create-modal";
@@ -425,9 +426,19 @@ export function ProductsTableClient({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center h-7 px-2 text-xs font-semibold rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-900 dark:text-amber-300 transition"
-                          title="Print Barcode Price Sticker"
+                          title="Print Barcode Price Sticker (PDF)"
                         >
                           <Printer className="h-3.5 w-3.5" />
+                        </a>
+
+                        <a
+                          href={`/api/products/${p.id}/label?format=jpeg&download=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center h-7 px-2 text-xs font-semibold rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-900 dark:text-blue-300 transition"
+                          title="Download Barcode Price Sticker (JPEG)"
+                        >
+                          <FileImage className="h-3.5 w-3.5" />
                         </a>
 
                         {/* Grouped Action Dropdown */}
@@ -454,11 +465,38 @@ export function ProductsTableClient({
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild className="text-xs cursor-pointer gap-2">
                               <a
-                                href={`/api/products/${p.id}/label`}
+                                href={`/api/products/${p.id}/label?size=32x20`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                <Printer className="h-3.5 w-3.5 text-amber-500" /> Print Price Sticker (VAT)
+                                <Printer className="h-3.5 w-3.5 text-amber-500" /> Thermal Roll (32x20mm)
+                              </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="text-xs cursor-pointer gap-2">
+                              <a
+                                href={`/api/products/${p.id}/label?size=a4_sheet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Printer className="h-3.5 w-3.5 text-emerald-500" /> A4 Sheet (24 Barcode Grid)
+                              </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="text-xs cursor-pointer gap-2">
+                              <a
+                                href={`/api/products/${p.id}/label?size=a5_sheet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Printer className="h-3.5 w-3.5 text-teal-500" /> A5 Sheet (12 Barcode Grid)
+                              </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="text-xs cursor-pointer gap-2">
+                              <a
+                                href={`/api/products/${p.id}/label?format=jpeg&download=1`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <FileImage className="h-3.5 w-3.5 text-blue-500" /> Download Barcode (JPEG)
                               </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem

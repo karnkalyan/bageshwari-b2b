@@ -270,8 +270,18 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                 {products.map((product: any) => {
                   return (
                     <Card key={product.id} className="group flex flex-col overflow-hidden rounded-xl border-slate-200 transition hover:-translate-y-0.5 hover:border-red-200 hover:shadow-lg">
-                      <div className="relative flex aspect-[4/3] items-center justify-center border-b bg-[radial-gradient(circle_at_center,#fff,#f1f5f9)] p-4">
-                        <Package className="h-14 w-14 text-slate-300 transition-transform group-hover:scale-110" />
+                      <div className="relative flex aspect-[4/3] items-center justify-center border-b bg-[radial-gradient(circle_at_center,#fff,#f1f5f9)] p-4 overflow-hidden">
+                        {product.images?.[0]?.url ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={product.images[0].url}
+                            alt={product.name}
+                            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <Package className="h-14 w-14 text-slate-300 transition-transform group-hover:scale-110" />
+                        )}
                         <div className="absolute top-2 left-2 flex flex-col gap-1">
                           {product.featured && <Badge className="bg-red-500 text-white text-[10px]">Featured</Badge>}
                           {product.newArrival && <Badge className="bg-emerald-500 text-white text-[10px]">New</Badge>}

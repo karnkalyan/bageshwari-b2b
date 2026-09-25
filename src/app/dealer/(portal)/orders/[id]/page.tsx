@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   FileText, ShieldCheck, Truck, ArrowLeft, Download, ExternalLink,
-  CheckCircle2, Clock, PackageCheck, AlertCircle, Phone, MapPin, Receipt, History, ShoppingCart
+  CheckCircle2, Clock, PackageCheck, AlertCircle, Phone, MapPin, Receipt, History, ShoppingCart, FileImage
 } from "lucide-react";
 import { placeOrderAction } from "./actions";
 import { DealerOrderActions } from "./dealer-order-actions";
+import { OrderDocumentsToolbar } from "@/components/admin/order-documents-toolbar";
 
 interface DealerOrderPageProps {
   params: Promise<{ id: string }>;
@@ -93,6 +94,20 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
     bankSwiftCode: companyRaw?.bankSwiftCode || "NICA-NP",
     bankAccountType: companyMeta.bankAccountType || "Current Account",
     merchantQrUrl: companyMeta.merchantQrUrl || null,
+    merchantQrs: Array.isArray(companyMeta.merchantQrs)
+      ? companyMeta.merchantQrs
+      : companyMeta.merchantQrUrl
+      ? [
+          {
+            id: "default-qr",
+            title: "Merchant QR",
+            qrUrl: companyMeta.merchantQrUrl,
+            accountName: companyRaw?.companyName || "Bageshwari Tractors",
+            accountNumber: companyMeta.upiId || "",
+            isActive: true,
+          },
+        ]
+      : [],
     upiId: companyMeta.upiId || null,
     paymentInstructions: companyMeta.paymentInstructions || null,
   };
@@ -167,65 +182,19 @@ export default async function DealerOrderPage({ params }: DealerOrderPageProps) 
           </p>
         </div>
 
-        {/* Quick PDF Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Sales Order: Only downloadable after released to warehouse */}
-          {isSentToWarehouse ? (
-            <a
-              href={`/api/orders/${order.id}/documents/sales-order?download=1`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
-            >
-              <Download className="h-3.5 w-3.5" /> Sales Order PDF
-            </a>
-          ) : (
-            <span
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-              title="Sales Order PDF will be available after the order is released to warehouse for fulfillment."
-            >
-              <Download className="h-3.5 w-3.5" /> Sales Order (Pending Warehouse Release)
-            </span>
-          )}
-
-          {/* Proforma Invoice PDF */}
-          {proforma ? (
-            <a
-              href={`/api/orders/${order.id}/documents/proforma`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 transition"
-            >
-              <FileText className="h-3.5 w-3.5" /> View Proforma (PDF)
-            </a>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
-              <FileText className="h-3.5 w-3.5" /> Proforma (Pending)
-            </span>
-          )}
-
-          {/* Final Tax Invoice PDF */}
-          {finalInvoice && (
-            <a
-              href={`/api/orders/${order.id}/documents/final-invoice`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-900 transition"
-            >
-              <ShieldCheck className="h-3.5 w-3.5" /> Tax Invoice (PDF)
-            </a>
-          )}
-
-          {/* Delivery Challan PDF */}
-          {shipment && (
-            <a
-              href={`/api/orders/${order.id}/documents/dispatch-challan`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-800 transition"
-            >
-              <Truck className="h-3.5 w-3.5" /> Delivery Challan (PDF)
-            </a>
-          )}
-        </div>
+        {/* Quick Action Buttons (PDF & JPEG with Paper Size selection) */}
+        <OrderDocumentsToolbar
+          orderId={order.id}
+          isSentToWarehouse={isSentToWarehouse}
+          hasProforma={!!proforma}
+          hasPickList={false}
+          hasFinalInvoice={!!finalInvoice}
+          hasPackingList={false}
+          packageCount={0}
+          hasShipment={!!shipment}
+          isPaymentConfirmed={true}
+          theme="light"
+        />
       </div>
 
       {/* Workflow Progress Tracker */}

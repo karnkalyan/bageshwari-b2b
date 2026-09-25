@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { FileText, ShieldCheck, Download, ExternalLink, Receipt, Eye } from "lucide-react";
+import { FileText, ShieldCheck, Download, ExternalLink, Receipt, Eye, FileImage } from "lucide-react";
 
 export default async function DealerInvoicesPage() {
   const ctx = await getTenantContext("bageshwari", "/dealer/login");
@@ -106,8 +106,18 @@ export default async function DealerInvoicesPage() {
                               <a
                                 href={`/api/orders/${inv.order.id}/documents/final-invoice?download=1`}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md bg-cyan-700 hover:bg-cyan-800 text-white"
+                                title="Download PDF document"
                               >
-                                <Download className="h-3 w-3" /> Download
+                                <Download className="h-3 w-3" /> PDF
+                              </a>
+                              <a
+                                href={`/api/orders/${inv.order.id}/documents/final-invoice?format=jpeg&download=1`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-900"
+                                title="Download as JPEG image"
+                              >
+                                <FileImage className="h-3 w-3" /> JPEG
                               </a>
                             </div>
                           </td>
@@ -177,8 +187,18 @@ export default async function DealerInvoicesPage() {
                               <a
                                 href={`/api/orders/${pi.order.id}/documents/proforma?download=1`}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md bg-indigo-700 hover:bg-indigo-800 text-white"
+                                title="Download PDF document"
                               >
-                                <Download className="h-3 w-3" /> Download
+                                <Download className="h-3 w-3" /> PDF
+                              </a>
+                              <a
+                                href={`/api/orders/${pi.order.id}/documents/proforma?format=jpeg&download=1`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-900"
+                                title="Download as JPEG image"
+                              >
+                                <FileImage className="h-3 w-3" /> JPEG
                               </a>
                             </div>
                           </td>

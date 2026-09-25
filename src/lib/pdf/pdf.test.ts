@@ -5,11 +5,13 @@ import {
   renderPickListPdf,
   renderSalesOrderPdf,
   renderPackageLabelPdf,
+  renderPackageLabelsPdf,
   renderDispatchChallanPdf,
   renderPackingListPdf,
   renderProductBarcodeLabelPdf,
 } from "./templates";
 import { formatFullAddress } from "./helpers";
+import { convertPdfToJpeg } from "./pdf-to-jpeg";
 
 const mockCompany = {
   legalName: "Bageshwari Tractors",
@@ -160,6 +162,23 @@ describe("PDF Template Renderers", () => {
 
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(bytes.length).toBeGreaterThan(1000);
+    expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+  });
+
+  it("renders 4 carton labels on a single A4 page in 2x2 grid layout", async () => {
+    const packages = [1, 2, 3, 4].map((idx) => ({
+      packageNumber: `PKG-2026-00045-${idx}`,
+      cartonIndex: idx,
+      totalCartons: 4,
+      orderNumber: "ORD-2026-00109",
+      weight: 10 + idx,
+      company: mockCompany,
+      dealer: mockDealer,
+    }));
+
+    const bytes = await renderPackageLabelsPdf(packages, "a4_4");
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(2000);
     expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
   });
 
@@ -337,6 +356,188 @@ describe("PDF Template Renderers", () => {
         "Nepal"
       );
       expect(formatted).toBe("Nepalgunj, Banke, Nepal");
+    });
+  });
+
+  describe("convertPdfToJpeg", () => {
+    it("converts a rendered PDF into valid JPEG bytes with correct magic header", async () => {
+      const pdfBytes = await renderPackageLabelPdf({
+        packageNumber: "PKG-2026-TEST",
+        cartonIndex: 1,
+        totalCartons: 1,
+        orderNumber: "ORD-2026-TEST",
+        weight: 5.2,
+        company: mockCompany,
+        dealer: mockDealer,
+      });
+
+      const jpegBytes = await convertPdfToJpeg(pdfBytes, { scale: 1.5, quality: 85 });
+      expect(jpegBytes).toBeInstanceOf(Uint8Array);
+      expect(jpegBytes.length).toBeGreaterThan(1000);
+
+      // Verify JPEG magic bytes: 0xFF, 0xD8, 0xFF
+      expect(jpegBytes[0]).toBe(0xff);
+      expect(jpegBytes[1]).toBe(0xd8);
+      expect(jpegBytes[2]).toBe(0xff);
+    });
+  });
+
+  describe("Adjustable Paper Sizes (A4, A5, Letter, Legal)", () => {
+    it("renders Tax Invoice in A5 compact format", async () => {
+      const bytes = await renderTaxInvoicePdf({
+        invoiceNumber: "INV-A5-001",
+        issueDate: new Date(),
+        orderNumber: "ORD-A5-001",
+        company: mockCompany,
+        dealer: mockDealer,
+        items: mockItems,
+        subtotal: 67000,
+        discountTotal: 1500,
+        taxTotal: 8710,
+        freightTotal: 1200,
+        grandTotal: 75410,
+        paperSize: "A5",
+      });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+    });
+
+    it("renders Proforma Invoice in A5 format", async () => {
+      const bytes = await renderProformaInvoicePdf({
+        proformaNumber: "PI-A5-001",
+        issueDate: new Date(),
+        orderNumber: "ORD-A5-001",
+        company: mockCompany,
+        dealer: mockDealer,
+        items: mockItems,
+        subtotal: 67000,
+        discountTotal: 1500,
+        taxTotal: 8710,
+        freightTotal: 1200,
+        grandTotal: 75410,
+        paperSize: "A5",
+      });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+    });
+
+    it("renders Delivery Challan in A5 format", async () => {
+      const bytes = await renderDispatchChallanPdf({
+        challanNumber: "CHL-A5-001",
+        dispatchDate: new Date(),
+        orderNumber: "ORD-A5-001",
+        company: mockCompany,
+        dealer: mockDealer,
+        items: mockItems,
+        packages: [{ packageNumber: "PKG-01", packageType: "Carton", weight: 8.5 }],
+        totalCartons: 1,
+        totalWeight: 8.5,
+        paperSize: "A5",
+      });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+    });
+
+    it("renders Warehouse Pick List in A5 format", async () => {
+      const bytes = await renderPickListPdf({
+        pickListNumber: "PL-A5-001",
+        orderNumber: "ORD-A5-001",
+        warehouseName: "Central Fulfillment Depot - Nepalgunj",
+        createdAt: new Date(),
+        company: mockCompany,
+        dealer: mockDealer,
+        items: mockItems,
+        paperSize: "A5",
+      });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+    });
+
+    it("renders Packing List in A5 format", async () => {
+      const bytes = await renderPackingListPdf({
+        packingListNumber: "PKL-A5-001",
+        orderNumber: "ORD-A5-001",
+        packingDate: new Date(),
+        company: mockCompany,
+        dealer: mockDealer,
+        packages: [
+          {
+            packageNumber: "PKG-01",
+            boxIndex: 1,
+            totalBoxes: 1,
+            packageType: "Box",
+            weight: 5,
+            items: [{ sku: "SKU-1", name: "Item 1", quantity: 2, unit: "PCS" }],
+          },
+        ],
+        totalCartons: 1,
+        totalWeight: 5,
+        paperSize: "A5",
+      });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(String.fromCharCode(...bytes.slice(0, 4))).toBe("%PDF");
+    });
+
+    it("renders Package Labels in various layouts and paper sizes", async () => {
+      const label = {
+        packageNumber: "PKG-01",
+        cartonIndex: 1,
+        totalCartons: 1,
+        orderNumber: "ORD-TEST",
+        weight: 5,
+        company: mockCompany,
+        dealer: mockDealer,
+      };
+
+      const a4_4 = await renderPackageLabelsPdf([label], "a4_4", "A4");
+      expect(a4_4).toBeInstanceOf(Uint8Array);
+
+      const a4_2 = await renderPackageLabelsPdf([label], "a4_2", "A4");
+      expect(a4_2).toBeInstanceOf(Uint8Array);
+
+      const a4_1 = await renderPackageLabelsPdf([label], "a4_1", "A4");
+      expect(a4_1).toBeInstanceOf(Uint8Array);
+
+      const thermal = await renderPackageLabelsPdf([label], "thermal", "A4");
+      expect(thermal).toBeInstanceOf(Uint8Array);
+
+      const a5_label = await renderPackageLabelsPdf([label], "a4_4", "A5");
+      expect(a5_label).toBeInstanceOf(Uint8Array);
+    });
+
+    it("renders Product Barcodes in A4 sheet (24 grid) and A5 sheet (12 grid)", async () => {
+      const barcodeData = {
+        name: "Swaraj Clutch Plate Assembly",
+        sku: "SW-CLUTCH-01",
+        barcode: "8901234567890",
+        mrp: 12500,
+        vatPercent: 13,
+        mrpInclVat: 12500,
+        companyName: "Bageshwari Tractors",
+      };
+
+      // A4 Sheet Grid
+      const a4Sheet = await renderProductBarcodeLabelPdf(
+        { ...barcodeData, stickerSize: "a4_sheet", paperSize: "A4" },
+        24
+      );
+      expect(a4Sheet).toBeInstanceOf(Uint8Array);
+      expect(String.fromCharCode(...a4Sheet.slice(0, 4))).toBe("%PDF");
+
+      // A5 Sheet Grid
+      const a5Sheet = await renderProductBarcodeLabelPdf(
+        { ...barcodeData, stickerSize: "a5_sheet", paperSize: "A5" },
+        12
+      );
+      expect(a5Sheet).toBeInstanceOf(Uint8Array);
+      expect(String.fromCharCode(...a5Sheet.slice(0, 4))).toBe("%PDF");
+
+      // Convert A5 Sheet to JPEG
+      const a5Jpeg = await convertPdfToJpeg(a5Sheet, { scale: 1.5 });
+      expect(a5Jpeg).toBeInstanceOf(Uint8Array);
+      expect(a5Jpeg[0]).toBe(0xff);
+      expect(a5Jpeg[1]).toBe(0xd8);
+      expect(a5Jpeg[2]).toBe(0xff);
     });
   });
 });

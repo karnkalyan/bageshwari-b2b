@@ -6,7 +6,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, Download, ExternalLink, PackageCheck, Eye, MapPin } from "lucide-react";
+import { Truck, Download, ExternalLink, PackageCheck, Eye, MapPin, FileImage } from "lucide-react";
 
 export default async function DealerShipmentsPage() {
   const ctx = await getTenantContext("bageshwari", "/dealer/login");
@@ -93,8 +93,18 @@ export default async function DealerShipmentsPage() {
                           <a
                             href={`/api/orders/${shp.order.id}/documents/dispatch-challan?download=1`}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-700 hover:bg-blue-800 text-white"
+                            title="Download Challan as PDF"
                           >
-                            <Download className="h-3 w-3" /> Challan PDF
+                            <Download className="h-3 w-3" /> PDF
+                          </a>
+                          <a
+                            href={`/api/orders/${shp.order.id}/documents/dispatch-challan?format=jpeg&download=1`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900"
+                            title="Download Challan as JPEG image"
+                          >
+                            <FileImage className="h-3 w-3" /> JPEG
                           </a>
                         </div>
                       </td>

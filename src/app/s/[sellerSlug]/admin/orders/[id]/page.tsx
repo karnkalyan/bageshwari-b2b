@@ -9,13 +9,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ArrowLeft, CheckCircle2, FileText, Warehouse, Truck, Clock, ShieldCheck,
   AlertTriangle, Receipt, CreditCard, ChevronRight, XCircle, Download, ExternalLink,
-  PackageCheck, Package, Printer, Tag, History, Edit3, UserCheck
+  PackageCheck, Package, Printer, Tag, History, Edit3, UserCheck, FileImage
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
 import { advanceWorkflowAction, assignWarehouseUserAction } from "./actions";
 import { AdminOrderActions } from "./admin-order-actions";
 import { OrderWarehouseAssignment } from "@/components/admin/order-warehouse-assignment";
 import { CartonPackingDialog } from "@/components/admin/carton-packing-dialog";
+import { OrderDocumentsToolbar } from "@/components/admin/order-documents-toolbar";
 
 interface OrderDetailsProps {
   params: Promise<{ sellerSlug: string; id: string }>;
@@ -581,140 +582,35 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
         <div className="bg-slate-900 text-white p-4 rounded-xl flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Printer className="h-4 w-4 text-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">Printable Commercial Documents</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+              Printable Commercial Documents
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Sales Order: Active only after released to warehouse */}
-            {isSentToWarehouse ? (
-              <a
-                href={`/api/orders/${order.id}/documents/sales-order`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-              >
-                <FileText className="h-3.5 w-3.5" /> Sales Order
-              </a>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed"
-                title="Sales Order PDF is available after order is released to warehouse for fulfillment."
-              >
-                <FileText className="h-3.5 w-3.5" /> Sales Order (Pending Warehouse Release)
-              </span>
-            )}
-
-            {/* Proforma Invoice: Only active if Proforma exists */}
-            {proforma ? (
-              <a
-                href={`/api/orders/${order.id}/documents/proforma`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-900/90 hover:bg-indigo-800 text-indigo-200 border border-indigo-700 transition"
-              >
-                <FileText className="h-3.5 w-3.5" /> Proforma (PI)
-              </a>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed">
-                <FileText className="h-3.5 w-3.5" /> Proforma (Pending)
-              </span>
-            )}
-
-            {/* Pick List: Only active after payment confirmed AND picklist exists */}
-            {isPaymentConfirmed && pickList ? (
-              <a
-                href={`/api/orders/${order.id}/documents/pick-list`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-900/90 hover:bg-teal-800 text-teal-200 border border-teal-700 transition"
-              >
-                <Warehouse className="h-3.5 w-3.5" /> Pick List
-              </a>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed"
-                title={!isPaymentConfirmed ? "Available after payment confirmation" : "Pick list pending warehouse release"}
-              >
-                <Warehouse className="h-3.5 w-3.5" /> Pick List {!isPaymentConfirmed ? "(Locked - Payment Required)" : "(Pending)"}
-              </span>
-            )}
-
-            {/* VAT Tax Invoice: Only active if Final Invoice exists */}
-            {finalInvoice ? (
-              <a
-                href={`/api/orders/${order.id}/documents/final-invoice`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-900/90 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 transition"
-              >
-                <ShieldCheck className="h-3.5 w-3.5" /> VAT Tax Invoice
-              </a>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed">
-                <ShieldCheck className="h-3.5 w-3.5" /> Tax Invoice (Pending)
-              </span>
-            )}
-
-            {/* Dedicated Packaging List (Carton Manifest): Only active after payment confirmed AND released to warehouse */}
-            {isPaymentConfirmed && (order.packages.length > 0 || ![
-              "DRAFT",
-              "PENDING_ACCOUNTS_REVIEW",
-              "ACCOUNTS_REVIEW_IN_PROGRESS",
-              "WAITING_FOR_DEALER_CONFIRMATION",
-              "DEALER_CHANGE_REQUESTED",
-              "FINAL_ORDER_CONFIRMED",
-              "PROFORMA_INVOICE_GENERATED",
-              "PROFORMA_INVOICE_CONFIRMED",
-            ].includes(order.status)) ? (
-              <a
-                href={`/api/orders/${order.id}/documents/packing-list`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-900/90 hover:bg-emerald-800 text-emerald-200 border border-emerald-700 transition"
-              >
-                <PackageCheck className="h-3.5 w-3.5" /> Packaging List ({order.packages.length > 0 ? order.packages.length : "Auto"})
-              </a>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed"
-                title={!isPaymentConfirmed ? "Available after payment confirmation and warehouse release" : "Packaging pending"}
-              >
-                <PackageCheck className="h-3.5 w-3.5" /> Packaging List {!isPaymentConfirmed ? "(Locked - Payment Required)" : "(Pending)"}
-              </span>
-            )}
-
-            {/* Carton Labels: Only active after payment confirmed and packages packed */}
-            {isPaymentConfirmed && order.packages.length > 0 ? (
-              <a
-                href={`/api/orders/${order.id}/documents/package-labels`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-900/90 hover:bg-amber-800 text-amber-200 border border-amber-700 transition"
-              >
-                <Tag className="h-3.5 w-3.5" /> Carton Labels ({order.packages.length})
-              </a>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed">
-                <Tag className="h-3.5 w-3.5" /> Labels {!isPaymentConfirmed ? "(Locked)" : "(Pending)"}
-              </span>
-            )}
-
-            {/* Delivery Challan: Only active after payment confirmed and shipment created */}
-            {isPaymentConfirmed && order.shipments.length > 0 ? (
-              <a
-                href={`/api/orders/${order.id}/documents/dispatch-challan`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900/90 hover:bg-blue-800 text-blue-200 border border-blue-700 transition"
-              >
-                <Truck className="h-3.5 w-3.5" /> Delivery Challan
-              </a>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed">
-                <Truck className="h-3.5 w-3.5" /> Challan {!isPaymentConfirmed ? "(Locked)" : "(Pending)"}
-              </span>
-            )}
-          </div>
+          <OrderDocumentsToolbar
+            orderId={order.id}
+            isSentToWarehouse={isSentToWarehouse}
+            hasProforma={!!proforma}
+            hasPickList={isPaymentConfirmed && !!pickList}
+            hasFinalInvoice={!!finalInvoice}
+            hasPackingList={
+              order.packages.length > 0 ||
+              ![
+                "DRAFT",
+                "PENDING_ACCOUNTS_REVIEW",
+                "ACCOUNTS_REVIEW_IN_PROGRESS",
+                "WAITING_FOR_DEALER_CONFIRMATION",
+                "DEALER_CHANGE_REQUESTED",
+                "FINAL_ORDER_CONFIRMED",
+                "PROFORMA_INVOICE_GENERATED",
+                "PROFORMA_INVOICE_CONFIRMED",
+              ].includes(order.status)
+            }
+            packageCount={order.packages.length}
+            hasShipment={order.shipments.length > 0}
+            isPaymentConfirmed={isPaymentConfirmed}
+            theme="dark"
+          />
         </div>
       </div>
 

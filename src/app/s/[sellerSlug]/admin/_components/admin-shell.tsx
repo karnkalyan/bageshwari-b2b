@@ -136,6 +136,17 @@ const navigationGroups: NavGroup[] = [
         ],
         allowedPermissions: ["picklist.generate", "picklist.complete", "inventory.manage"],
       },
+      {
+        label: "Search Analytics",
+        segment: "/search-analytics",
+        icon: Search,
+        color: "text-rose-500",
+        allowedRoles: [
+          ...ALL_PRIVILEGED_ROLES,
+          "PRODUCT_MANAGER", "SALES_MANAGER", "ACCOUNTANT", "ACCOUNTS_MANAGER", "WAREHOUSE_MANAGER",
+        ],
+        allowedPermissions: ["product.manage", "product.view", "order.view"],
+      },
     ],
   },
   {

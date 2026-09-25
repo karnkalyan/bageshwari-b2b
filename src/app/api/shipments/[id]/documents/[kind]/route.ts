@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { apiError } from "@/lib/api-response";
-import { generateOrderPdf } from "@/lib/pdf";
+import { generateOrderPdf, convertPdfToJpeg, parsePaperSize } from "@/lib/pdf";
 import { prisma } from "@/lib/db";
 
 export async function GET(
@@ -30,20 +30,41 @@ export async function GET(
     return apiError("SHIPMENT_NOT_FOUND", "Shipment not found.", 404);
   }
 
+  const { searchParams } = new URL(request.url);
+  const rawLayout = searchParams.get("layout");
+  const layout = (rawLayout === "a4_4" || rawLayout === "a4_2" || rawLayout === "a4_1" || rawLayout === "thermal") ? rawLayout : "a4_4";
+  const paperSize = parsePaperSize(searchParams.get("pageSize") || searchParams.get("paperSize") || searchParams.get("size"));
+
   const documentKind = kind === "challan" ? "dispatch-challan" : "package-labels";
-  const bytes = await generateOrderPdf(shipment.orderId, session.sellerId, documentKind);
+  const bytes = await generateOrderPdf(shipment.orderId, session.sellerId, documentKind, { layout, paperSize });
   if (!bytes) {
     return apiError("DOCUMENT_UNAVAILABLE", "Document data is unavailable.", 404);
   }
 
-  const { searchParams } = new URL(request.url);
   const isDownload = searchParams.get("download") === "1" || searchParams.get("download") === "true";
   const disposition = isDownload ? "attachment" : "inline";
-  const filename = kind === "challan" ? `${shipment.challanNumber || shipment.shipmentNumber}-challan.pdf` : `${shipment.shipmentNumber}-package-labels.pdf`;
 
-  return new Response(new Uint8Array(bytes).buffer, {
+  const formatParam = searchParams.get("format")?.toLowerCase();
+  const isJpeg = formatParam === "jpeg" || formatParam === "jpg";
+  const ext = isJpeg ? "jpg" : "pdf";
+  const baseName = kind === "challan" ? `${shipment.challanNumber || shipment.shipmentNumber}-challan` : `${shipment.shipmentNumber}-package-labels`;
+  const filename = `${baseName}.${ext}`;
+
+  let responseBytes = bytes;
+  let contentType = "application/pdf";
+
+  if (isJpeg) {
+    try {
+      responseBytes = await convertPdfToJpeg(bytes, { scale: 2, quality: 92 });
+      contentType = "image/jpeg";
+    } catch (e: any) {
+      console.error("Failed to convert shipment PDF to JPEG:", e);
+    }
+  }
+
+  return new Response(new Uint8Array(responseBytes).buffer, {
     headers: {
-      "Content-Type": "application/pdf",
+      "Content-Type": contentType,
       "Content-Disposition": `${disposition}; filename="${filename}"`,
       "Cache-Control": "private, no-store",
     },
