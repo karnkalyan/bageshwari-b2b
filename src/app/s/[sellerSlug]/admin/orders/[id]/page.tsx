@@ -622,20 +622,64 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
         {/* Left 2 Cols: Order Items & Sub-documents */}
         <div className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="items">
-            <TabsList className="bg-white border rounded-xl p-1 shadow-xs">
-              <TabsTrigger value="items">Order Items ({order.items.length})</TabsTrigger>
-              <TabsTrigger value="revisions">Revisions ({order.revisions.length})</TabsTrigger>
-              <TabsTrigger value="proforma">Proforma Invoice</TabsTrigger>
-              <TabsTrigger value="picklist">Pick List</TabsTrigger>
-              <TabsTrigger value="invoice">Final Tax Invoice</TabsTrigger>
-              <TabsTrigger value="logistics">Cartons & Packaging ({order.packages.length})</TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto pb-1 max-w-full">
+              <TabsList className="bg-white border rounded-xl p-1 shadow-xs flex w-max min-w-full sm:w-auto">
+                <TabsTrigger value="items" className="text-xs whitespace-nowrap">Order Items ({order.items.length})</TabsTrigger>
+                <TabsTrigger value="revisions" className="text-xs whitespace-nowrap">Revisions ({order.revisions.length})</TabsTrigger>
+                <TabsTrigger value="proforma" className="text-xs whitespace-nowrap">Proforma Invoice</TabsTrigger>
+                <TabsTrigger value="picklist" className="text-xs whitespace-nowrap">Pick List</TabsTrigger>
+                <TabsTrigger value="invoice" className="text-xs whitespace-nowrap">Final Tax Invoice</TabsTrigger>
+                <TabsTrigger value="logistics" className="text-xs whitespace-nowrap">Cartons & Packaging ({order.packages.length})</TabsTrigger>
+              </TabsList>
+            </div>
 
             {/* Items Tab */}
             <TabsContent value="items" className="mt-4">
               <Card>
                 <CardContent className="p-0">
-                  <div className="overflow-x-auto">
+                  {/* Mobile Item Cards (< md) */}
+                  <div className="block md:hidden divide-y divide-slate-100">
+                    {order.items.map((item) => {
+                      const itemQty = Number(item.approvedQuantity ?? item.originalQuantity);
+                      const baseDp = Number(item.dealerPrice);
+                      const itemTax = Number(item.taxAmount);
+                      const itemVatRate = itemQty > 0 && baseDp > 0 && itemTax > 0 ? Number(((itemTax / (baseDp * itemQty)) * 100).toFixed(1)) : effectiveVatPercent;
+                      const unitDpWithVat = Number((baseDp * (1 + itemVatRate / 100)).toFixed(2));
+
+                      return (
+                        <div key={item.id} className="p-4 space-y-2 text-xs">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-bold text-slate-900">{item.productName}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">SKU: {item.sku}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-slate-900">{formatCurrency(item.lineTotal)}</div>
+                              <div className="text-[10px] text-slate-500 font-mono">{formatCurrency(unitDpWithVat)}/unit</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg text-[11px]">
+                            <span className="text-slate-500">
+                              Req: <span className="font-semibold text-slate-700">{item.originalQuantity}</span>
+                            </span>
+                            <span className="font-bold text-blue-700">
+                              Approved: {itemQty} {item.product?.unitCode || "PCS"}
+                            </span>
+                          </div>
+
+                          {item.accountsRemarks && (
+                            <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
+                              Note: {item.accountsRemarks}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Item Table (>= md) */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead className="bg-slate-50 text-slate-500 uppercase border-b text-[10px] font-semibold">
                         <tr>

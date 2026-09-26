@@ -393,10 +393,11 @@ export function AdminShell({
             <button
               aria-label="Sign out"
               onClick={() => signOut({ callbackUrl: window.location.origin + "/staff/login" })}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+              className="flex items-center gap-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 px-2 py-1.5 text-xs font-bold transition-all shrink-0"
               title="Sign out"
             >
               <LogOut className="h-3.5 w-3.5" />
+              <span>Logout</span>
             </button>
           )}
         </div>
@@ -417,7 +418,7 @@ export function AdminShell({
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
         >
-          <div className="h-full animate-slide-in-left" onClick={(e) => e.stopPropagation()}>
+          <div className="h-full animate-slide-in-left max-w-[85vw]" onClick={(e) => e.stopPropagation()}>
             {sidebarContent(true)}
           </div>
           <button
@@ -433,12 +434,12 @@ export function AdminShell({
       {/* Main content wrapper */}
       <div className={cn("min-w-0 flex-1 sidebar-transition", paddingLeft)}>
         {/* Sticky Top Navbar */}
-        <header className="sticky top-0 z-40 flex h-[64px] items-center justify-between gap-3 border-b border-border bg-card/90 px-4 backdrop-blur-md md:px-7">
+        <header className="sticky top-0 z-40 flex h-[64px] items-center justify-between gap-3 border-b border-border bg-card/90 px-3 md:px-7 backdrop-blur-md">
           {/* Left section: Hamburger + Desktop Collapse/Expand + Page Title */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Mobile menu trigger */}
             <button
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground hover:bg-accent lg:hidden transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground hover:bg-accent lg:hidden transition-colors shrink-0"
               onClick={() => setMobileOpen(true)}
               aria-label="Open navigation"
             >
@@ -469,13 +470,13 @@ export function AdminShell({
 
             {/* Breadcrumb / Title */}
             <div className="min-w-0">
-              <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{sellerName}</div>
-              <div className="truncate text-sm md:text-base font-extrabold text-foreground">{current?.label || "Admin Hub"}</div>
+              <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground truncate">{sellerName}</div>
+              <div className="truncate text-xs sm:text-sm md:text-base font-extrabold text-foreground">{current?.label || "Admin Hub"}</div>
             </div>
           </div>
 
-          {/* Right section: Search bar + Theme Toggle + Notifications */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Right section: Search bar + Theme Toggle + Notifications + Quick Logout */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Search Input */}
             <LiveSearchInput
               placeholder="Search products..."
@@ -488,11 +489,80 @@ export function AdminShell({
 
             {/* Notifications */}
             <NotificationBell />
+
+            {/* Quick logout button on mobile navbar */}
+            <button
+              onClick={() => signOut({ callbackUrl: window.location.origin + "/staff/login" })}
+              className="lg:hidden flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted/60 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 transition-colors"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="animate-fade-in bg-background text-foreground min-h-[calc(100vh-64px)]">{children}</main>
+        {/* Page Content with bottom padding to accommodate mobile bottom navbar */}
+        <main className="animate-fade-in bg-background text-foreground min-h-[calc(100vh-64px)] pb-20 lg:pb-8">{children}</main>
+
+        {/* Mobile Bottom Navigation Bar: Instant 1-tap thumb navigation on phones */}
+        <nav
+          aria-label="Mobile Navigation"
+          className="fixed bottom-0 inset-x-0 z-40 flex h-16 items-center justify-around border-t border-border bg-card/95 backdrop-blur-md px-1 py-1 lg:hidden shadow-lg"
+        >
+          <Link
+            href={base}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center py-1 text-[10px] font-bold transition-colors",
+              normalizedPathname === base ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <LayoutDashboard className="h-4 w-4 mb-0.5" />
+            <span>Home</span>
+          </Link>
+
+          <Link
+            href={`${base}/orders`}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center py-1 text-[10px] font-bold transition-colors",
+              normalizedPathname.startsWith(`${base}/orders`) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ShoppingCart className="h-4 w-4 mb-0.5" />
+            <span>Orders</span>
+          </Link>
+
+          <Link
+            href={`${base}/warehouse`}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center py-1 text-[10px] font-bold transition-colors",
+              normalizedPathname.startsWith(`${base}/warehouse`) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Warehouse className="h-4 w-4 mb-0.5" />
+            <span>Warehouse</span>
+          </Link>
+
+          <Link
+            href={`${base}/accounts`}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center py-1 text-[10px] font-bold transition-colors",
+              normalizedPathname.startsWith(`${base}/accounts`) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <FileText className="h-4 w-4 mb-0.5" />
+            <span>Accounts</span>
+          </Link>
+
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="flex flex-1 flex-col items-center justify-center py-1 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Open menu drawer"
+          >
+            <Menu className="h-4 w-4 mb-0.5" />
+            <span>Menu</span>
+          </button>
+        </nav>
       </div>
     </div>
   );

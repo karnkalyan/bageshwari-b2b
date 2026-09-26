@@ -169,15 +169,19 @@ export function AdminSettingsClient({
       .then((res) => res.json())
       .then((json) => {
         if (!active || !json?.success || !json?.data) return;
-        const live = json.data;
+        const liveCompany = json.data.company || json.data;
+        if (!liveCompany || typeof liveCompany !== "object") return;
         setCompany((prev) => ({
           ...prev,
-          ...live,
+          ...liveCompany,
           merchantQrs:
-            Array.isArray(live.merchantQrs) && live.merchantQrs.length > 0
-              ? live.merchantQrs
+            Array.isArray(liveCompany.merchantQrs)
+              ? liveCompany.merchantQrs
               : prev.merchantQrs,
         }));
+        if (Array.isArray(json.data.categories) && json.data.categories.length > 0) {
+          setCategories(json.data.categories);
+        }
       })
       .catch(() => {});
     return () => {
@@ -207,6 +211,9 @@ export function AdminSettingsClient({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("assetType", "merchant_qr");
+      if (newQrTitle.trim()) formData.append("title", newQrTitle.trim());
+      if (newQrAccountName.trim()) formData.append("accountName", newQrAccountName.trim());
+      if (newQrAccountNumber.trim()) formData.append("accountNumber", newQrAccountNumber.trim());
 
       const res = await fetch("/api/admin/company/upload", {
         method: "POST",
@@ -218,7 +225,7 @@ export function AdminSettingsClient({
         throw new Error(json.error || "Failed to upload QR code image.");
       }
 
-      const newQrItem: MerchantQrItem = {
+      const newQrItem: MerchantQrItem = json.newQrItem || {
         id: `qr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         title: newQrTitle.trim() || `Merchant QR #${(company.merchantQrs?.length || 0) + 1}`,
         qrUrl: json.url,
@@ -228,38 +235,18 @@ export function AdminSettingsClient({
         createdAt: new Date().toISOString(),
       };
 
-      const updatedCompany = (() => {
-        const existing = company.merchantQrs || [];
-        const updated = [...existing, newQrItem];
-        return {
-          ...company,
-          merchantQrs: updated,
-          merchantQrUrl: company.merchantQrUrl || json.url,
-        };
-      })();
-      setCompany(updatedCompany);
+      const updatedMerchantQrs = Array.isArray(json.merchantQrs) && json.merchantQrs.length > 0
+        ? json.merchantQrs
+        : [...(company.merchantQrs || []), newQrItem];
 
-      // Auto-save after QR upload so images persist on refresh
-      try {
-        const saveRes = await fetch("/api/admin/settings", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...updatedCompany,
-            themeConfig,
-            categories: categories.map((c) => ({
-              id: c.id,
-              taxPercent: c.taxPercent,
-            })),
-          }),
-        });
-        const saveJson = await saveRes.json();
-        if (saveRes.ok && saveJson.success) {
-          router.refresh();
-        }
-      } catch (autoSaveErr) {
-        console.warn("Auto-save after QR upload failed:", autoSaveErr);
-      }
+      const activeQr = updatedMerchantQrs.find((q: any) => q.isActive);
+
+      const updatedCompany = {
+        ...company,
+        merchantQrs: updatedMerchantQrs,
+        merchantQrUrl: activeQr ? activeQr.qrUrl : json.url,
+      };
+      setCompany(updatedCompany);
 
       setNewQrTitle("");
       setNewQrAccountName("");
@@ -271,7 +258,7 @@ export function AdminSettingsClient({
     }
   };
 
-  const handleToggleQrStatus = (id: string) => {
+  const handleToggleQrStatus = async (id: string) => {
     setCompany((prev) => {
       const updated = (prev.merchantQrs || []).map((q) =>
         q.id === id ? { ...q, isActive: !q.isActive } : q
@@ -283,9 +270,19 @@ export function AdminSettingsClient({
         merchantQrUrl: activeQr ? activeQr.qrUrl : null,
       };
     });
+
+    try {
+      await fetch("/api/admin/company/qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle", qrId: id }),
+      });
+    } catch (e) {
+      console.warn("Background QR toggle save failed:", e);
+    }
   };
 
-  const handleDeleteQr = (id: string) => {
+  const handleDeleteQr = async (id: string) => {
     setCompany((prev) => {
       const updated = (prev.merchantQrs || []).filter((q) => q.id !== id);
       const activeQr = updated.find((q) => q.isActive);
@@ -295,15 +292,35 @@ export function AdminSettingsClient({
         merchantQrUrl: activeQr ? activeQr.qrUrl : null,
       };
     });
+
+    try {
+      await fetch("/api/admin/company/qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", qrId: id }),
+      });
+    } catch (e) {
+      console.warn("Background QR delete save failed:", e);
+    }
   };
 
-  const handleUpdateQrTitle = (id: string, title: string) => {
+  const handleUpdateQrTitle = async (id: string, title: string) => {
     setCompany((prev) => ({
       ...prev,
       merchantQrs: (prev.merchantQrs || []).map((q) =>
         q.id === id ? { ...q, title } : q
       ),
     }));
+
+    try {
+      await fetch("/api/admin/company/qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", qrId: id, title }),
+      });
+    } catch (e) {
+      // ignore
+    }
   };
 
   const handleCategoryTaxChange = (id: string, value: string) => {
@@ -421,30 +438,32 @@ export function AdminSettingsClient({
       )}
 
       <Tabs defaultValue="vat" className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-2 border rounded-xl shadow-xs">
-          <TabsList className="bg-slate-100 p-1 rounded-lg flex flex-wrap">
-            <TabsTrigger value="vat" className="text-xs font-bold flex items-center gap-1.5">
-              <Percent className="h-3.5 w-3.5" /> VAT & Tax Configuration
-            </TabsTrigger>
-            <TabsTrigger value="seller" className="text-xs font-bold flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5" /> Company & Seller Details
-            </TabsTrigger>
-            <TabsTrigger value="bank" className="text-xs font-bold flex items-center gap-1.5">
-              <CreditCard className="h-3.5 w-3.5" /> Bank & Settlement Info
-            </TabsTrigger>
-            <TabsTrigger value="credit" className="text-xs font-bold flex items-center gap-1.5">
-              <FileCheck2 className="h-3.5 w-3.5 text-blue-700" /> Dealer Credit Facility
-            </TabsTrigger>
-            <TabsTrigger value="theme" className="text-xs font-bold flex items-center gap-1.5 text-indigo-700 data-[state=active]:text-indigo-900">
-              <Palette className="h-3.5 w-3.5" /> Theme & UI Management
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2 border rounded-xl shadow-xs">
+          <div className="overflow-x-auto pb-1 sm:pb-0 max-w-full">
+            <TabsList className="bg-slate-100 p-1 rounded-lg flex flex-nowrap w-max sm:w-auto">
+              <TabsTrigger value="vat" className="text-xs font-bold flex items-center gap-1.5 whitespace-nowrap">
+                <Percent className="h-3.5 w-3.5" /> VAT & Tax Configuration
+              </TabsTrigger>
+              <TabsTrigger value="seller" className="text-xs font-bold flex items-center gap-1.5 whitespace-nowrap">
+                <Building2 className="h-3.5 w-3.5" /> Company & Seller Details
+              </TabsTrigger>
+              <TabsTrigger value="bank" className="text-xs font-bold flex items-center gap-1.5 whitespace-nowrap">
+                <CreditCard className="h-3.5 w-3.5" /> Bank & Settlement Info
+              </TabsTrigger>
+              <TabsTrigger value="credit" className="text-xs font-bold flex items-center gap-1.5 whitespace-nowrap">
+                <FileCheck2 className="h-3.5 w-3.5 text-blue-700" /> Dealer Credit Facility
+              </TabsTrigger>
+              <TabsTrigger value="theme" className="text-xs font-bold flex items-center gap-1.5 whitespace-nowrap text-indigo-700 data-[state=active]:text-indigo-900">
+                <Palette className="h-3.5 w-3.5" /> Theme & UI Management
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <Button
             type="button"
             onClick={handleSaveAll}
             disabled={saving}
-            className="bg-[#0b2d55] hover:bg-[#124177] text-white font-black text-xs h-9 px-5 shadow-sm flex items-center gap-1.5"
+            className="w-full sm:w-auto bg-[#0b2d55] hover:bg-[#124177] text-white font-black text-xs h-9 px-5 shadow-sm flex items-center justify-center gap-1.5 shrink-0"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
             Save All Settings

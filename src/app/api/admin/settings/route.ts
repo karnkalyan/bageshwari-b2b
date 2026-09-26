@@ -8,9 +8,9 @@ const updateSettingsSchema = z.object({
   companyName: z.string().trim().min(1).max(255).optional(),
   tradingName: z.string().trim().min(1).max(255).optional(),
   contactPerson: z.string().trim().max(100).optional().nullable(),
-  email: z.string().trim().email().optional().nullable(),
+  email: z.string().trim().optional().nullable(),
   phone: z.string().trim().max(50).optional().nullable(),
-  website: z.string().trim().url().optional().nullable().or(z.literal("")),
+  website: z.string().trim().optional().nullable(),
   country: z.string().trim().max(50).optional(),
   province: z.string().trim().max(50).optional().nullable(),
   district: z.string().trim().max(50).optional().nullable(),
@@ -37,7 +37,7 @@ const updateSettingsSchema = z.object({
       accountNumber: z.string().trim().optional().nullable(),
       isActive: z.boolean().default(true),
       createdAt: z.string().optional(),
-    })
+    }).passthrough()
   ).optional(),
   upiId: z.string().trim().max(100).optional().nullable(),
   paymentInstructions: z.string().trim().max(1000).optional().nullable(),
@@ -56,14 +56,15 @@ const updateSettingsSchema = z.object({
       cardRadius: z.string().optional(),
       tableDensity: z.string().optional(),
     })
+    .passthrough()
     .optional(),
   categories: z.array(
     z.object({
       id: z.string(),
       taxPercent: z.coerce.number().min(0).max(100).optional().nullable(),
-    })
+    }).passthrough()
   ).optional(),
-});
+}).passthrough();
 
 export async function GET() {
   const session = await auth();

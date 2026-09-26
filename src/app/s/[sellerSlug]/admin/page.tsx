@@ -135,16 +135,16 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
             Real-time pipeline monitoring, fulfillment queues, accounts review, and carrier logistics.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Link
             href={`${base}/orders`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:shadow-lg hover:-translate-y-0.5 transition-all text-center"
           >
             <ShoppingCart className="h-4 w-4" /> Manage Orders
           </Link>
           <Link
             href={`${base}/settings`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-accent transition-all shadow-2xs"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-accent transition-all shadow-2xs text-center"
           >
             Settings & VAT
           </Link>
@@ -278,7 +278,38 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Recent Orders Cards (< md) */}
+          <div className="block md:hidden divide-y divide-border">
+            {recentOrders.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground">No recent orders recorded.</div>
+            ) : (
+              recentOrders.map((order) => (
+                <div key={order.id} className="p-3.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Link href={`${base}/orders/${order.id}`} className="font-bold text-xs text-blue-500 hover:underline">
+                      {order.orderNumber}
+                    </Link>
+                    <Badge className="bg-blue-500/10 text-blue-500 border border-blue-500/20 text-[10px]">
+                      {ORDER_STATUS_LABELS[order.status] || order.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-semibold text-foreground">{order.dealer.tradingName}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">{order.dealer.code}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-bold text-foreground">{formatCurrency(Number(order.grandTotal))}</div>
+                      <div className="text-[10px] text-muted-foreground">{formatDate(order.createdAt)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="admin-table w-full text-left text-xs">
               <thead className="bg-muted/50 text-muted-foreground uppercase border-b border-border text-[10px] font-bold">
                 <tr>

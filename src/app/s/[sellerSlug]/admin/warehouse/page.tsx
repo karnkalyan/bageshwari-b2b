@@ -368,7 +368,53 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
             <span className="text-xs text-muted-foreground font-normal">Ready to assign picker & generate pick sheet</span>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Ready Orders Cards (< md) */}
+          <div className="block md:hidden divide-y divide-border">
+            {readyOrders.map((ord) => (
+              <div key={ord.id} className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono font-bold text-sm text-foreground">{ord.orderNumber}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">{ord.items.length} product(s)</span>
+                </div>
+                <div className="text-xs font-medium text-foreground">{ord.dealer.tradingName || ord.dealer.legalName}</div>
+                <div className="pt-1">
+                  <form action={startPickingAction} className="flex flex-col gap-2">
+                    <input type="hidden" name="orderId" value={ord.id} />
+                    {warehouseStaff.length > 0 ? (
+                      <select
+                        name="assignedWarehouseUserId"
+                        defaultValue=""
+                        className="w-full h-8 text-xs border border-border rounded-lg px-2 bg-card text-foreground font-medium outline-none"
+                        required
+                      >
+                        <option value="" disabled>Choose Warehouse User...</option>
+                        {warehouseStaff.map((ws) => (
+                          <option key={ws.user.id} value={ws.user.id}>
+                            {ws.user.name || ws.user.email}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Default Picker</span>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Button type="submit" size="sm" className="flex-1 h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold">
+                        Assign & Generate Pick Sheet
+                      </Button>
+                      <Link href={`/admin/orders/${ord.id}`}>
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-border">
+                          View
+                        </Button>
+                      </Link>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-muted/50 text-muted-foreground uppercase border-b border-border text-[10px] font-bold">
                 <tr>
@@ -441,7 +487,200 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Mobile Cards View (< md) */}
+            <div className="block md:hidden divide-y divide-border">
+              {pickLists.map((pl) => {
+                const isAssignedToCurrent =
+                  pl.assignedToId === ctx.userId || pl.pickerId === ctx.userId;
+                const canComplete =
+                  pl.status !== "COMPLETED" && (isManager || isAssignedToCurrent);
+
+                const packingItems = (pl.order?.items || []).map((it) => ({
+                  id: it.id,
+                  sku: it.sku,
+                  productName: it.productName,
+                  approvedQuantity:
+                    it.approvedQuantity !== null
+                      ? Number(it.approvedQuantity)
+                      : Number(it.originalQuantity),
+                  unitCode: it.product?.unitCode || "PCS",
+                }));
+
+                const existingPackages = (pl.order?.packages || []).map((pkg) => ({
+                  id: pkg.id,
+                  packageNumber: pkg.packageNumber,
+                  packageType: pkg.packageType,
+                  length: pkg.length !== null ? Number(pkg.length) : null,
+                  width: pkg.width !== null ? Number(pkg.width) : null,
+                  height: pkg.height !== null ? Number(pkg.height) : null,
+                  weight: pkg.weight !== null ? Number(pkg.weight) : null,
+                  status: pkg.status,
+                  handlingInstructions: pkg.handlingInstructions,
+                  itemsJson: pkg.itemsJson,
+                }));
+
+                return (
+                  <div key={`m-${pl.id}`} className="p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-sm text-foreground">{pl.pickListNumber}</span>
+                        {pl.order && (
+                          <Link href={`/admin/orders/${pl.orderId}`} className="text-xs font-semibold text-blue-500 hover:underline">
+                            {pl.order.orderNumber}
+                          </Link>
+                        )}
+                      </div>
+                      <Badge
+                        className={`text-[10px] font-bold ${
+                          pl.status === "COMPLETED"
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                            : pl.status === "ASSIGNED"
+                            ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                        }`}
+                      >
+                        {pl.status}
+                      </Badge>
+                    </div>
+
+                    <div className="text-xs font-medium text-foreground">
+                      {pl.order?.dealer?.tradingName || pl.order?.dealer?.legalName}
+                    </div>
+
+                    <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg text-xs">
+                      <span className="font-medium text-foreground">{pl.items.length} item(s)</span>
+                      <span className="text-purple-600 font-semibold">
+                        {existingPackages.length > 0 ? `📦 ${existingPackages.length} carton(s)` : "0 cartons"}
+                      </span>
+                    </div>
+
+                    {/* Picker Assignment */}
+                    <div className="text-xs space-y-1">
+                      {pl.assignedTo ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground text-[11px]">Picker:</span>
+                          <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                            <span>{pl.assignedTo.name || pl.assignedTo.email}</span>
+                            {isAssignedToCurrent && (
+                              <Badge variant="outline" className="text-[9px] bg-teal-500/10 text-teal-500 border-teal-500/20">
+                                You
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-amber-500 font-medium text-[11px] flex items-center gap-1">
+                          <Clock className="h-3 w-3" /> Unassigned
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Quick Primary Actions */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {pl.order && (
+                        <PickListConsoleDialog
+                          orderId={pl.order.id}
+                          orderNumber={pl.order.orderNumber}
+                          sellerSlug={sellerSlug}
+                          dealerName={pl.order.dealer?.tradingName || pl.order.dealer?.legalName || "Dealer"}
+                          warehouseStaff={normalizedStaff}
+                          trigger={
+                            <Button
+                              size="sm"
+                              className="w-full h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-1 shadow-2xs"
+                            >
+                              <CheckSquare className="h-3.5 w-3.5" />
+                              Pick Items
+                            </Button>
+                          }
+                        />
+                      )}
+
+                      {pl.order && (
+                        <CartonPackingDialog
+                          orderId={pl.order.id}
+                          orderNumber={pl.order.orderNumber}
+                          sellerSlug={sellerSlug}
+                          dealerName={pl.order.dealer?.tradingName || pl.order.dealer?.legalName || "Dealer"}
+                          orderItems={packingItems}
+                          existingPackages={existingPackages}
+                          trigger={
+                            <Button
+                              size="sm"
+                              className="w-full h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center justify-center gap-1 shadow-2xs"
+                            >
+                              <Package className="h-3.5 w-3.5" />
+                              {existingPackages.length > 0 ? `Cartons (${existingPackages.length})` : "Pack Cartons"}
+                            </Button>
+                          }
+                        />
+                      )}
+                    </div>
+
+                    {/* Printable Documents Pills */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                      <a
+                        href={`/api/orders/${pl.orderId}/documents/pick-list`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-card text-[11px] font-semibold text-teal-600 hover:bg-accent"
+                      >
+                        <Printer className="h-3 w-3 text-teal-500" /> Pick Sheet
+                      </a>
+                      <a
+                        href={`/api/orders/${pl.orderId}/documents/packing-list`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-card text-[11px] font-semibold text-emerald-600 hover:bg-accent"
+                      >
+                        <PackageCheck className="h-3 w-3 text-emerald-500" /> Packing List
+                      </a>
+                      <a
+                        href={`/api/orders/${pl.orderId}/documents/package-labels`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-card text-[11px] font-semibold text-amber-600 hover:bg-accent"
+                      >
+                        <Tag className="h-3 w-3 text-amber-500" /> Labels
+                      </a>
+                      <a
+                        href={`/api/orders/${pl.orderId}/documents/dispatch-challan`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-card text-[11px] font-semibold text-blue-600 hover:bg-accent"
+                      >
+                        <Truck className="h-3 w-3 text-blue-500" /> Challan
+                      </a>
+                      {canAssignPicker && (
+                        <Link href={`/admin/orders/${pl.orderId}`} className="ml-auto">
+                          <Button size="sm" variant="outline" className="h-7 text-[11px] border-border px-2">
+                            Order
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+
+                    {canComplete && (
+                      <form action={completePickListAction} className="pt-1">
+                        <input type="hidden" name="pickListId" value={pl.id} />
+                        <input type="hidden" name="orderId" value={pl.orderId} />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="w-full h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                        >
+                          <CheckCheck className="h-3.5 w-3.5 mr-1" /> Complete Picking
+                        </Button>
+                      </form>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-muted/50 text-muted-foreground uppercase border-b border-border text-[10px] font-bold">
                 <tr>
@@ -746,6 +985,7 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
               </tbody>
             </table>
           </div>
+          </>
         )}
         {totalPages > 1 && (
           <div className="p-4 border-t border-border bg-muted/20">

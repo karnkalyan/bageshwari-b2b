@@ -116,9 +116,56 @@ export default async function AdminOrdersPage({ params, searchParams }: OrdersPa
         />
       </div>
 
-      {/* Orders Table */}
+      {/* Orders Directory: Mobile Cards for phone screens, Data Table for desktop */}
       <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View (< md) */}
+        <div className="block md:hidden divide-y divide-border">
+          {orders.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-xs">
+              No orders found matching this filter.
+            </div>
+          ) : (
+            orders.map((ord) => (
+              <div key={ord.id} className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Link href={`/admin/orders/${ord.id}`} className="font-bold font-mono text-sm text-blue-500 hover:underline">
+                    {ord.orderNumber}
+                  </Link>
+                  <Badge className="bg-blue-500/10 text-blue-500 border border-blue-500/20 text-[10px] font-bold">
+                    {ORDER_STATUS_LABELS[ord.status] || ord.status}
+                  </Badge>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="font-semibold text-xs text-foreground">{ord.dealer.tradingName}</div>
+                  <div className="text-[10px] text-muted-foreground font-mono">
+                    {ord.dealer.code} {ord.dealer.contactName ? `• ${ord.dealer.contactName}` : ""}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-border/50 text-xs">
+                  <div className="text-muted-foreground font-medium">
+                    {ord._count.items} item(s) • {formatDate(ord.createdAt)}
+                  </div>
+                  <div className="font-black text-foreground font-mono">
+                    {formatCurrency(Number(ord.grandTotal))}
+                  </div>
+                </div>
+
+                <div className="pt-1">
+                  <Link href={`/admin/orders/${ord.id}`} className="block">
+                    <Button size="sm" variant="outline" className="w-full h-8 text-xs font-bold border-border">
+                      View Order Details
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-muted/50 text-muted-foreground uppercase border-b border-border text-[10px] font-bold">
               <tr>
