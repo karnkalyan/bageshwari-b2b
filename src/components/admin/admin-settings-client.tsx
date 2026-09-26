@@ -140,6 +140,7 @@ export function AdminSettingsClient({
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [uploadingQr, setUploadingQr] = useState(false);
   const [qrUploadError, setQrUploadError] = useState<string | null>(null);
@@ -190,15 +191,38 @@ export function AdminSettingsClient({
         createdAt: new Date().toISOString(),
       };
 
-      setCompany((prev) => {
-        const existing = prev.merchantQrs || [];
+      const updatedCompany = (() => {
+        const existing = company.merchantQrs || [];
         const updated = [...existing, newQrItem];
         return {
-          ...prev,
+          ...company,
           merchantQrs: updated,
-          merchantQrUrl: prev.merchantQrUrl || json.url,
+          merchantQrUrl: company.merchantQrUrl || json.url,
         };
-      });
+      })();
+      setCompany(updatedCompany);
+
+      // Auto-save after QR upload so images persist on refresh
+      try {
+        const saveRes = await fetch("/api/admin/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...updatedCompany,
+            themeConfig,
+            categories: categories.map((c) => ({
+              id: c.id,
+              taxPercent: c.taxPercent,
+            })),
+          }),
+        });
+        const saveJson = await saveRes.json();
+        if (saveRes.ok && saveJson.success) {
+          router.refresh();
+        }
+      } catch (autoSaveErr) {
+        console.warn("Auto-save after QR upload failed:", autoSaveErr);
+      }
 
       setNewQrTitle("");
       setNewQrAccountName("");
@@ -258,6 +282,7 @@ export function AdminSettingsClient({
     setSaving(true);
     setError(null);
     setSuccess(false);
+    setFieldErrors({});
 
     try {
       const res = await fetch("/api/admin/settings", {
@@ -275,6 +300,56 @@ export function AdminSettingsClient({
 
       const json = await res.json();
       if (!res.ok || !json.success) {
+        // Parse field-level validation errors from Zod response
+        const zodErrors = json?.error?.details || json?.error || json?.details;
+        if (zodErrors && typeof zodErrors === "object") {
+          const parsed: Record<string, string> = {};
+          const extractErrors = (obj: any, prefix = "") => {
+            if (!obj || typeof obj !== "object") return;
+            if (obj._errors && Array.isArray(obj._errors) && obj._errors.length > 0) {
+              const key = prefix || "general";
+              parsed[key] = obj._errors.join(", ");
+            }
+            for (const [key, val] of Object.entries(obj)) {
+              if (key === "_errors") continue;
+              extractErrors(val, prefix ? `${prefix}.${key}` : key);
+            }
+          };
+          extractErrors(zodErrors);
+          if (Object.keys(parsed).length > 0) {
+            setFieldErrors(parsed);
+            const fieldNames = Object.keys(parsed).filter((k) => k !== "general").map((k) => {
+              const labels: Record<string, string> = {
+                companyName: "Company Name",
+                tradingName: "Trading Name",
+                email: "Email",
+                phone: "Phone",
+                website: "Website URL",
+                panNumber: "PAN Number",
+                vatNumber: "VAT Number",
+                registrationNumber: "Registration Number",
+                defaultVatPercent: "VAT Rate",
+                bankName: "Bank Name",
+                bankAccountName: "Account Holder",
+                bankAccountNumber: "Account Number",
+                bankBranch: "Branch Name",
+                bankSwiftCode: "SWIFT Code",
+                contactPerson: "Contact Person",
+                address: "Address",
+                city: "City",
+                district: "District",
+                province: "Province",
+                country: "Country",
+              };
+              return labels[k] || k;
+            });
+            const errorMsg = fieldNames.length > 0
+              ? `Invalid settings: ${fieldNames.join(", ")}. Please correct the highlighted fields.`
+              : json?.message || json?.error?.message || "Invalid settings parameters.";
+            setError(errorMsg);
+            return;
+          }
+        }
         throw new Error(json?.message || json?.error?.message || "Failed to save settings.");
       }
 
@@ -287,6 +362,9 @@ export function AdminSettingsClient({
       setSaving(false);
     }
   };
+
+  const fieldErrorClass = (field: string) =>
+    fieldErrors[field] ? "border-red-500 ring-2 ring-red-200 bg-red-50/30" : "";
 
   return (
     <div className="space-y-6">
@@ -515,18 +593,22 @@ export function AdminSettingsClient({
                 <div>
                   <Label className="text-xs font-semibold">Company Legal Name</Label>
                   <Input
+                    type="text"
                     value={company.companyName}
                     onChange={(e) => setCompany({ ...company, companyName: e.target.value })}
-                    className="mt-1 h-8 text-xs font-bold"
+                    className={`mt-1 h-8 text-xs font-bold ${fieldErrorClass("companyName")}`}
                   />
+                  {fieldErrors.companyName && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.companyName}</p>}
                 </div>
                 <div>
                   <Label className="text-xs font-semibold">Trading Name / Brand</Label>
                   <Input
+                    type="text"
                     value={company.tradingName}
                     onChange={(e) => setCompany({ ...company, tradingName: e.target.value })}
-                    className="mt-1 h-8 text-xs font-bold"
+                    className={`mt-1 h-8 text-xs font-bold ${fieldErrorClass("tradingName")}`}
                   />
+                  {fieldErrors.tradingName && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.tradingName}</p>}
                 </div>
               </div>
 
@@ -534,26 +616,32 @@ export function AdminSettingsClient({
                 <div>
                   <Label className="text-xs font-semibold">PAN / VAT Number</Label>
                   <Input
+                    type="text"
                     value={company.panNumber || ""}
                     onChange={(e) => setCompany({ ...company, panNumber: e.target.value })}
-                    className="mt-1 h-8 text-xs font-mono font-bold"
+                    className={`mt-1 h-8 text-xs font-mono font-bold ${fieldErrorClass("panNumber")}`}
                   />
+                  {fieldErrors.panNumber && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.panNumber}</p>}
                 </div>
                 <div>
                   <Label className="text-xs font-semibold">Company Registration Number</Label>
                   <Input
+                    type="text"
                     value={company.registrationNumber || ""}
                     onChange={(e) => setCompany({ ...company, registrationNumber: e.target.value })}
-                    className="mt-1 h-8 text-xs font-mono"
+                    className={`mt-1 h-8 text-xs font-mono ${fieldErrorClass("registrationNumber")}`}
                   />
+                  {fieldErrors.registrationNumber && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.registrationNumber}</p>}
                 </div>
                 <div>
                   <Label className="text-xs font-semibold">Contact Person</Label>
                   <Input
+                    type="text"
                     value={company.contactPerson || ""}
                     onChange={(e) => setCompany({ ...company, contactPerson: e.target.value })}
-                    className="mt-1 h-8 text-xs"
+                    className={`mt-1 h-8 text-xs ${fieldErrorClass("contactPerson")}`}
                   />
+                  {fieldErrors.contactPerson && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.contactPerson}</p>}
                 </div>
               </div>
 
@@ -561,26 +649,32 @@ export function AdminSettingsClient({
                 <div>
                   <Label className="text-xs font-semibold">Official Phone Number</Label>
                   <Input
+                    type="text"
                     value={company.phone || ""}
                     onChange={(e) => setCompany({ ...company, phone: e.target.value })}
-                    className="mt-1 h-8 text-xs"
+                    className={`mt-1 h-8 text-xs ${fieldErrorClass("phone")}`}
                   />
+                  {fieldErrors.phone && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.phone}</p>}
                 </div>
                 <div>
                   <Label className="text-xs font-semibold">Official Email Address</Label>
                   <Input
+                    type="text"
                     value={company.email || ""}
                     onChange={(e) => setCompany({ ...company, email: e.target.value })}
-                    className="mt-1 h-8 text-xs"
+                    className={`mt-1 h-8 text-xs ${fieldErrorClass("email")}`}
                   />
+                  {fieldErrors.email && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.email}</p>}
                 </div>
                 <div>
                   <Label className="text-xs font-semibold">Website URL</Label>
                   <Input
+                    type="text"
                     value={company.website || ""}
                     onChange={(e) => setCompany({ ...company, website: e.target.value })}
-                    className="mt-1 h-8 text-xs"
+                    className={`mt-1 h-8 text-xs ${fieldErrorClass("website")}`}
                   />
+                  {fieldErrors.website && <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{fieldErrors.website}</p>}
                 </div>
               </div>
 

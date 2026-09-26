@@ -186,7 +186,14 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = updateSettingsSchema.safeParse(body);
   if (!parsed.success) {
-    return apiError("VALIDATION_ERROR", "Invalid settings parameters.", 422, parsed.error.format());
+    const formatted = parsed.error.format();
+    const fieldIssues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    return apiError(
+      "VALIDATION_ERROR",
+      `Invalid settings: ${fieldIssues || "Please check your inputs."}`,
+      422,
+      formatted
+    );
   }
 
   const { categories, ...companyData } = parsed.data;

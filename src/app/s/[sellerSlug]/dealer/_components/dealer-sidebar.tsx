@@ -32,8 +32,8 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
   ];
 
   const sidebar = (
-    <aside className="flex h-full w-[240px] flex-col bg-[#072d57] text-white">
-      <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
+    <aside className="flex h-full w-[240px] flex-col bg-[#072d57] text-white overflow-y-auto">
+      <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5 shrink-0">
         <div className="grid h-10 w-10 place-items-center rounded-xl bg-red-600"><Boxes className="h-5 w-5" /></div>
         <div className="min-w-0"><div className="truncate text-sm font-black uppercase">{sellerName}</div><div className="text-[9px] font-bold uppercase tracking-[.17em] text-blue-200">Authorized dealer</div></div>
       </div>
@@ -43,7 +43,7 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
           return <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={cn("flex items-center gap-3 rounded-lg px-3 py-3 text-xs font-semibold transition", active ? "bg-[#1268d3] text-white shadow" : "text-blue-100/80 hover:bg-white/10 hover:text-white")}><item.icon className="h-4 w-4" />{item.label}</Link>;
         })}
       </nav>
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-white/10 p-3 pb-24 lg:pb-3 shrink-0">
         <div className="flex items-center gap-2 rounded-xl bg-[#052546] p-3">
           <CircleUserRound className="h-7 w-7 text-blue-200" />
           <div className="min-w-0 flex-1">
@@ -84,7 +84,7 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
       <div className="fixed inset-y-0 left-0 z-50 hidden lg:block">{sidebar}</div>
       {open && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 lg:hidden" onClick={() => setOpen(false)}>
-          <div className="h-full w-[240px]" onClick={(event) => event.stopPropagation()}>
+          <div className="h-full w-[240px] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
             {sidebar}
           </div>
           <button
@@ -123,10 +123,10 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
             <NotificationBell />
           </div>
         </header>
-        <main className="pb-20 lg:pb-0">{children}</main>
+        <main className="pb-24 lg:pb-0">{children}</main>
 
         {/* Mobile App Bottom Navigation Bar */}
-        <nav className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md py-1.5 px-2 text-[10px] text-slate-500 shadow-lg lg:hidden">
+        <nav className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md py-1.5 px-1 text-[10px] text-slate-500 shadow-lg lg:hidden">
           {[
             { label: "Dashboard", href: "/dealer/dashboard", icon: LayoutDashboard, exact: true },
             { label: "Catalog", href: "/dealer/products", icon: ShoppingBag },
@@ -140,7 +140,7 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors min-w-[54px]",
+                  "flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-lg transition-colors min-w-[44px]",
                   active ? "text-[#0b2d55] font-black" : "text-slate-500 hover:text-slate-900"
                 )}
               >
@@ -151,6 +151,17 @@ export function DealerShell({ sellerSlug, sellerName, user, children }: DealerSh
               </Link>
             );
           })}
+          {/* Logout Button in Bottom Navbar */}
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: window.location.origin + "/dealer/login" })}
+            className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-lg transition-colors min-w-[44px] text-slate-500 hover:text-red-600"
+          >
+            <div className="p-1 rounded-full">
+              <LogOut className="h-4 w-4" />
+            </div>
+            <span className="leading-tight">Logout</span>
+          </button>
         </nav>
       </div>
     </div>

@@ -87,6 +87,7 @@ interface SalesOrderCreatorProps {
   vatPercent?: number;
   initialOrderItems?: SalesOrderItem[];
   initialNotes?: string;
+  onCartSync?: (productId: string, variantId: string | null, quantity: number) => Promise<void>;
 }
 
 export function SalesOrderCreator({
@@ -99,6 +100,7 @@ export function SalesOrderCreator({
   vatPercent = 13.0,
   initialOrderItems = [],
   initialNotes = "",
+  onCartSync,
 }: SalesOrderCreatorProps) {
   const router = useRouter();
 
@@ -333,6 +335,13 @@ export function SalesOrderCreator({
     });
 
     showToast(`Added ${name} to order`);
+
+    // Sync to database cart so /dealer/cart page reflects the addition
+    if (isDealer && onCartSync) {
+      onCartSync(product.id, targetVariantId, 1).catch((err) =>
+        console.warn("Cart sync failed:", err)
+      );
+    }
   };
 
   // Decrement or Remove

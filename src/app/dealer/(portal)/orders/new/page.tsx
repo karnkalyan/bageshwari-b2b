@@ -7,10 +7,10 @@ import { resolveDealerPrice } from "@/services/pricing.service";
 import { getCompanyVatSetting } from "@/services/vat.service";
 import { getDealerCart } from "@/services/cart.service";
 import {
-  SalesOrderCreator,
   SerializedDealer,
   SerializedProduct,
 } from "@/components/admin/sales-order-creator";
+import { QuickOrderCartSyncWrapper } from "./quick-order-wrapper";
 
 export default async function DealerNewOrderPage() {
   const ctx = await getTenantContext("bageshwari", "/dealer/login");
@@ -132,12 +132,11 @@ export default async function DealerNewOrderPage() {
         </div>
       </div>
 
-      <SalesOrderCreator
+      <QuickOrderCartSyncWrapper
         sellerSlug="bageshwari"
         dealers={[serializedDealer]}
         products={serializedProducts}
         initialDealerId={dealer.id}
-        isDealer={true}
         initialCategories={categories.map((c) => c.name)}
         vatPercent={companyVat.defaultVatPercent}
         initialOrderItems={initialOrderItems}
