@@ -158,11 +158,51 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
       }
       return null;
     })(),
-    enableDealerCredit: companyRaw?.enableDealerCredit !== undefined ? Boolean(companyRaw.enableDealerCredit) : true,
-    defaultCreditLimit: companyRaw?.defaultCreditLimit ? Number(companyRaw.defaultCreditLimit) : 500000,
-    defaultCreditPeriodDays: companyRaw?.defaultCreditPeriodDays ? Number(companyRaw.defaultCreditPeriodDays) : 30,
-    maxCreditLimit: companyRaw?.maxCreditLimit ? Number(companyRaw.maxCreditLimit) : 5000000,
-    creditTermsPolicy: companyRaw?.creditTermsPolicy || "Standard 30-Day Net B2B Commercial Credit Facility subject to approved limit and periodic account reconciliation.",
+    enableDealerCredit: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.enableDealerCredit !== undefined) return Boolean(parsed.enableDealerCredit);
+        } catch {}
+      }
+      return companyRaw?.enableDealerCredit !== undefined ? Boolean(companyRaw.enableDealerCredit) : true;
+    })(),
+    defaultCreditLimit: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.defaultCreditLimit !== undefined) return Number(parsed.defaultCreditLimit);
+        } catch {}
+      }
+      return companyRaw?.defaultCreditLimit ? Number(companyRaw.defaultCreditLimit) : 500000;
+    })(),
+    defaultCreditPeriodDays: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.defaultCreditPeriodDays !== undefined) return Number(parsed.defaultCreditPeriodDays);
+        } catch {}
+      }
+      return companyRaw?.defaultCreditPeriodDays ? Number(companyRaw.defaultCreditPeriodDays) : 30;
+    })(),
+    maxCreditLimit: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.maxCreditLimit !== undefined) return Number(parsed.maxCreditLimit);
+        } catch {}
+      }
+      return companyRaw?.maxCreditLimit ? Number(companyRaw.maxCreditLimit) : 5000000;
+    })(),
+    creditTermsPolicy: (() => {
+      if (companyRaw?.socialLinksJson) {
+        try {
+          const parsed = JSON.parse(companyRaw.socialLinksJson);
+          if (parsed.creditTermsPolicy !== undefined) return parsed.creditTermsPolicy;
+        } catch {}
+      }
+      return companyRaw?.creditTermsPolicy || "Standard 30-Day Net B2B Commercial Credit Facility subject to approved limit and periodic account reconciliation.";
+    })(),
     themeConfig: (() => {
       if (companyRaw?.socialLinksJson) {
         try {

@@ -140,6 +140,20 @@ export async function GET() {
         bankAccountType: meta.bankAccountType || "Current Account",
         upiId: meta.upiId || null,
         paymentInstructions: meta.paymentInstructions || null,
+        enableDealerCredit: meta.enableDealerCredit !== undefined ? Boolean(meta.enableDealerCredit) : true,
+        defaultCreditLimit: meta.defaultCreditLimit !== undefined ? Number(meta.defaultCreditLimit) : 500000,
+        defaultCreditPeriodDays: meta.defaultCreditPeriodDays !== undefined ? Number(meta.defaultCreditPeriodDays) : 30,
+        maxCreditLimit: meta.maxCreditLimit !== undefined ? Number(meta.maxCreditLimit) : 5000000,
+        creditTermsPolicy: meta.creditTermsPolicy || "Standard 30-Day Net B2B Commercial Credit Facility subject to approved limit and periodic account reconciliation.",
+        themeConfig: {
+          primaryColor: meta.primaryColor || "#0b2d55",
+          accentColor: meta.accentColor || "#d97706",
+          themeMode: meta.themeMode || "light",
+          headerStyle: meta.headerStyle || "dark",
+          brandTagline: meta.brandTagline || "Authorized B2B Tractor Parts & Agricultural Machinery Distributor",
+          cardRadius: meta.cardRadius || "rounded-xl",
+          tableDensity: meta.tableDensity || "standard",
+        },
       }
     : null;
 
@@ -163,6 +177,10 @@ export async function PUT(request: Request) {
   if (!sellerId) {
     const activeSeller = await prisma.seller.findFirst({ where: { status: "ACTIVE" } });
     sellerId = activeSeller?.id;
+  }
+  if (!sellerId) {
+    const anySeller = await prisma.seller.findFirst();
+    sellerId = anySeller?.id;
   }
 
   const isPrivileged = (session.roles || []).some((r) =>
@@ -225,89 +243,154 @@ export async function PUT(request: Request) {
       }
 
       // 2. Update or Create Company Profile
-      try {
-        const existingProfile = await (tx.companyProfile as any).findFirst({
-          where: {
-            OR: [
-              ...(sellerId ? [{ sellerId }] : []),
-              { id: "bageshwari-tractors" },
-            ],
-          },
-        }).catch(() => null);
+      const existingProfile = await (tx.companyProfile as any).findFirst({
+        where: {
+          OR: [
+            ...(sellerId ? [{ sellerId }] : []),
+            { id: "bageshwari-tractors" },
+          ],
+        },
+      }).catch(() => null);
 
-        if (existingProfile) {
+      let existingMeta: any = {};
+      if (existingProfile?.socialLinksJson) {
+        try {
+          existingMeta = JSON.parse(existingProfile.socialLinksJson);
+        } catch {}
+      }
+
+      const activeQr = companyData.merchantQrs?.find((q: any) => q.isActive);
+      const primaryQr = activeQr?.qrUrl || companyData.merchantQrUrl || companyData.merchantQrs?.[0]?.qrUrl || existingMeta.merchantQrUrl || null;
+
+      const mergedMeta = {
+        ...existingMeta,
+        ...(companyData.themeConfig || {}),
+        merchantQrUrl: primaryQr,
+        ...(companyData.merchantQrs !== undefined ? { merchantQrs: companyData.merchantQrs } : {}),
+        ...(companyData.bankAccountType !== undefined ? { bankAccountType: companyData.bankAccountType } : {}),
+        ...(companyData.upiId !== undefined ? { upiId: companyData.upiId } : {}),
+        ...(companyData.paymentInstructions !== undefined ? { paymentInstructions: companyData.paymentInstructions } : {}),
+        ...(companyData.enableDealerCredit !== undefined ? { enableDealerCredit: companyData.enableDealerCredit } : {}),
+        ...(companyData.defaultCreditLimit !== undefined ? { defaultCreditLimit: Number(companyData.defaultCreditLimit) } : {}),
+        ...(companyData.defaultCreditPeriodDays !== undefined ? { defaultCreditPeriodDays: Number(companyData.defaultCreditPeriodDays) } : {}),
+        ...(companyData.maxCreditLimit !== undefined ? { maxCreditLimit: Number(companyData.maxCreditLimit) } : {}),
+        ...(companyData.creditTermsPolicy !== undefined ? { creditTermsPolicy: companyData.creditTermsPolicy } : {}),
+      };
+
+      const profilePayload: Record<string, any> = {
+        ...(companyData.companyName ? { companyName: companyData.companyName } : {}),
+        ...(companyData.tradingName ? { tradingName: companyData.tradingName } : {}),
+        ...(companyData.contactPerson !== undefined ? { contactPerson: companyData.contactPerson } : {}),
+        ...(companyData.email !== undefined ? { email: companyData.email } : {}),
+        ...(companyData.phone !== undefined ? { phone: companyData.phone } : {}),
+        ...(companyData.website !== undefined ? { website: companyData.website || null } : {}),
+        ...(companyData.country ? { country: companyData.country } : {}),
+        ...(companyData.province !== undefined ? { province: companyData.province } : {}),
+        ...(companyData.district !== undefined ? { district: companyData.district } : {}),
+        ...(companyData.city !== undefined ? { city: companyData.city } : {}),
+        ...(companyData.address !== undefined ? { address: companyData.address } : {}),
+        ...(companyData.panNumber !== undefined ? { panNumber: companyData.panNumber } : {}),
+        ...(companyData.vatNumber !== undefined ? { vatNumber: companyData.vatNumber } : {}),
+        ...(companyData.registrationNumber !== undefined ? { registrationNumber: companyData.registrationNumber } : {}),
+        ...(companyData.defaultVatPercent !== undefined ? { defaultVatPercent: new Prisma.Decimal(companyData.defaultVatPercent) } : {}),
+        ...(companyData.pricesIncludeVat !== undefined ? { pricesIncludeVat: companyData.pricesIncludeVat } : {}),
+        ...(companyData.bankName !== undefined ? { bankName: companyData.bankName } : {}),
+        ...(companyData.bankAccountName !== undefined ? { bankAccountName: companyData.bankAccountName } : {}),
+        ...(companyData.bankAccountNumber !== undefined ? { bankAccountNumber: companyData.bankAccountNumber } : {}),
+        ...(companyData.bankBranch !== undefined ? { bankBranch: companyData.bankBranch } : {}),
+        ...(companyData.bankSwiftCode !== undefined ? { bankSwiftCode: companyData.bankSwiftCode } : {}),
+        socialLinksJson: JSON.stringify(mergedMeta),
+      };
+
+      if (existingProfile) {
+        try {
           await (tx.companyProfile as any).update({
             where: { id: existingProfile.id },
-            data: {
-              ...(sellerId ? { sellerId } : {}),
-              ...(companyData.companyName ? { companyName: companyData.companyName } : {}),
-              ...(companyData.tradingName ? { tradingName: companyData.tradingName } : {}),
-              ...(companyData.contactPerson !== undefined ? { contactPerson: companyData.contactPerson } : {}),
-              ...(companyData.email !== undefined ? { email: companyData.email } : {}),
-              ...(companyData.phone !== undefined ? { phone: companyData.phone } : {}),
-              ...(companyData.website !== undefined ? { website: companyData.website || null } : {}),
-              ...(companyData.country ? { country: companyData.country } : {}),
-              ...(companyData.province !== undefined ? { province: companyData.province } : {}),
-              ...(companyData.district !== undefined ? { district: companyData.district } : {}),
-              ...(companyData.city !== undefined ? { city: companyData.city } : {}),
-              ...(companyData.address !== undefined ? { address: companyData.address } : {}),
-              ...(companyData.panNumber !== undefined ? { panNumber: companyData.panNumber } : {}),
-              ...(companyData.vatNumber !== undefined ? { vatNumber: companyData.vatNumber } : {}),
-              ...(companyData.registrationNumber !== undefined ? { registrationNumber: companyData.registrationNumber } : {}),
-              ...(companyData.defaultVatPercent !== undefined ? { defaultVatPercent: new Prisma.Decimal(companyData.defaultVatPercent) } : {}),
-              ...(companyData.pricesIncludeVat !== undefined ? { pricesIncludeVat: companyData.pricesIncludeVat } : {}),
-              ...(companyData.bankName !== undefined ? { bankName: companyData.bankName } : {}),
-              ...(companyData.bankAccountName !== undefined ? { bankAccountName: companyData.bankAccountName } : {}),
-              ...(companyData.bankAccountNumber !== undefined ? { bankAccountNumber: companyData.bankAccountNumber } : {}),
-              ...(companyData.bankBranch !== undefined ? { bankBranch: companyData.bankBranch } : {}),
-              ...(companyData.bankSwiftCode !== undefined ? { bankSwiftCode: companyData.bankSwiftCode } : {}),
-              ...(companyData.enableDealerCredit !== undefined ? { enableDealerCredit: companyData.enableDealerCredit } : {}),
-              ...(companyData.defaultCreditLimit !== undefined ? { defaultCreditLimit: new Prisma.Decimal(companyData.defaultCreditLimit) } : {}),
-              ...(companyData.defaultCreditPeriodDays !== undefined ? { defaultCreditPeriodDays: companyData.defaultCreditPeriodDays } : {}),
-              ...(companyData.maxCreditLimit !== undefined ? { maxCreditLimit: new Prisma.Decimal(companyData.maxCreditLimit) } : {}),
-              ...(companyData.creditTermsPolicy !== undefined ? { creditTermsPolicy: companyData.creditTermsPolicy } : {}),
-              socialLinksJson: (() => {
-                let existingMeta: any = {};
-                try {
-                  existingMeta = existingProfile?.socialLinksJson ? JSON.parse(existingProfile.socialLinksJson) : {};
-                } catch {}
-                const activeQr = companyData.merchantQrs?.find((q: any) => q.isActive);
-                const primaryQr = activeQr?.qrUrl || companyData.merchantQrUrl || companyData.merchantQrs?.[0]?.qrUrl || null;
-                const merged = {
-                  ...existingMeta,
-                  ...(companyData.themeConfig || {}),
-                  ...(companyData.merchantQrUrl !== undefined ? { merchantQrUrl: primaryQr } : {}),
-                  ...(companyData.merchantQrs !== undefined ? { merchantQrs: companyData.merchantQrs, merchantQrUrl: primaryQr } : {}),
-                  ...(companyData.bankAccountType !== undefined ? { bankAccountType: companyData.bankAccountType } : {}),
-                  ...(companyData.upiId !== undefined ? { upiId: companyData.upiId } : {}),
-                  ...(companyData.paymentInstructions !== undefined ? { paymentInstructions: companyData.paymentInstructions } : {}),
-                };
-                return JSON.stringify(merged);
-              })(),
-            },
+            data: profilePayload,
           });
-        } else {
-          const activeQr = companyData.merchantQrs?.find((q: any) => q.isActive);
-          const primaryQr = activeQr?.qrUrl || companyData.merchantQrUrl || companyData.merchantQrs?.[0]?.qrUrl || null;
-          const newMeta = {
-            ...(companyData.themeConfig || {}),
-            merchantQrUrl: primaryQr,
-            merchantQrs: companyData.merchantQrs || (primaryQr ? [{
-              id: "default-qr",
-              title: "Primary Merchant QR",
-              qrUrl: primaryQr,
-              accountName: companyData.companyName || "Bageshwari Tractors",
-              accountNumber: companyData.upiId || "",
-              isActive: true,
-            }] : []),
-            bankAccountType: companyData.bankAccountType || "Current Account",
-            upiId: companyData.upiId || null,
-            paymentInstructions: companyData.paymentInstructions || null,
-          };
+        } catch (updateErr) {
+          console.warn("Prisma companyProfile.update failed, using raw SQL fallback:", updateErr);
+          const finalCompanyName = profilePayload.companyName ?? existingProfile.companyName;
+          const finalTradingName = profilePayload.tradingName ?? existingProfile.tradingName;
+          const finalContactPerson = profilePayload.contactPerson ?? existingProfile.contactPerson;
+          const finalEmail = profilePayload.email ?? existingProfile.email;
+          const finalPhone = profilePayload.phone ?? existingProfile.phone;
+          const finalWebsite = profilePayload.website ?? existingProfile.website;
+          const finalCountry = profilePayload.country ?? existingProfile.country ?? "Nepal";
+          const finalProvince = profilePayload.province ?? existingProfile.province;
+          const finalDistrict = profilePayload.district ?? existingProfile.district;
+          const finalCity = profilePayload.city ?? existingProfile.city;
+          const finalAddress = profilePayload.address ?? existingProfile.address;
+          const finalPan = profilePayload.panNumber ?? existingProfile.panNumber;
+          const finalVat = profilePayload.vatNumber ?? existingProfile.vatNumber;
+          const finalReg = profilePayload.registrationNumber ?? existingProfile.registrationNumber;
+          const finalVatPct = companyData.defaultVatPercent !== undefined ? companyData.defaultVatPercent : 13.00;
+          const finalPricesInc = companyData.pricesIncludeVat !== undefined ? (companyData.pricesIncludeVat ? 1 : 0) : (existingProfile.pricesIncludeVat ? 1 : 0);
+          const finalBankName = profilePayload.bankName ?? existingProfile.bankName;
+          const finalBankAccName = profilePayload.bankAccountName ?? existingProfile.bankAccountName;
+          const finalBankAccNo = profilePayload.bankAccountNumber ?? existingProfile.bankAccountNumber;
+          const finalBankBranch = profilePayload.bankBranch ?? existingProfile.bankBranch;
+          const finalBankSwift = profilePayload.bankSwiftCode ?? existingProfile.bankSwiftCode;
+          const finalSocialJson = JSON.stringify(mergedMeta);
+
+          await tx.$executeRawUnsafe(
+            `UPDATE CompanyProfile SET 
+              companyName = ?,
+              tradingName = ?,
+              contactPerson = ?,
+              email = ?,
+              phone = ?,
+              website = ?,
+              country = ?,
+              province = ?,
+              district = ?,
+              city = ?,
+              address = ?,
+              panNumber = ?,
+              vatNumber = ?,
+              registrationNumber = ?,
+              defaultVatPercent = ?,
+              pricesIncludeVat = ?,
+              bankName = ?,
+              bankAccountName = ?,
+              bankAccountNumber = ?,
+              bankBranch = ?,
+              bankSwiftCode = ?,
+              socialLinksJson = ?,
+              updatedAt = NOW()
+            WHERE id = ?`,
+            finalCompanyName,
+            finalTradingName,
+            finalContactPerson,
+            finalEmail,
+            finalPhone,
+            finalWebsite,
+            finalCountry,
+            finalProvince,
+            finalDistrict,
+            finalCity,
+            finalAddress,
+            finalPan,
+            finalVat,
+            finalReg,
+            finalVatPct,
+            finalPricesInc,
+            finalBankName,
+            finalBankAccName,
+            finalBankAccNo,
+            finalBankBranch,
+            finalBankSwift,
+            finalSocialJson,
+            existingProfile.id
+          );
+        }
+      } else {
+        const resolvedSellerId = sellerId || "seller-bageshwari";
+        try {
           await (tx.companyProfile as any).create({
             data: {
               id: "bageshwari-tractors",
-              sellerId: sellerId || "seller-bageshwari",
+              sellerId: resolvedSellerId,
               companyName: companyData.companyName || "Bageshwari Tractors",
               tradingName: companyData.tradingName || "Bageshwari Tractors",
               contactPerson: companyData.contactPerson || "Managing Director",
@@ -327,20 +410,54 @@ export async function PUT(request: Request) {
               bankAccountNumber: companyData.bankAccountNumber || "0194291823901928",
               bankBranch: companyData.bankBranch || "Nepalgunj Main Branch",
               bankSwiftCode: companyData.bankSwiftCode || "NICA-NP",
-              enableDealerCredit: companyData.enableDealerCredit ?? true,
-              defaultCreditLimit: new Prisma.Decimal(companyData.defaultCreditLimit ?? 500000),
-              defaultCreditPeriodDays: companyData.defaultCreditPeriodDays ?? 30,
-              maxCreditLimit: new Prisma.Decimal(companyData.maxCreditLimit ?? 5000000),
-              creditTermsPolicy: companyData.creditTermsPolicy || null,
-              socialLinksJson: JSON.stringify(newMeta),
+              socialLinksJson: JSON.stringify(mergedMeta),
             },
           });
+        } catch (createErr) {
+          console.warn("Prisma companyProfile.create failed, using raw SQL fallback:", createErr);
+          await tx.$executeRawUnsafe(
+            `INSERT INTO CompanyProfile (
+              id, sellerId, companyName, tradingName, contactPerson, email, phone, website,
+              country, province, district, city, address, panNumber, vatNumber, registrationNumber,
+              defaultVatPercent, pricesIncludeVat, bankName, bankAccountName, bankAccountNumber,
+              bankBranch, bankSwiftCode, socialLinksJson, createdAt, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE
+              companyName = VALUES(companyName),
+              tradingName = VALUES(tradingName),
+              phone = VALUES(phone),
+              email = VALUES(email),
+              socialLinksJson = VALUES(socialLinksJson),
+              updatedAt = NOW()`,
+            "bageshwari-tractors",
+            resolvedSellerId,
+            companyData.companyName || "Bageshwari Tractors",
+            companyData.tradingName || "Bageshwari Tractors",
+            companyData.contactPerson || "Managing Director",
+            companyData.email || "info@bageshwari.com.np",
+            companyData.phone || "+977-81-520123",
+            companyData.website || null,
+            companyData.country || "Nepal",
+            companyData.province || null,
+            companyData.district || "Banke",
+            companyData.city || "Nepalgunj",
+            companyData.address || "Nepalgunj, Banke",
+            companyData.panNumber || "302918239",
+            companyData.vatNumber || "302918239",
+            companyData.registrationNumber || "29384/078/079",
+            companyData.defaultVatPercent ?? 13.0,
+            companyData.pricesIncludeVat ? 1 : 0,
+            companyData.bankName || "NIC ASIA Bank Ltd.",
+            companyData.bankAccountName || "Bageshwari Tractors",
+            companyData.bankAccountNumber || "0194291823901928",
+            companyData.bankBranch || "Nepalgunj Main Branch",
+            companyData.bankSwiftCode || "NICA-NP",
+            JSON.stringify(mergedMeta)
+          );
         }
-      } catch (profileErr) {
-        console.error("Company profile update error:", profileErr);
       }
 
-      // 2. Update Category-Based VAT Overrides
+      // 3. Update Category-Based VAT Overrides
       if (categories && categories.length > 0) {
         for (const cat of categories) {
           try {
@@ -365,6 +482,7 @@ export async function PUT(request: Request) {
 
     return apiSuccess(updated, { status: 200 });
   } catch (error) {
+    console.error("Settings update critical error:", error);
     const message = error instanceof Error ? error.message : "Failed to update settings.";
     return apiError("SETTINGS_UPDATE_FAILED", message, 500);
   }
