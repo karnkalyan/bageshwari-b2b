@@ -215,10 +215,10 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
   // 3. Package Manifest Table
   const colX = {
     box: MARGIN,
-    pkgNum: MARGIN + (isA5 ? 36 : 52),
-    typeDim: MARGIN + (isA5 ? 78 : 110),
+    pkgNum: MARGIN + (isA5 ? 36 : 48),
+    typeDim: MARGIN + (isA5 ? 120 : 155),
     weight: MARGIN + CONTENT_WIDTH - (isA5 ? 175 : 240),
-    contents: MARGIN + CONTENT_WIDTH - (isA5 ? 120 : 175),
+    contents: MARGIN + CONTENT_WIDTH - (isA5 ? 125 : 175),
     check: MARGIN + CONTENT_WIDTH,
   };
 
@@ -229,11 +229,11 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
     borderWidth: 0.75,
   });
 
-  drawText(page, "BOX #", colX.box + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
-  drawText(page, "CARTON NO", colX.pkgNum + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
-  drawText(page, "TYPE & DIM", colX.typeDim + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
-  drawRightText(page, "GROSS WT", colX.contents - 6, y - 12, bold, { size: isA5 ? 6.5 : 7.5, color: COLORS.primary });
-  drawText(page, "CONTENTS", colX.contents + 3, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "BOX #", colX.box + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "CARTON NO", colX.pkgNum + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawText(page, "TYPE & DIM", colX.typeDim + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+  drawRightText(page, "GROSS WT", colX.contents - 8, y - 12, bold, { size: isA5 ? 6.5 : 7.5, color: COLORS.primary });
+  drawText(page, "CONTENTS", colX.contents + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
   drawRightText(page, "STATUS", colX.check - 6, y - 12, bold, { size: isA5 ? 6.5 : 7.5, color: COLORS.primary });
 
   y -= headerH;
@@ -292,12 +292,12 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
         borderColor: COLORS.primary,
         borderWidth: 0.75,
       });
-      drawText(page, "BOX #", colX.box + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-      drawText(page, "CARTON NO", colX.pkgNum + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-      drawText(page, "TYPE & DIMENSIONS", colX.typeDim + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-      drawRightText(page, "GROSS WT", colX.weight + 52, y - 12, bold, { size: 7.5, color: COLORS.primary });
-      drawText(page, "PACKED ITEMS / CONTENTS", colX.contents + 4, y - 12, { size: 7.5, font: bold, color: COLORS.primary });
-      drawRightText(page, "STATUS", colX.check - 6, y - 12, bold, { size: 7.5, color: COLORS.primary });
+      drawText(page, "BOX #", colX.box + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+      drawText(page, "CARTON NO", colX.pkgNum + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+      drawText(page, "TYPE & DIMENSIONS", colX.typeDim + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+      drawRightText(page, "GROSS WT", colX.contents - 8, y - 12, bold, { size: isA5 ? 6.5 : 7.5, color: COLORS.primary });
+      drawText(page, "PACKED ITEMS / CONTENTS", colX.contents + 4, y - 12, { size: isA5 ? 6.5 : 7.5, font: bold, color: COLORS.primary });
+      drawRightText(page, "STATUS", colX.check - 6, y - 12, bold, { size: isA5 ? 6.5 : 7.5, color: COLORS.primary });
       y -= headerH;
     }
 
@@ -315,35 +315,39 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
 
     // Box Index
     drawText(page, `Box ${pkg.boxIndex || i + 1}/${data.totalCartons}`, colX.box + 4, textBaselineY, {
-      size: 7.5,
+      size: isA5 ? 6.8 : 7.5,
       font: bold,
       color: COLORS.primary,
     });
 
-    // Carton Number
-    drawText(page, pkg.packageNumber, colX.pkgNum + 4, textBaselineY, {
-      size: 7.5,
+    // Carton Number (clean double hyphens and enforce maxWidth to prevent any overlap)
+    const cleanPkgNumber = (pkg.packageNumber || "").replace(/--+/g, "-");
+    const pkgNumMaxWidth = colX.typeDim - colX.pkgNum - 8;
+    drawText(page, cleanPkgNumber, colX.pkgNum + 4, textBaselineY, {
+      size: isA5 ? 6.6 : 7.2,
       font: bold,
       color: COLORS.black,
+      maxWidth: pkgNumMaxWidth,
     });
 
     // Box Type (Line 1) & Dimensions (Line 2)
+    const typeDimMaxWidth = colX.weight - colX.typeDim - 8;
     drawText(page, pkg.packageType || "Standard Corrugated Carton", colX.typeDim + 4, textBaselineY, {
-      size: 7.5,
+      size: isA5 ? 6.6 : 7.2,
       font: bold,
       color: COLORS.primary,
-      maxWidth: 138,
+      maxWidth: typeDimMaxWidth,
     });
     drawText(page, dimStr, colX.typeDim + 4, textBaselineY - 11, {
-      size: 7,
+      size: isA5 ? 6.2 : 6.8,
       font: regular,
       color: COLORS.secondary,
-      maxWidth: 138,
+      maxWidth: typeDimMaxWidth,
     });
 
     // Gross Weight (Right-aligned inside weight column)
-    drawRightText(page, `${Number(pkg.weight).toFixed(2)} KG`, colX.weight + 52, textBaselineY, bold, {
-      size: 7.5,
+    drawRightText(page, `${Number(pkg.weight).toFixed(2)} KG`, colX.contents - 8, textBaselineY, bold, {
+      size: isA5 ? 6.8 : 7.5,
       color: COLORS.primary,
     });
 
@@ -360,7 +364,7 @@ export async function renderPackingListPdf(data: PackingListData): Promise<Uint8
 
     // Status: ASCII-safe SEALED (no missing Unicode checkmark box)
     drawRightText(page, "SEALED", colX.check - 6, textBaselineY, bold, {
-      size: 7.5,
+      size: isA5 ? 6.8 : 7.5,
       color: COLORS.success,
     });
 

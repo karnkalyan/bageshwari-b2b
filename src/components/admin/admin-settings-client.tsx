@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -147,6 +147,43 @@ export function AdminSettingsClient({
   const [newQrTitle, setNewQrTitle] = useState("");
   const [newQrAccountName, setNewQrAccountName] = useState("");
   const [newQrAccountNumber, setNewQrAccountNumber] = useState("");
+
+  // Synchronize state when initialCompany updates from the server
+  useEffect(() => {
+    if (initialCompany) {
+      setCompany((prev) => ({
+        ...prev,
+        ...initialCompany,
+        merchantQrs:
+          Array.isArray(initialCompany.merchantQrs) && initialCompany.merchantQrs.length > 0
+            ? initialCompany.merchantQrs
+            : prev.merchantQrs,
+      }));
+    }
+  }, [initialCompany]);
+
+  // Fetch live settings on mount to ensure fresh database state after reload
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/settings")
+      .then((res) => res.json())
+      .then((json) => {
+        if (!active || !json?.success || !json?.data) return;
+        const live = json.data;
+        setCompany((prev) => ({
+          ...prev,
+          ...live,
+          merchantQrs:
+            Array.isArray(live.merchantQrs) && live.merchantQrs.length > 0
+              ? live.merchantQrs
+              : prev.merchantQrs,
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

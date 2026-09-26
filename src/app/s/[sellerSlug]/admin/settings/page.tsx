@@ -7,6 +7,9 @@ import {
   SerializedCategoryTax,
 } from "@/components/admin/admin-settings-client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 interface AdminSettingsPageProps {
   params: Promise<{ sellerSlug: string }>;
 }
@@ -60,10 +63,13 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
           { id: "bageshwari-tractors" },
         ],
       },
+      orderBy: { updatedAt: "desc" },
     }).catch(() => null);
 
     if (!companyRaw) {
-      companyRaw = await prisma.companyProfile.findFirst().catch(() => null);
+      companyRaw = await prisma.companyProfile.findFirst({
+        orderBy: { updatedAt: "desc" },
+      }).catch(() => null);
     }
   } catch {
     // fallback
