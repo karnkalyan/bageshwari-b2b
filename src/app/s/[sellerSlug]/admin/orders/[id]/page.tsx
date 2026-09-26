@@ -9,13 +9,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ArrowLeft, CheckCircle2, FileText, Warehouse, Truck, Clock, ShieldCheck,
   AlertTriangle, Receipt, CreditCard, ChevronRight, XCircle, Download, ExternalLink,
-  PackageCheck, Package, Printer, Tag, History, Edit3, UserCheck, FileImage
+  PackageCheck, Package, Printer, Tag, History, Edit3, UserCheck, FileImage, CheckSquare
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/lib/utils";
 import { advanceWorkflowAction, assignWarehouseUserAction } from "./actions";
 import { AdminOrderActions } from "./admin-order-actions";
 import { OrderWarehouseAssignment } from "@/components/admin/order-warehouse-assignment";
 import { CartonPackingDialog } from "@/components/admin/carton-packing-dialog";
+import { PickListConsoleDialog } from "@/components/admin/pick-list-console-dialog";
 import { OrderDocumentsToolbar } from "@/components/admin/order-documents-toolbar";
 
 interface OrderDetailsProps {
@@ -194,6 +195,8 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
         binLocation: pi.binLocation,
         approvedQuantity: Number(pi.approvedQuantity),
         pickedQuantity: Number(pi.pickedQuantity),
+        remarks: pi.remarks,
+        isPicked: Number(pi.pickedQuantity) >= Number(pi.approvedQuantity),
       })),
     })),
     finalInvoices: rawOrder.finalInvoices.map((fi) => ({
@@ -836,11 +839,31 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-teal-700 bg-teal-50 border-teal-200">{pickList.status}</Badge>
+                              <PickListConsoleDialog
+                                orderId={order.id}
+                                orderNumber={order.orderNumber}
+                                sellerSlug={sellerSlug}
+                                dealerName={order.dealer?.tradingName || order.dealer?.legalName || "Dealer"}
+                                dealerCity={order.dealer?.city || undefined}
+                                pickListId={pickList.id}
+                                pickListNumber={pickList.pickListNumber}
+                                currentStatus={pickList.status}
+                                warehouseStaff={uniqueWarehouseStaff}
+                                trigger={
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center gap-1.5 shadow-2xs"
+                                    title="Update picking counts and generate updated Pick List PDF"
+                                  >
+                                    <CheckSquare className="h-3.5 w-3.5" /> Pick Items Console
+                                  </Button>
+                                }
+                              />
                               <a
                                 href={`/api/orders/${order.id}/documents/pick-list`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 hover:bg-teal-800 text-white"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 hover:bg-teal-800 text-white shadow-2xs"
                               >
                                 <Printer className="h-3.5 w-3.5" /> Print Pick List (PDF)
                               </a>
@@ -848,23 +871,55 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailsProps
                           </div>
                           <div className="divide-y border rounded-lg overflow-hidden">
                             {pickList.items.map((pi) => (
-                              <div key={pi.id} className="p-3 flex justify-between">
+                              <div key={pi.id} className="p-3 flex justify-between items-center">
                                 <div>
                                   <span className="font-bold text-slate-900">{pi.sku}</span>
                                   <span className="text-slate-500 ml-2">(Loc: {pi.rackLocation || "R-01"} / {pi.binLocation || "B-01"})</span>
+                                  {pi.remarks && (
+                                    <span className="block text-[11px] text-amber-600 font-medium mt-0.5">
+                                      Note: {pi.remarks}
+                                    </span>
+                                  )}
                                 </div>
-                                <span className="font-semibold text-teal-800">{pi.pickedQuantity} / {pi.approvedQuantity} units picked</span>
+                                <div className="text-right">
+                                  <span className={`font-semibold ${Number(pi.pickedQuantity) >= Number(pi.approvedQuantity) ? "text-emerald-700 font-bold" : Number(pi.pickedQuantity) > 0 ? "text-amber-600 font-bold" : "text-slate-500"}`}>
+                                    {pi.pickedQuantity} / {pi.approvedQuantity} units picked
+                                  </span>
+                                  {Number(pi.pickedQuantity) >= Number(pi.approvedQuantity) && (
+                                    <span className="ml-2 inline-flex items-center text-emerald-600 font-bold text-xs bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                      ✓ Picked
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
                         </>
                       ) : (
-                        <div className="py-6 text-center text-xs text-slate-500 space-y-1">
+                        <div className="py-6 text-center text-xs text-slate-500 space-y-2">
                           <Warehouse className="h-8 w-8 mx-auto text-slate-300 mb-1" />
-                          <div className="font-semibold text-slate-700">Pick List Generating</div>
+                          <div className="font-semibold text-slate-700">Pick List Not Generated Yet</div>
                           <p className="text-[11px] text-slate-400">
-                            Assign a warehouse staff member above to generate the pick list immediately.
+                            Assign a warehouse staff member above or open the picking console to initialize items and pick list.
                           </p>
+                          <div className="pt-2">
+                            <PickListConsoleDialog
+                              orderId={order.id}
+                              orderNumber={order.orderNumber}
+                              sellerSlug={sellerSlug}
+                              dealerName={order.dealer?.tradingName || order.dealer?.legalName || "Dealer"}
+                              dealerCity={order.dealer?.city || undefined}
+                              warehouseStaff={uniqueWarehouseStaff}
+                              trigger={
+                                <Button
+                                  size="sm"
+                                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold inline-flex items-center gap-1.5 shadow-2xs"
+                                >
+                                  <CheckSquare className="h-3.5 w-3.5" /> Open Pick List Console
+                                </Button>
+                              }
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

@@ -57,4 +57,7 @@ export interface LineItemDto {
   hsnCode?: string | null;
   rackLocation?: string | null;
   binLocation?: string | null;
+  pickedQuantity?: number | null;
+  isPicked?: boolean | null;
+  remarks?: string | null;
 }

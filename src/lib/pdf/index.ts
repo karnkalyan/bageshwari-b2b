@@ -253,8 +253,18 @@ export async function generateOrderPdf(
     const rawPickListNumber = pickList?.pickListNumber || `PL-${order.orderNumber.replace(/^[A-Za-z]+[-_]?/, "")}`;
     const pickListNumber = rawPickListNumber.replace(/-+/g, "-");
 
+    const pickListItemsMap = new Map<string, any>();
+    if (pickList?.items) {
+      for (const pi of pickList.items) {
+        if (pi.variantId) pickListItemsMap.set(pi.variantId, pi);
+        if (pi.sku) pickListItemsMap.set(pi.sku, pi);
+      }
+    }
+
     const items: LineItemDto[] = order.items.map((item, idx) => {
       const approvedQty = Number(item.approvedQuantity ?? item.originalQuantity);
+      const matchedPi = (item.variantId ? pickListItemsMap.get(item.variantId) : null) || pickListItemsMap.get(item.sku);
+      const pickedQty = matchedPi !== undefined && matchedPi !== null ? Number(matchedPi.pickedQuantity) : null;
       return {
         sn: idx + 1,
         sku: item.sku,
@@ -263,6 +273,11 @@ export async function generateOrderPdf(
         quantity: approvedQty,
         unitPrice: Number(item.dealerPrice),
         lineTotal: approvedQty * Number(item.dealerPrice),
+        rackLocation: matchedPi?.rackLocation || null,
+        binLocation: matchedPi?.binLocation || null,
+        pickedQuantity: pickedQty,
+        isPicked: pickedQty !== null && pickedQty >= approvedQty,
+        remarks: matchedPi?.remarks || null,
       };
     });
 

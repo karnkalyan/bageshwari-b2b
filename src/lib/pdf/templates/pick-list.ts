@@ -137,36 +137,109 @@ export async function renderPickListPdf(data: PickListData): Promise<Uint8Array>
   const rowHeight = isA5 ? 19 : 22;
   let rowIndex = 0;
   let totalUnits = 0;
+  let totalPickedUnits = 0;
 
   for (const item of data.items) {
+    const hasRemarks = Boolean(item.remarks && item.remarks.trim());
+    const currentRowH = hasRemarks ? (isA5 ? 25 : 28) : rowHeight;
+
     if (y < (isA5 ? 100 : 120)) {
       page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       y = PAGE_HEIGHT - MARGIN - 20;
+
+      // Repeat table header on new page
+      drawBox(page, MARGIN, y - headerHeight, CONTENT_WIDTH, headerHeight, {
+        color: COLORS.primary,
+        borderColor: COLORS.primary,
+      });
+      drawText(page, "S.N.", colX.sn + 3, y - 12, { size: isA5 ? 6.2 : 7, font: bold, color: COLORS.white });
+      drawText(page, "Rack", colX.rack + 3, y - 12, { size: isA5 ? 6.2 : 7, font: bold, color: COLORS.white });
+      drawText(page, "Bin", colX.bin + 3, y - 12, { size: isA5 ? 6.2 : 7, font: bold, color: COLORS.white });
+      drawText(page, "SKU", colX.sku + 3, y - 12, { size: isA5 ? 6.2 : 7, font: bold, color: COLORS.white });
+      drawText(page, "Part Name", colX.name + 3, y - 12, { size: isA5 ? 6.2 : 7, font: bold, color: COLORS.white });
+      drawRightText(page, "Req", colX.pickQty - 6, y - 12, bold, { size: isA5 ? 6.2 : 7, color: COLORS.white });
+      drawText(page, "Picked", colX.pickQty + 4, y - 12, { size: isA5 ? 6.2 : 7, font: bold, color: COLORS.white });
+      drawCenteredText(page, "Done", colX.chk - (isA5 ? 10 : 15), y - 12, bold, { size: isA5 ? 6.2 : 7, color: COLORS.white });
+      y -= headerHeight;
     }
 
     const rowBg = rowIndex % 2 === 1 ? COLORS.bgLight : COLORS.white;
-    drawBox(page, MARGIN, y - rowHeight, CONTENT_WIDTH, rowHeight, {
+    drawBox(page, MARGIN, y - currentRowH, CONTENT_WIDTH, currentRowH, {
       color: rowBg,
       borderColor: COLORS.borderLight,
       borderWidth: 0.5,
     });
 
     totalUnits += item.quantity;
+    const pickedVal = item.pickedQuantity !== undefined && item.pickedQuantity !== null ? Number(item.pickedQuantity) : null;
+    if (pickedVal !== null) {
+      totalPickedUnits += pickedVal;
+    }
 
-    drawText(page, String(item.sn || rowIndex + 1), colX.sn + 3, y - (isA5 ? 12 : 14), { size: isA5 ? 6.8 : 7.5, font: regular, color: COLORS.secondary });
-    drawText(page, item.rackLocation || "R-01", colX.rack + 3, y - (isA5 ? 12 : 14), { size: isA5 ? 6.8 : 7.5, font: bold, color: COLORS.primary });
-    drawText(page, item.binLocation || "B-04", colX.bin + 3, y - (isA5 ? 12 : 14), { size: isA5 ? 6.8 : 7.5, font: bold, color: COLORS.primary });
-    drawText(page, item.sku.slice(0, 14), colX.sku + 3, y - (isA5 ? 12 : 14), { size: isA5 ? 6.8 : 7.5, font: bold, color: COLORS.black });
-    drawText(page, item.description.slice(0, 36), colX.name + 3, y - (isA5 ? 12 : 14), { size: isA5 ? 6.8 : 7.5, font: regular, color: COLORS.black, maxWidth: isA5 ? 100 : 170 });
-    drawRightText(page, `${item.quantity} ${item.unit || "PCS"}`, colX.pickQty - 6, y - (isA5 ? 12 : 14), bold, { size: isA5 ? 7 : 8, color: COLORS.primary });
+    const isFullyPicked = item.isPicked || (pickedVal !== null && pickedVal >= item.quantity);
+    const isPartiallyPicked = pickedVal !== null && pickedVal > 0 && pickedVal < item.quantity;
 
-    // Picked box (Blank for manual warehouse marker)
-    drawBox(page, colX.pickQty + 4, y - (isA5 ? 15 : 17), isA5 ? 26 : 35, 12, { borderColor: COLORS.border, borderWidth: 0.75, color: COLORS.white });
+    const baseTextY = y - (isA5 ? 12 : 14);
+
+    drawText(page, String(item.sn || rowIndex + 1), colX.sn + 3, baseTextY, { size: isA5 ? 6.8 : 7.5, font: regular, color: COLORS.secondary });
+    drawText(page, item.rackLocation || "R-01", colX.rack + 3, baseTextY, { size: isA5 ? 6.8 : 7.5, font: bold, color: COLORS.primary });
+    drawText(page, item.binLocation || "B-04", colX.bin + 3, baseTextY, { size: isA5 ? 6.8 : 7.5, font: bold, color: COLORS.primary });
+    drawText(page, item.sku.slice(0, 16), colX.sku + 3, baseTextY, { size: isA5 ? 6.8 : 7.5, font: bold, color: COLORS.black });
+    
+    // Part name + optional picker remarks on second line
+    drawText(page, item.description.slice(0, 36), colX.name + 3, baseTextY, { 
+      size: isA5 ? 6.8 : 7.5, 
+      font: regular, 
+      color: COLORS.black, 
+      maxWidth: isA5 ? 100 : 170 
+    });
+    if (hasRemarks) {
+      drawText(page, `Note: ${item.remarks}`, colX.name + 3, baseTextY - 9, {
+        size: isA5 ? 5.8 : 6.5,
+        font: oblique,
+        color: COLORS.muted,
+        maxWidth: isA5 ? 100 : 170,
+      });
+    }
+
+    // Required quantity
+    drawRightText(page, `${item.quantity} ${item.unit || "PCS"}`, colX.pickQty - 6, baseTextY, bold, { size: isA5 ? 7 : 8, color: COLORS.primary });
+
+    // Picked box with recorded value
+    const boxW = isA5 ? 26 : 35;
+    const boxH = 12;
+    const boxX = colX.pickQty + 4;
+    const boxY = y - (isA5 ? 15 : 17);
+
+    drawBox(page, boxX, boxY, boxW, boxH, {
+      borderColor: isFullyPicked ? COLORS.success : (isPartiallyPicked ? COLORS.primary : COLORS.border),
+      borderWidth: isFullyPicked || isPartiallyPicked ? 1 : 0.75,
+      color: isFullyPicked ? COLORS.white : (isPartiallyPicked ? COLORS.bgLight : COLORS.white),
+    });
+
+    if (pickedVal !== null) {
+      drawCenteredText(page, `${pickedVal}`, boxX + boxW / 2, baseTextY, bold, {
+        size: isA5 ? 7 : 8,
+        color: isFullyPicked ? COLORS.success : (isPartiallyPicked ? COLORS.primary : COLORS.muted),
+      });
+    }
 
     // Checkbox box
-    drawBox(page, colX.chk - (isA5 ? 16 : 21), y - (isA5 ? 15 : 17), isA5 ? 10 : 12, isA5 ? 10 : 12, { borderColor: COLORS.primary, borderWidth: 1, color: COLORS.white });
+    const chkW = isA5 ? 10 : 12;
+    const chkX = colX.chk - (isA5 ? 16 : 21);
+    const chkY = y - (isA5 ? 15 : 17);
 
-    y -= rowHeight;
+    if (isFullyPicked) {
+      drawBox(page, chkX, chkY, chkW, chkW, { borderColor: COLORS.success, borderWidth: 1, color: COLORS.success });
+      drawCenteredText(page, "OK", chkX + chkW / 2, baseTextY, bold, { size: isA5 ? 5.5 : 6.5, color: COLORS.white });
+    } else if (isPartiallyPicked) {
+      drawBox(page, chkX, chkY, chkW, chkW, { borderColor: COLORS.primary, borderWidth: 1, color: COLORS.bgLight });
+      drawCenteredText(page, "~", chkX + chkW / 2, baseTextY, bold, { size: isA5 ? 6 : 7, color: COLORS.primary });
+    } else {
+      drawBox(page, chkX, chkY, chkW, chkW, { borderColor: COLORS.border, borderWidth: 0.75, color: COLORS.white });
+    }
+
+    y -= currentRowH;
     rowIndex++;
   }
 
@@ -179,7 +252,13 @@ export async function renderPickListPdf(data: PickListData): Promise<Uint8Array>
     borderWidth: 0.75,
   });
   drawText(page, `Total Line Items: ${data.items.length} SKUs`, MARGIN + 8, y - 16, { size: isA5 ? 7.5 : 8.5, font: bold, color: COLORS.primary });
-  drawRightText(page, `Total Units: ${totalUnits} Units`, MARGIN + CONTENT_WIDTH - 8, y - 16, bold, { size: isA5 ? 7.8 : 9, color: COLORS.primary });
+  const pickStatusText = totalPickedUnits > 0
+    ? `Picked: ${totalPickedUnits} / ${totalUnits} Units (${totalUnits > 0 ? Math.round((totalPickedUnits / totalUnits) * 100) : 0}%)`
+    : `Total Units: ${totalUnits} Units`;
+  drawRightText(page, pickStatusText, MARGIN + CONTENT_WIDTH - 8, y - 16, bold, { 
+    size: isA5 ? 7.8 : 9, 
+    color: totalPickedUnits >= totalUnits && totalUnits > 0 ? COLORS.success : COLORS.primary 
+  });
 
   y -= (isA5 ? 28 : 34);
 

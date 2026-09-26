@@ -21,6 +21,7 @@ import {
   Tag,
   FileText,
   FileImage,
+  CheckSquare,
 } from "lucide-react";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
@@ -28,6 +29,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { sendWorkflowNotification } from "@/services/notification.service";
 import { executeOrderWorkflowAction } from "@/services/order-workflow.service";
 import { CartonPackingDialog } from "@/components/admin/carton-packing-dialog";
+import { PickListConsoleDialog } from "@/components/admin/pick-list-console-dialog";
 
 interface WarehousePageProps {
   params: Promise<{ sellerSlug: string }>;
@@ -276,6 +278,14 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
 
     revalidatePath(`/s/${sellerSlug}/admin/warehouse`);
   }
+
+  const normalizedStaff = Array.from(
+    new Map(
+      warehouseStaff
+        .filter((ws) => ws.user)
+        .map((ws) => [ws.user.id, { id: ws.user.id, name: ws.user.name, email: ws.user.email }])
+    ).values()
+  );
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 md:p-7">
@@ -574,6 +584,27 @@ export default async function WarehousePortalPage({ params, searchParams }: Ware
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          {/* Pick List Console: Update picked status, quantities, remarks, and generate updated PDF */}
+                          {pl.order && (
+                            <PickListConsoleDialog
+                              orderId={pl.order.id}
+                              orderNumber={pl.order.orderNumber}
+                              sellerSlug={sellerSlug}
+                              dealerName={pl.order.dealer?.tradingName || pl.order.dealer?.legalName || "Dealer"}
+                              warehouseStaff={normalizedStaff}
+                              trigger={
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1 shadow-2xs"
+                                  title="Check off picked items, update quantities & generate updated Pick List PDF"
+                                >
+                                  <CheckSquare className="h-3 w-3" />
+                                  Pick Items
+                                </Button>
+                              }
+                            />
+                          )}
+
                           {/* 0. Interactive Carton Packing Console Trigger */}
                           {pl.order && (
                             <CartonPackingDialog
