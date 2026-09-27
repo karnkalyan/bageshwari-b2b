@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef, useCallback } from "react";
 import { Minus, Plus, Loader2 } from "lucide-react";
 
 interface CartItemQuantityProps {
@@ -17,20 +17,41 @@ export function CartItemQuantity({
   const [qty, setQty] = useState<string>(String(initialQuantity));
   const [isPending, startTransition] = useTransition();
 
+  // Track whether we have an in-flight or recently-completed update.
+  // While pending, skip overwriting the local qty from server props
+  // so the component doesn't "vibrate" on revalidation.
+  const pendingQtyRef = useRef<number | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    setQty(String(initialQuantity));
+    // Only sync from server when there's no pending local update,
+    // OR when the server value matches what we sent (confirming it).
+    if (pendingQtyRef.current === null || pendingQtyRef.current === initialQuantity) {
+      setQty(String(initialQuantity));
+      pendingQtyRef.current = null;
+    }
   }, [initialQuantity]);
 
-  const handleUpdate = (newQty: number) => {
+  const handleUpdate = useCallback((newQty: number) => {
     const validQty = Math.max(1, newQty);
     setQty(String(validQty));
-    const formData = new FormData();
-    formData.append("itemId", itemId);
-    formData.append("quantity", String(validQty));
-    startTransition(async () => {
-      await updateAction(formData);
-    });
-  };
+    pendingQtyRef.current = validQty;
+
+    // Debounce rapid clicks (e.g. clicking +++ quickly)
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const formData = new FormData();
+      formData.append("itemId", itemId);
+      formData.append("quantity", String(validQty));
+      startTransition(async () => {
+        await updateAction(formData);
+        // Clear pending after server confirms, but only if no newer update came in
+        if (pendingQtyRef.current === validQty) {
+          pendingQtyRef.current = null;
+        }
+      });
+    }, 300);
+  }, [itemId, updateAction]);
 
   const handleBlur = () => {
     const parsed = parseInt(qty, 10);

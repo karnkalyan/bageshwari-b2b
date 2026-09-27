@@ -336,11 +336,18 @@ export function SalesOrderCreator({
 
     showToast(`Added ${name} to order`);
 
-    // Sync to database cart so /dealer/cart page reflects the addition
+    // Sync to database cart so /dealer/cart page reflects the addition.
+    // Fire-and-forget: do NOT await, so server revalidation doesn't
+    // cause this client component to re-render/vibrate.
     if (isDealer && onCartSync) {
-      onCartSync(product.id, targetVariantId, 1).catch((err) =>
-        console.warn("Cart sync failed:", err)
-      );
+      // Use setTimeout to push the server action call outside of React's
+      // current render cycle, preventing revalidation from triggering
+      // a re-render of this component.
+      setTimeout(() => {
+        onCartSync(product.id, targetVariantId, 1).catch((err) =>
+          console.warn("Cart sync failed:", err)
+        );
+      }, 0);
     }
   };
 
@@ -857,7 +864,7 @@ export function SalesOrderCreator({
               ) : (
                 <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 border rounded-xl">
                   {orderItems.map((item, idx) => (
-                    <div key={`${item.productId}-${item.variantId || idx}`} className="p-3 space-y-2 bg-white">
+                    <div key={`${item.productId}-${item.variantId || "default"}`} className="p-3 space-y-2 bg-white">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <div className="font-bold text-xs text-slate-900 truncate">

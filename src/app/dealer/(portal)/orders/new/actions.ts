@@ -25,9 +25,12 @@ export async function syncQuickOrderItemToCart(formData: FormData) {
       quantity,
     });
 
+    // Only revalidate the cart page — NOT the current page or layout.
+    // The SalesOrderCreator manages its own client-side cart state;
+    // revalidating /dealer/products or the layout would re-render
+    // the server component tree and remount the client component,
+    // causing the cart UI to vibrate/flash.
     revalidatePath("/dealer/cart");
-    revalidatePath("/dealer/products");
-    revalidatePath("/dealer", "layout");
 
     return { success: true };
   } catch (err) {
