@@ -126,10 +126,11 @@ export function SalesOrderCreator({
   const [orderNotes, setOrderNotes] = useState(initialNotes || "");
   const [freightTotal, setFreightTotal] = useState<number>(0);
   const [draftSavedTime, setDraftSavedTime] = useState<string | null>(null);
+  const hasInitialOrderItems = initialOrderItems.length > 0;
 
   // Restore draft from localStorage on mount if no initial items provided
   useEffect(() => {
-    if (initialOrderItems && initialOrderItems.length > 0) return;
+    if (hasInitialOrderItems) return;
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
@@ -141,7 +142,7 @@ export function SalesOrderCreator({
         }
       }
     } catch {}
-  }, [storageKey, initialOrderItems]);
+  }, [storageKey, hasInitialOrderItems]);
 
   // Persist cart items & notes to localStorage whenever changed
   useEffect(() => {

@@ -1,6 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+const SERVER_ACTION_ID_PATTERN = /^[0-9a-f]{42}$/i;
+
 export function proxy(request: NextRequest) {
+  const serverActionId = request.headers.get("next-action");
+
+  // Next.js otherwise tries to decode arbitrary values as Server Action IDs
+  // and emits a noisy framework stack trace. Real action references generated
+  // by this Next.js version are 42-character hexadecimal IDs.
+  if (serverActionId && !SERVER_ACTION_ID_PATTERN.test(serverActionId)) {
+    return new NextResponse("Invalid Server Action request", { status: 400 });
+  }
+
   const { pathname } = request.nextUrl;
   const destination = request.nextUrl.clone();
 
@@ -25,5 +36,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/s/:path*", "/platform/:path*", "/select-workspace"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\..*).*)",
+  ],
 };
