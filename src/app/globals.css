@@ -291,6 +291,25 @@ button, a, input, select, textarea { outline-offset: 2px; }
 .animate-slide-in-left { animation: slide-in-left 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 
+/* ─── Toast Notification Animations ─── */
+@keyframes toast-slide-in {
+  from { opacity: 0; transform: translateX(100%) scale(0.95); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes toast-slide-out {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to { opacity: 0; transform: translateX(100%) scale(0.95); }
+}
+
+@keyframes toast-progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+.toast-enter { animation: toast-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.toast-exit { animation: toast-slide-out 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
 .stagger-children > * {
   opacity: 0;
   animation: fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;

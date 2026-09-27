@@ -12,6 +12,7 @@ import {
   Bell, Command, UserCog, KeyRound, ShieldAlert
 } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { OrderToastNotifier } from "@/components/notifications/order-toast-notifier";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LiveSearchInput } from "@/components/search/live-search-input";
 
@@ -501,6 +502,9 @@ export function AdminShell({
             </button>
           </div>
         </header>
+
+        {/* Real-time toast notifications for new orders / status updates */}
+        <OrderToastNotifier />
 
         {/* Page Content with bottom padding to accommodate mobile bottom navbar */}
         <main className="animate-fade-in bg-background text-foreground min-h-[calc(100vh-64px)] pb-20 lg:pb-8">{children}</main>
