@@ -27,6 +27,7 @@
 *.pem
 ~$*
 *.tmp
+*.mp4
 
 # debug
 npm-debug.log*
