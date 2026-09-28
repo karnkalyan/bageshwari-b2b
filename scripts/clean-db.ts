@@ -97,7 +97,7 @@ async function main() {
   await prisma.inventory.deleteMany({});
 
   // 4. Delete Products and Product-related Tables
-  console.log("🗑️ Deleting products, prices, variants, media...");
+  console.log("🗑️ Deleting products, prices, variants, media, categories, brands...");
   await prisma.productPrice.deleteMany({});
   await prisma.productImage.deleteMany({});
   await prisma.productDocument.deleteMany({});
@@ -106,6 +106,11 @@ async function main() {
   await prisma.productAttributeValue.deleteMany({});
   await prisma.productAttribute.deleteMany({});
   await prisma.product.deleteMany({});
+  await prisma.productBrand.deleteMany({});
+  await prisma.productCategory.deleteMany({});
+
+  // Clean all search queries and audit logs
+  await prisma.auditLog.deleteMany({});
 
   // 5. Delete Dealers and Dealer-related Tables
   console.log("🗑️ Deleting dealers, dealer users, credit limits...");
