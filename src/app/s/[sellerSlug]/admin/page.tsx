@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { getTenantContext } from "@/lib/tenant";
+import { getTenantContext, hasRole, hasPermission } from "@/lib/tenant";
 import { formatCurrency, formatDate, ORDER_STATUS_LABELS } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -30,6 +30,39 @@ import { Button } from "@/components/ui/button";
 export default async function AdminDashboardPage({ params }: { params: Promise<{ sellerSlug: string }> }) {
   const { sellerSlug } = await params;
   const ctx = await getTenantContext(sellerSlug);
+
+  const canManageSettings =
+    hasRole(
+      ctx,
+      "SUPER_ADMIN",
+      "PLATFORM_ADMIN",
+      "SELLER_OWNER",
+      "SELLER_ADMIN",
+      "ADMIN",
+      "ACCOUNTS_MANAGER",
+      "ACCOUNT_MANAGER",
+      "ACCOUNTANT"
+    ) ||
+    hasPermission(ctx, "settings.manage") ||
+    hasPermission(ctx, "vat.manage") ||
+    hasPermission(ctx, "company.manage");
+
+  const canViewAccounts =
+    hasRole(
+      ctx,
+      "SUPER_ADMIN",
+      "PLATFORM_ADMIN",
+      "SELLER_OWNER",
+      "ADMIN",
+      "STAFF",
+      "ACCOUNTANT",
+      "ACCOUNTS_MANAGER",
+      "ACCOUNT_MANAGER",
+      "ACCOUNTS_USER",
+      "FINANCE"
+    ) ||
+    hasPermission(ctx, "invoice.generate") ||
+    hasPermission(ctx, "order.revise");
 
   const [
     orderCount,
@@ -101,9 +134,13 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
 
   const kpis = [
     { icon: ShoppingCart, label: "Total Orders", value: orderCount.toLocaleString(), color: "text-blue-500", bg: "bg-blue-500/10", href: `${base}/orders` },
-    { icon: TrendingUp, label: "Net Revenue", value: formatCurrency(totalSales), color: "text-emerald-500", bg: "bg-emerald-500/10", href: `${base}/accounts` },
-    { icon: FileText, label: "Proforma Invoices", value: proformaCount.toLocaleString(), color: "text-amber-500", bg: "bg-amber-500/10", href: `${base}/accounts?tab=proformas` },
-    { icon: ShieldCheck, label: "VAT Invoices", value: finalInvoiceCount.toLocaleString(), color: "text-cyan-500", bg: "bg-cyan-500/10", href: `${base}/accounts?tab=tax-invoices` },
+    ...(canViewAccounts
+      ? [
+          { icon: TrendingUp, label: "Net Revenue", value: formatCurrency(totalSales), color: "text-emerald-500", bg: "bg-emerald-500/10", href: `${base}/accounts` },
+          { icon: FileText, label: "Proforma Invoices", value: proformaCount.toLocaleString(), color: "text-amber-500", bg: "bg-amber-500/10", href: `${base}/accounts?tab=proformas` },
+          { icon: ShieldCheck, label: "VAT Invoices", value: finalInvoiceCount.toLocaleString(), color: "text-cyan-500", bg: "bg-cyan-500/10", href: `${base}/accounts?tab=tax-invoices` },
+        ]
+      : []),
     { icon: Truck, label: "Dispatches", value: shipmentCount.toLocaleString(), color: "text-sky-500", bg: "bg-sky-500/10", href: `${base}/dispatch` },
     { icon: PackageCheck, label: "Cartons Packed", value: packageCount.toLocaleString(), color: "text-indigo-500", bg: "bg-indigo-500/10", href: `${base}/warehouse` },
     { icon: Users, label: "Active Dealers", value: dealers.toLocaleString(), color: "text-purple-500", bg: "bg-purple-500/10", href: `${base}/dealers` },
@@ -114,7 +151,11 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
 
   const quickActions = [
     { icon: ShoppingCart, label: "Orders Pipeline", href: "/orders", color: "text-blue-500", desc: "View & confirm orders" },
-    { icon: FileText, label: "Accounts Review", href: "/accounts", color: "text-amber-500", desc: "Proformas & Tax Invoices" },
+    ...(canViewAccounts
+      ? [
+          { icon: FileText, label: "Accounts Review", href: "/accounts", color: "text-amber-500", desc: "Proformas & Tax Invoices" },
+        ]
+      : []),
     { icon: Warehouse, label: "Warehouse Picking", href: "/warehouse", color: "text-orange-500", desc: "Pick lists & Packaging" },
     { icon: Truck, label: "Dispatch Logistics", href: "/dispatch", color: "text-sky-500", desc: "Delivery challans & tracking" },
     { icon: Users, label: "Dealer Network", href: "/dealers", color: "text-pink-500", desc: "Accounts & Credit limits" },
@@ -142,12 +183,14 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
           >
             <ShoppingCart className="h-4 w-4" /> Manage Orders
           </Link>
-          <Link
-            href={`${base}/settings`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-accent transition-all shadow-2xs text-center"
-          >
-            Settings & VAT
-          </Link>
+          {canManageSettings && (
+            <Link
+              href={`${base}/settings`}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-accent transition-all shadow-2xs text-center"
+            >
+              Settings & VAT
+            </Link>
+          )}
         </div>
       </div>
 
