@@ -87,6 +87,7 @@ export function ProductEditModal({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCustomUnit, setIsCustomUnit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -320,20 +321,57 @@ export function ProductEditModal({
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">Unit of Measure</Label>
-              <select
-                value={formData.unitCode || "PCS"}
-                onChange={(e) => setFormData({ ...formData, unitCode: e.target.value })}
-                className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="PCS">PCS (Pieces)</option>
-                <option value="SET">SET (Set)</option>
-                <option value="PKT">PKT (Packet)</option>
-                <option value="LTR">LTR (Litre)</option>
-                <option value="KG">KG (Kilogram)</option>
-                <option value="PAIR">PAIR (Pair)</option>
-                <option value="MTR">MTR (Meter)</option>
-              </select>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Unit of Measure</Label>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomUnit(!isCustomUnit)}
+                  className="text-[10px] text-primary hover:underline font-semibold"
+                >
+                  {isCustomUnit ? "Choose list" : "+ Custom Unit"}
+                </button>
+              </div>
+              {isCustomUnit ? (
+                <Input
+                  placeholder="e.g. PEL, CRT, DRUM, CAN"
+                  value={formData.unitCode || ""}
+                  onChange={(e) => setFormData({ ...formData, unitCode: e.target.value.toUpperCase() })}
+                  className="mt-1 h-8 text-xs uppercase font-bold"
+                  autoFocus
+                />
+              ) : (
+                <select
+                  value={formData.unitCode || "PCS"}
+                  onChange={(e) => {
+                    if (e.target.value === "CUSTOM") {
+                      setIsCustomUnit(true);
+                      setFormData({ ...formData, unitCode: "" });
+                    } else {
+                      setFormData({ ...formData, unitCode: e.target.value });
+                    }
+                  }}
+                  className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring font-medium"
+                >
+                  <option value="PCS">PCS (Pieces)</option>
+                  <option value="PEL">PEL (Pail / Bucket - Lubricants)</option>
+                  <option value="CRT">CRT (Carton / Box)</option>
+                  <option value="SET">SET (Set / Kit)</option>
+                  <option value="PKT">PKT (Packet)</option>
+                  <option value="LTR">LTR (Litre)</option>
+                  <option value="KG">KG (Kilogram)</option>
+                  <option value="BOX">BOX (Box)</option>
+                  <option value="CAN">CAN (Can / Tin)</option>
+                  <option value="DRUM">DRUM (Drum / Barrel)</option>
+                  <option value="PAIR">PAIR (Pair)</option>
+                  <option value="MTR">MTR (Meter)</option>
+                  <option value="ROLL">ROLL (Roll)</option>
+                  <option value="BAG">BAG (Bag / Sack)</option>
+                  {!["PCS","PEL","CRT","SET","PKT","LTR","KG","BOX","CAN","DRUM","PAIR","MTR","ROLL","BAG"].includes(formData.unitCode || "") && formData.unitCode && (
+                    <option value={formData.unitCode}>{formData.unitCode} (Custom Unit)</option>
+                  )}
+                  <option value="CUSTOM">+ Create / Type Custom Unit...</option>
+                </select>
+              )}
             </div>
 
             <div>

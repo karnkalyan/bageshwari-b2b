@@ -39,7 +39,7 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const ALL_PRIVILEGED_ROLES = ["SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN", "STAFF"];
+const ALL_PRIVILEGED_ROLES = ["SUPER_ADMIN", "PLATFORM_ADMIN", "SELLER_OWNER", "ADMIN"];
 
 const navigationGroups: NavGroup[] = [
   {

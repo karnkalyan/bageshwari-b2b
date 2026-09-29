@@ -26,18 +26,13 @@ export default async function AdminSettingsPage({ params }: AdminSettingsPagePro
       "SELLER_OWNER",
       "SELLER_ADMIN",
       "ADMIN",
-      "STAFF",
-      "ACCOUNTANT",
       "ACCOUNTS_MANAGER",
       "ACCOUNT_MANAGER",
-      "SALES_MANAGER",
-      "SALES_REP",
-      "SALESPERSON",
-      "PRODUCT_MANAGER"
+      "ACCOUNTANT"
     ) ||
     hasPermission(ctx, "settings.manage") ||
     hasPermission(ctx, "vat.manage") ||
-    hasPermission(ctx, "dealer.manage");
+    hasPermission(ctx, "company.manage");
 
   if (!isAuthorized) {
     redirect(`/s/${sellerSlug}/admin`);

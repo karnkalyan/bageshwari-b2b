@@ -93,12 +93,14 @@ export function BulkProductManagerModal({
       setFileContent("");
       setPreviewItems([
         {
-          sku: "EXCEL WORKBOOK READY",
+          sku: "Auto-resolved / Generated",
           name: file.name,
-          category: `Size: ${(file.size / 1024).toFixed(1)} KB`,
-          mrp: "Parsed on server",
+          category: `Excel Workbook (${(file.size / 1024).toFixed(1)} KB)`,
+          mrp: "Calculated",
           dealerPrice: "Auto-upserted",
-          stock: "Ready to process",
+          stock: "Ready to import",
+          rackLocation: "Auto-mapped",
+          binLocation: "Auto-mapped",
         },
       ]);
       return;

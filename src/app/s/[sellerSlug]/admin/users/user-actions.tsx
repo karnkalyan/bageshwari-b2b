@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KeyRound, Shield, X, Pencil, UserCog, AlertCircle } from "lucide-react";
-import { updatePasswordAction, updateRolesAction, updateUserAction } from "./actions";
+import { KeyRound, Shield, X, Pencil, UserCog, AlertCircle, Trash2 } from "lucide-react";
+import { updatePasswordAction, updateRolesAction, updateUserAction, deleteUserAction } from "./actions";
 
 interface Role {
   id: string;
@@ -40,6 +40,7 @@ export function UserActions({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isRolesOpen, setIsRolesOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -79,6 +80,22 @@ export function UserActions({
       >
         <Shield className="h-3 w-3 mr-1" /> Roles
       </Button>
+
+      {/* Remove User Button */}
+      {canEditUser && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs text-rose-600 border-rose-500/30 hover:bg-rose-500/10"
+          onClick={() => {
+            setErrorMessage(null);
+            setIsDeleteOpen(true);
+          }}
+          title="Remove user from workspace"
+        >
+          <Trash2 className="h-3 w-3 mr-1" /> Remove
+        </Button>
+      )}
 
       {/* Edit User Modal */}
       {isEditOpen && (
@@ -260,6 +277,57 @@ export function UserActions({
                 <Button type="submit" size="sm" disabled={isSubmitting}>Save Roles</Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {isDeleteOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-card text-foreground rounded-xl w-full max-w-sm shadow-xl overflow-hidden border border-border">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+                <Trash2 className="h-4 w-4" /> Remove User
+              </div>
+              <button onClick={() => setIsDeleteOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Are you sure you want to remove <strong className="text-foreground">{userName}</strong> ({userEmail}) from this workspace?
+                Their access and assigned security roles will be revoked immediately.
+              </p>
+              {errorMessage && (
+                <div className="p-2.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs">
+                  {errorMessage}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" size="sm" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                  disabled={isSubmitting}
+                  onClick={async () => {
+                    setIsSubmitting(true);
+                    setErrorMessage(null);
+                    const fd = new FormData();
+                    fd.append("userId", userId);
+                    fd.append("sellerId", sellerId);
+                    const res = await deleteUserAction(fd, sellerSlug);
+                    setIsSubmitting(false);
+                    if (res?.success) {
+                      setIsDeleteOpen(false);
+                    } else if (res?.error) {
+                      setErrorMessage(res.error);
+                    }
+                  }}
+                >
+                  {isSubmitting ? "Removing..." : "Confirm Remove"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

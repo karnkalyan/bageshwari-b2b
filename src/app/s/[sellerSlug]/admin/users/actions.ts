@@ -104,3 +104,55 @@ export async function updateUserAction(formData: FormData, sellerSlug: string): 
     return { success: false, error: err?.message || "Failed to update user profile" };
   }
 }
+
+export async function deleteUserAction(formData: FormData, sellerSlug: string): Promise<{ success: boolean; error?: string }> {
+  const userId = String(formData.get("userId") || "").trim();
+  const sellerId = String(formData.get("sellerId") || "").trim();
+
+  if (!userId) {
+    return { success: false, error: "User ID is required" };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 1. Remove roles and memberships for this seller
+      if (sellerId) {
+        await tx.userRole.deleteMany({
+          where: { userId, sellerId },
+        });
+        await tx.userSellerMembership.deleteMany({
+          where: { userId, sellerId },
+        });
+      } else {
+        await tx.userRole.deleteMany({
+          where: { userId },
+        });
+        await tx.userSellerMembership.deleteMany({
+          where: { userId },
+        });
+      }
+
+      // 2. If no remaining memberships, soft-delete user
+      const otherMemberships = await tx.userSellerMembership.count({
+        where: { userId },
+      });
+
+      if (otherMemberships === 0) {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            status: "SUSPENDED",
+            deletedAt: new Date(),
+          },
+        });
+      }
+    });
+
+    revalidatePath(`/s/${sellerSlug}/admin/users`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Delete user error:", err);
+    return { success: false, error: err?.message || "Failed to remove user account." };
+  }
+}
+

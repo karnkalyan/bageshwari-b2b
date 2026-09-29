@@ -418,7 +418,9 @@ export async function POST(request: Request) {
               else if (h.includes("warehouse") || h.includes("loc")) item.location = val;
               else if (h.includes("desc")) item.description = val;
             });
-            if (item.sku && item.name) {
+            if (item.name && String(item.name).trim().length > 0) {
+              item.name = String(item.name).trim();
+              if (item.sku) item.sku = String(item.sku).trim();
               rawItems.push(item);
             }
           }
@@ -476,12 +478,53 @@ export async function POST(request: Request) {
   let updatedCount = 0;
   const errors: Array<{ sku: string; error: string }> = [];
 
+  // Helper to generate clean SKU if not provided in spreadsheet
+  function generateBulkSku(name: string, seq: number): string {
+    const clean = name.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    const prefix = (clean.slice(0, 4) || "ITEM").padEnd(4, "P");
+    return `${prefix}-${String(seq).padStart(4, "0")}`;
+  }
+
+  // Pre-load existing products to match by Name or SKU for smart upsert
+  const existingSellerProducts = await prisma.product.findMany({
+    where: { sellerId, deletedAt: null },
+    select: { id: true, name: true, sku: true },
+  });
+  const nameToSkuMap = new Map(existingSellerProducts.map((p) => [p.name.trim().toLowerCase(), p.sku]));
+  const usedSkus = new Set(existingSellerProducts.map((p) => p.sku.toUpperCase()));
+
+  let autoSkuSeq = 1001;
+  const processedItems: BulkProductItem[] = [];
+
+  for (const item of rawItems) {
+    if (!item.name || !String(item.name).trim()) continue;
+    const cleanName = String(item.name).trim();
+    let cleanSku = String(item.sku || "").trim().toUpperCase();
+
+    if (!cleanSku) {
+      const match = nameToSkuMap.get(cleanName.toLowerCase());
+      if (match) {
+        cleanSku = match;
+      } else {
+        do {
+          cleanSku = generateBulkSku(cleanName, autoSkuSeq++);
+        } while (usedSkus.has(cleanSku));
+        usedSkus.add(cleanSku);
+        nameToSkuMap.set(cleanName.toLowerCase(), cleanSku);
+      }
+    }
+
+    processedItems.push({
+      ...item,
+      name: cleanName,
+      sku: cleanSku,
+    });
+  }
+
   // Group items by unique SKU to deduplicate within the file
   const seenSkus = new Map<string, BulkProductItem>();
-  for (const item of rawItems) {
-    const cleanSku = String(item.sku || "").trim().toUpperCase();
-    if (!cleanSku || !item.name) continue;
-    seenSkus.set(cleanSku, { ...item, sku: cleanSku });
+  for (const item of processedItems) {
+    seenSkus.set(item.sku, item);
   }
 
   // Pre-load all existing categories for seller
@@ -490,7 +533,13 @@ export async function POST(request: Request) {
   });
   const categoryMap = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c.id]));
 
-  // Ensure all categories needed exist up front
+  // Pre-load all existing brands for seller
+  const brands = await prisma.productBrand.findMany({
+    where: { sellerId },
+  });
+  const brandMap = new Map(brands.map((b) => [b.name.trim().toLowerCase(), b.id]));
+
+  // Ensure all categories and brands needed exist up front
   for (const item of seenSkus.values()) {
     if (item.category && item.category.trim()) {
       const catKey = item.category.trim().toLowerCase();
@@ -513,6 +562,28 @@ export async function POST(request: Request) {
             where: { sellerId, name: item.category.trim() },
           });
           if (existing) categoryMap.set(catKey, existing.id);
+        }
+      }
+    }
+
+    if (item.brand && item.brand.trim()) {
+      const bKey = item.brand.trim().toLowerCase();
+      if (!brandMap.has(bKey)) {
+        try {
+          const bSlug = item.brand.trim().toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30) + "-" + Date.now().toString().slice(-4);
+          const newBrand = await prisma.productBrand.create({
+            data: {
+              sellerId,
+              name: item.brand.trim(),
+              slug: bSlug,
+            },
+          });
+          brandMap.set(bKey, newBrand.id);
+        } catch {
+          const existing = await prisma.productBrand.findFirst({
+            where: { sellerId, name: item.brand.trim() },
+          });
+          if (existing) brandMap.set(bKey, existing.id);
         }
       }
     }
@@ -557,6 +628,7 @@ export async function POST(request: Request) {
               : 13.0;
 
             const catId = item.category?.trim() ? categoryMap.get(item.category.trim().toLowerCase()) || null : null;
+            const brandId = item.brand?.trim() ? brandMap.get(item.brand.trim().toLowerCase()) || null : null;
             const existingProduct = existingMap.get(sku);
 
             if (existingProduct) {
@@ -567,6 +639,7 @@ export async function POST(request: Request) {
                   data: {
                     name: item.name.trim(),
                     ...(catId ? { categoryId: catId } : {}),
+                    ...(brandId ? { brandId: brandId } : {}),
                     ...(item.unitCode ? { unitCode: item.unitCode.trim().toUpperCase() } : {}),
                     ...(item.description ? { shortDescription: item.description.trim() } : {}),
                     taxPercent: new Prisma.Decimal(taxNum),
@@ -654,6 +727,7 @@ export async function POST(request: Request) {
                     sku,
                     slug,
                     categoryId: catId,
+                    brandId: brandId,
                     unitCode: item.unitCode?.trim().toUpperCase() || "PCS",
                     shortDescription: item.description?.trim() || null,
                     taxPercent: new Prisma.Decimal(taxNum),
@@ -746,13 +820,13 @@ function parseCsvToItems(csvText: string): BulkProductItem[] {
     const row = parseCsvRow(lines[i]);
     if (row.length === 0) continue;
 
-    const sku = skuIdx >= 0 ? row[skuIdx] : row[0];
-    const name = nameIdx >= 0 ? row[nameIdx] : row[1];
-    if (!sku || !name) continue;
+    const sku = skuIdx >= 0 ? (row[skuIdx]?.trim() || "") : "";
+    const name = nameIdx >= 0 ? row[nameIdx]?.trim() : (row[1]?.trim() || row[0]?.trim());
+    if (!name) continue;
 
     items.push({
-      sku: sku.trim(),
-      name: name.trim(),
+      sku: sku || "",
+      name: name,
       category: catIdx >= 0 ? row[catIdx]?.trim() : undefined,
       brand: brandIdx >= 0 ? row[brandIdx]?.trim() : undefined,
       unitCode: unitIdx >= 0 ? row[unitIdx]?.trim() : "PCS",
