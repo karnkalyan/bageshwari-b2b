@@ -91,12 +91,12 @@ async function main() {
   const passwordHash = await bcrypt.hash(defaultPassword, 12);
 
   for (const item of staffUsersToSeed) {
+    const existing = await prisma.user.findUnique({ where: { email: item.email.toLowerCase().trim() } });
     const user = await prisma.user.upsert({
       where: { email: item.email.toLowerCase().trim() },
       update: {
         name: item.name,
-        phone: item.phone,
-        passwordHash,
+        phone: item.phone ?? existing?.phone,
         status: "ACTIVE",
         emailVerified: new Date(),
         loginAttempts: 0,
