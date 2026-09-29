@@ -80,6 +80,31 @@ export async function getOrderPickListDetails(sellerId: string, orderId: string)
 
   let pickList: any = order.pickLists[0] || null;
 
+  // Retrieve storage locations from Inventory for order items
+  const productIds = Array.from(new Set(order.items.map((oi) => oi.productId).filter(Boolean))) as string[];
+  const itemInventories = await prisma.inventory.findMany({
+    where: {
+      sellerId,
+      productId: { in: productIds },
+    },
+    select: {
+      productId: true,
+      variantId: true,
+      rackLocation: true,
+      binLocation: true,
+    },
+  });
+
+  const getStorageLoc = (productId: string, variantId?: string | null) => {
+    const inv = itemInventories.find(
+      (i) => (variantId && i.variantId === variantId) || i.productId === productId
+    );
+    return {
+      rack: inv?.rackLocation?.trim() || "R-01",
+      bin: inv?.binLocation?.trim() || "B-01",
+    };
+  };
+
   // If no pick list exists yet, auto-initialize one so warehouse users can begin picking
   if (!pickList) {
     const defaultWarehouse = await prisma.warehouse.findFirst({ where: { sellerId } });
@@ -97,16 +122,19 @@ export async function getOrderPickListDetails(sellerId: string, orderId: string)
         status: "GENERATED",
         notes: "Initialized for warehouse picking manifest",
         items: {
-          create: order.items.map((oi) => ({
-            sellerId,
-            productId: oi.productId,
-            variantId: oi.variantId,
-            sku: oi.sku,
-            approvedQuantity: oi.approvedQuantity ?? oi.originalQuantity,
-            pickedQuantity: 0,
-            rackLocation: "R-01",
-            binLocation: "B-01",
-          })),
+          create: order.items.map((oi) => {
+            const loc = getStorageLoc(oi.productId, oi.variantId);
+            return {
+              sellerId,
+              productId: oi.productId,
+              variantId: oi.variantId,
+              sku: oi.sku,
+              approvedQuantity: oi.approvedQuantity ?? oi.originalQuantity,
+              pickedQuantity: 0,
+              rackLocation: loc.rack,
+              binLocation: loc.bin,
+            };
+          }),
         },
       },
       include: {
@@ -124,17 +152,20 @@ export async function getOrderPickListDetails(sellerId: string, orderId: string)
 
     if (missingOrderItems.length > 0) {
       await prisma.pickListItem.createMany({
-        data: missingOrderItems.map((oi) => ({
-          sellerId,
-          pickListId: pickList.id,
-          productId: oi.productId,
-          variantId: oi.variantId,
-          sku: oi.sku,
-          approvedQuantity: oi.approvedQuantity ?? oi.originalQuantity,
-          pickedQuantity: 0,
-          rackLocation: "R-01",
-          binLocation: "B-01",
-        })),
+        data: missingOrderItems.map((oi) => {
+          const loc = getStorageLoc(oi.productId, oi.variantId);
+          return {
+            sellerId,
+            pickListId: pickList.id,
+            productId: oi.productId,
+            variantId: oi.variantId,
+            sku: oi.sku,
+            approvedQuantity: oi.approvedQuantity ?? oi.originalQuantity,
+            pickedQuantity: 0,
+            rackLocation: loc.rack,
+            binLocation: loc.bin,
+          };
+        }),
       });
 
       // Reload pick list items
@@ -170,8 +201,8 @@ export async function getOrderPickListDetails(sellerId: string, orderId: string)
       approvedQuantity: approvedQty,
       pickedQuantity: pickedQty,
       isPicked: pickedQty >= approvedQty && approvedQty > 0,
-      rackLocation: matchedPi?.rackLocation || "R-01",
-      binLocation: matchedPi?.binLocation || "B-01",
+      rackLocation: (matchedPi?.rackLocation && matchedPi.rackLocation !== "R-01") ? matchedPi.rackLocation : (getStorageLoc(oi.productId, oi.variantId).rack || matchedPi?.rackLocation || "R-01"),
+      binLocation: (matchedPi?.binLocation && matchedPi.binLocation !== "B-01") ? matchedPi.binLocation : (getStorageLoc(oi.productId, oi.variantId).bin || matchedPi?.binLocation || "B-01"),
       remarks: matchedPi?.remarks || "",
       batchNumber: matchedPi?.batchNumber || null,
       serialNumber: matchedPi?.serialNumber || null,

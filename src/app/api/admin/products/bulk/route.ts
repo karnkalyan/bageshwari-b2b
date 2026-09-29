@@ -13,15 +13,18 @@ interface BulkProductItem {
   dealerPrice?: number | string | null;
   taxPercent?: number | string | null;
   stock?: number | string | null;
+  location?: string | null;
+  rackLocation?: string | null;
+  binLocation?: string | null;
   description?: string | null;
 }
 
-const SAMPLE_CSV_TEMPLATE = `SKU,Product Name,Category,Brand,Unit,MRP,Dealer Price,VAT %,Stock,Description
-BT-1011,Front Axle Pinion 18T,Tractor Transmission,Bageshwari Genuine,PCS,4500,3800,13,50,High grade alloy steel pinion for 45HP tractor
-BT-1012,Hydraulic Filter Cartridge,Hydraulics & Filters,Bageshwari Genuine,PCS,1250,950,13,120,Heavy duty filtration cartridge 10 micron
-BT-1013,Clutch Plate Assembly 11 Inch,Clutch & Brakes,Bageshwari Genuine,SET,8200,6900,13,30,Ceramic-metallic 11 inch dual clutch assembly
-BT-1014,Taper Roller Bearing 30207,Bearings,NBC Bearings,PCS,1650,1350,13,85,Precision tapered roller bearing for steering knuckle
-BT-1015,Fuel Injection Pump Element,Fuel System,Bosch Genuine,PCS,3100,2650,13,40,High pressure diesel pump element assembly`;
+const SAMPLE_CSV_TEMPLATE = `SKU,Product Name,Category,Brand,Unit,MRP,Dealer Price,VAT %,Stock,Warehouse,Rack,Bin,Description
+BT-1011,Front Axle Pinion 18T,Tractor Transmission,Bageshwari Genuine,PCS,4500,3800,13,50,Main Warehouse,R-01,B-02,High grade alloy steel pinion for 45HP tractor
+BT-1012,Hydraulic Filter Cartridge,Hydraulics & Filters,Bageshwari Genuine,PCS,1250,950,13,120,Main Warehouse,R-02,B-05,Heavy duty filtration cartridge 10 micron
+BT-1013,Clutch Plate Assembly 11 Inch,Clutch & Brakes,Bageshwari Genuine,SET,8200,6900,13,30,Main Warehouse,R-03,B-01,Ceramic-metallic 11 inch dual clutch assembly
+BT-1014,Taper Roller Bearing 30207,Bearings,NBC Bearings,PCS,1650,1350,13,85,Main Warehouse,R-04,B-08,Precision tapered roller bearing for steering knuckle
+BT-1015,Fuel Injection Pump Element,Fuel System,Bosch Genuine,PCS,3100,2650,13,40,Main Warehouse,R-05,B-03,High pressure diesel pump element assembly`;
 
 const SAMPLE_JSON_TEMPLATE = [
   {
@@ -34,6 +37,9 @@ const SAMPLE_JSON_TEMPLATE = [
     dealerPrice: 3800,
     taxPercent: 13,
     stock: 50,
+    location: "Main Warehouse",
+    rackLocation: "R-01",
+    binLocation: "B-02",
     description: "High grade alloy steel pinion for 45HP tractor",
   },
   {
@@ -46,6 +52,9 @@ const SAMPLE_JSON_TEMPLATE = [
     dealerPrice: 950,
     taxPercent: 13,
     stock: 120,
+    location: "Main Warehouse",
+    rackLocation: "R-02",
+    binLocation: "B-05",
     description: "Heavy duty filtration cartridge 10 micron",
   },
   {
@@ -58,6 +67,9 @@ const SAMPLE_JSON_TEMPLATE = [
     dealerPrice: 6900,
     taxPercent: 13,
     stock: 30,
+    location: "Main Warehouse",
+    rackLocation: "R-03",
+    binLocation: "B-01",
     description: "Ceramic-metallic 11 inch dual clutch assembly",
   },
 ];
@@ -68,7 +80,7 @@ export async function GET(request: Request) {
     return apiError("UNAUTHORIZED", "Authentication required.", 401);
   }
 
-  // Authorize Admin and Accounts roles
+  // Authorize Admin, Product Manager, Warehouse, and Accounts roles
   const userRoles = await prisma.userRole.findMany({
     where: { userId: session.user.id },
     include: { role: true },
@@ -80,11 +92,17 @@ export async function GET(request: Request) {
         "SUPER_ADMIN",
         "PLATFORM_ADMIN",
         "SELLER_OWNER",
+        "SELLER_ADMIN",
         "ADMIN",
+        "PRODUCT_MANAGER",
+        "WAREHOUSE_MANAGER",
+        "WAREHOUSE_USER",
         "STAFF",
         "ACCOUNTANT",
         "ACCOUNTS_MANAGER",
+        "ACCOUNT_MANAGER",
         "FINANCE",
+        "SALES_MANAGER",
       ].includes(rc)
     ) ||
     (session.user as any)?.role === "ADMIN" ||
@@ -117,6 +135,9 @@ export async function GET(request: Request) {
         { header: "Dealer Price", key: "dealerPrice", width: 14 },
         { header: "VAT %", key: "taxPercent", width: 10 },
         { header: "Stock", key: "stock", width: 10 },
+        { header: "Warehouse", key: "location", width: 18 },
+        { header: "Rack Number", key: "rackLocation", width: 14 },
+        { header: "Bin Number", key: "binLocation", width: 14 },
         { header: "Description", key: "description", width: 40 },
       ];
 
@@ -177,7 +198,14 @@ export async function GET(request: Request) {
       brand: { select: { name: true } },
       variants: { where: { isDefault: true }, take: 1 },
       prices: { where: { priceType: "DEFAULT_DEALER" }, take: 1 },
-      inventories: { select: { availableQuantity: true } },
+      inventories: {
+        select: {
+          availableQuantity: true,
+          rackLocation: true,
+          binLocation: true,
+          warehouse: { select: { name: true } },
+        },
+      },
     },
     orderBy: { name: "asc" },
   });
@@ -185,7 +213,8 @@ export async function GET(request: Request) {
   const exportRows = products.map((p) => {
     const variant = p.variants[0];
     const price = p.prices[0];
-    const stock = p.inventories[0]?.availableQuantity ? Number(p.inventories[0].availableQuantity) : 0;
+    const inv = p.inventories[0];
+    const stock = inv?.availableQuantity ? Number(inv.availableQuantity) : 0;
     return {
       sku: p.sku,
       name: p.name,
@@ -196,6 +225,9 @@ export async function GET(request: Request) {
       dealerPrice: price ? Number(price.amount) : 0,
       taxPercent: p.taxPercent !== null && p.taxPercent !== undefined ? Number(p.taxPercent) : 13,
       stock,
+      location: inv?.warehouse?.name || "Main Warehouse",
+      rackLocation: inv?.rackLocation || "R-01",
+      binLocation: inv?.binLocation || "B-01",
       description: p.shortDescription || "",
     };
   });
@@ -216,6 +248,9 @@ export async function GET(request: Request) {
       { header: "Dealer Price", key: "dealerPrice", width: 14 },
       { header: "VAT %", key: "taxPercent", width: 10 },
       { header: "Stock", key: "stock", width: 10 },
+      { header: "Warehouse", key: "location", width: 18 },
+      { header: "Rack Number", key: "rackLocation", width: 14 },
+      { header: "Bin Number", key: "binLocation", width: 14 },
       { header: "Description", key: "description", width: 40 },
     ];
 
@@ -247,7 +282,7 @@ export async function GET(request: Request) {
   }
 
   // Generate CSV
-  const header = "SKU,Product Name,Category,Brand,Unit,MRP,Dealer Price,VAT %,Stock,Description\n";
+  const header = "SKU,Product Name,Category,Brand,Unit,MRP,Dealer Price,VAT %,Stock,Warehouse,Rack,Bin,Description\n";
   const csvLines = exportRows.map((r) => {
     const esc = (s: any) => `"${String(s || "").replace(/"/g, '""')}"`;
     return [
@@ -260,6 +295,9 @@ export async function GET(request: Request) {
       r.dealerPrice,
       r.taxPercent,
       r.stock,
+      esc(r.location),
+      esc(r.rackLocation),
+      esc(r.binLocation),
       esc(r.description),
     ].join(",");
   });
@@ -306,11 +344,17 @@ export async function POST(request: Request) {
         "SUPER_ADMIN",
         "PLATFORM_ADMIN",
         "SELLER_OWNER",
+        "SELLER_ADMIN",
         "ADMIN",
+        "PRODUCT_MANAGER",
+        "WAREHOUSE_MANAGER",
+        "WAREHOUSE_USER",
         "STAFF",
         "ACCOUNTANT",
         "ACCOUNTS_MANAGER",
+        "ACCOUNT_MANAGER",
         "FINANCE",
+        "SALES_MANAGER",
       ].includes(rc)
     ) ||
     (session.user as any)?.role === "ADMIN" ||
@@ -369,6 +413,9 @@ export async function POST(request: Request) {
               else if (h.includes("dealer") || h.includes("dp") || h.includes("price") || h.includes("rate") || h.includes("wholesale")) item.dealerPrice = val;
               else if (h.includes("vat") || h.includes("tax")) item.taxPercent = val;
               else if (h.includes("stock") || h.includes("qty") || h.includes("quantity")) item.stock = val;
+              else if (h.includes("rack") || h.includes("shelf")) item.rackLocation = val;
+              else if (h.includes("bin") || h.includes("box")) item.binLocation = val;
+              else if (h.includes("warehouse") || h.includes("loc")) item.location = val;
               else if (h.includes("desc")) item.description = val;
             });
             if (item.sku && item.name) {
@@ -575,6 +622,8 @@ export async function POST(request: Request) {
                     where: { id: existingInv.id },
                     data: {
                       availableQuantity: new Prisma.Decimal(stockNum),
+                      ...(item.rackLocation ? { rackLocation: item.rackLocation.trim() } : {}),
+                      ...(item.binLocation ? { binLocation: item.binLocation.trim() } : {}),
                     },
                   });
                 } else {
@@ -585,6 +634,8 @@ export async function POST(request: Request) {
                       productId: existingProduct.id,
                       variantId: variantId!,
                       availableQuantity: new Prisma.Decimal(stockNum),
+                      rackLocation: item.rackLocation ? item.rackLocation.trim() : null,
+                      binLocation: item.binLocation ? item.binLocation.trim() : null,
                     },
                   });
                 }
@@ -640,6 +691,8 @@ export async function POST(request: Request) {
                     productId: product.id,
                     variantId: variant.id,
                     availableQuantity: new Prisma.Decimal(stockNum),
+                    rackLocation: item.rackLocation ? item.rackLocation.trim() : null,
+                    binLocation: item.binLocation ? item.binLocation.trim() : null,
                   },
                 });
               });
@@ -682,6 +735,9 @@ function parseCsvToItems(csvText: string): BulkProductItem[] {
   const dpIdx = headers.findIndex((h) => h.includes("dealer") || h.includes("dp") || h.includes("price"));
   const vatIdx = headers.findIndex((h) => h.includes("vat") || h.includes("tax"));
   const stockIdx = headers.findIndex((h) => h.includes("stock") || h.includes("qty") || h.includes("quantity"));
+  const rackIdx = headers.findIndex((h) => h.includes("rack") || h.includes("shelf"));
+  const binIdx = headers.findIndex((h) => h.includes("bin") || h.includes("box"));
+  const locIdx = headers.findIndex((h) => h.includes("warehouse") || h.includes("loc"));
   const descIdx = headers.findIndex((h) => h.includes("desc"));
 
   const items: BulkProductItem[] = [];
@@ -704,6 +760,9 @@ function parseCsvToItems(csvText: string): BulkProductItem[] {
       dealerPrice: dpIdx >= 0 ? parseFloat(row[dpIdx]) || 0 : 0,
       taxPercent: vatIdx >= 0 ? parseFloat(row[vatIdx]) || 13 : 13,
       stock: stockIdx >= 0 ? parseInt(row[stockIdx], 10) || 0 : 0,
+      location: locIdx >= 0 ? row[locIdx]?.trim() : undefined,
+      rackLocation: rackIdx >= 0 ? row[rackIdx]?.trim() : undefined,
+      binLocation: binIdx >= 0 ? row[binIdx]?.trim() : undefined,
       description: descIdx >= 0 ? row[descIdx]?.trim() : undefined,
     });
   }

@@ -18,6 +18,8 @@ const updateProductSchema = z.object({
   mrp: z.coerce.number().min(0).optional(),
   dealerPrice: z.coerce.number().min(0).optional(),
   stock: z.coerce.number().min(0).optional(),
+  rackLocation: z.string().trim().max(50).optional().nullable(),
+  binLocation: z.string().trim().max(50).optional().nullable(),
   images: z.array(
     z.object({
       id: z.string().optional(),
@@ -75,7 +77,7 @@ export async function PUT(
     return apiError("VALIDATION_ERROR", "Invalid product data.", 422, parsed.error.format());
   }
 
-  const { mrp, dealerPrice, stock, images, ...productFields } = parsed.data;
+  const { mrp, dealerPrice, stock, rackLocation, binLocation, images, ...productFields } = parsed.data;
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
@@ -148,8 +150,8 @@ export async function PUT(
         }
       }
 
-      // 4. Update Stock in default warehouse if provided
-      if (stock !== undefined) {
+      // 4. Update Stock & Storage Location in default warehouse
+      if (stock !== undefined || rackLocation !== undefined || binLocation !== undefined) {
         const defaultWarehouse = await tx.warehouse.findFirst({
           where: { sellerId, isActive: true },
         });
@@ -165,13 +167,19 @@ export async function PUT(
                   variantId: defaultVariant.id,
                 },
               },
-              update: { availableQuantity: new Prisma.Decimal(stock) },
+              update: {
+                ...(stock !== undefined ? { availableQuantity: new Prisma.Decimal(stock) } : {}),
+                ...(rackLocation !== undefined ? { rackLocation: rackLocation ? rackLocation.trim() : null } : {}),
+                ...(binLocation !== undefined ? { binLocation: binLocation ? binLocation.trim() : null } : {}),
+              },
               create: {
                 sellerId,
                 warehouseId: defaultWarehouse.id,
                 productId: product.id,
                 variantId: defaultVariant.id,
-                availableQuantity: new Prisma.Decimal(stock),
+                availableQuantity: new Prisma.Decimal(stock ?? 0),
+                rackLocation: rackLocation ? rackLocation.trim() : null,
+                binLocation: binLocation ? binLocation.trim() : null,
               },
             });
           }

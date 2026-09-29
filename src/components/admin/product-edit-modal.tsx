@@ -32,6 +32,7 @@ import {
   Printer,
   Boxes,
   Store,
+  MapPin,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -48,6 +49,8 @@ export interface ProductEditData {
   brandId?: string | null;
   taxPercent?: number | null;
   categoryTaxPercent?: number | null;
+  rackLocation?: string | null;
+  binLocation?: string | null;
   shortDescription?: string | null;
   categoryName?: string | null;
   brandName?: string | null;
@@ -90,6 +93,8 @@ export function ProductEditModal({
     if (product) {
       setFormData({
         ...product,
+        rackLocation: product.rackLocation ?? "",
+        binLocation: product.binLocation ?? "",
         categoryId: product.categoryId || (categories.find(c => c.name === product.categoryName)?.id || ""),
         brandId: product.brandId || (brands.find(b => b.name === product.brandName)?.id || ""),
         images: product.images ? [...product.images] : [],
@@ -212,6 +217,8 @@ export function ProductEditModal({
           mrp: formData.mrp,
           dealerPrice: formData.dealerPrice,
           stock: formData.stock,
+          rackLocation: formData.rackLocation?.trim() || null,
+          binLocation: formData.binLocation?.trim() || null,
           status: formData.status,
           unitCode: formData.unitCode,
           taxPercent: formData.taxPercent,
@@ -446,7 +453,46 @@ export function ProductEditModal({
             </div>
           </div>
 
-          {/* 4. Description */}
+          {/* 4. Warehouse & Physical Storage Location (Pick List Routing) */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-border rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-sky-600 dark:text-sky-400" /> Warehouse Storage Location (Pick List Routing)
+              </span>
+              <Badge variant="outline" className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                Printed on Pick List & Packaging Manifest
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-[11px] font-semibold text-foreground">
+                  Rack Number / Aisle Shelf
+                </Label>
+                <Input
+                  placeholder="e.g. R-01, RACK-A3"
+                  value={formData.rackLocation || ""}
+                  onChange={(e) => setFormData({ ...formData, rackLocation: e.target.value })}
+                  className="mt-1 h-8 text-xs font-mono font-bold"
+                />
+                <span className="text-[10px] text-muted-foreground">Rack identifier printed on pick lists</span>
+              </div>
+              <div>
+                <Label className="text-[11px] font-semibold text-foreground">
+                  Bin Number / Storage Box
+                </Label>
+                <Input
+                  placeholder="e.g. B-04, BIN-12"
+                  value={formData.binLocation || ""}
+                  onChange={(e) => setFormData({ ...formData, binLocation: e.target.value })}
+                  className="mt-1 h-8 text-xs font-mono font-bold"
+                />
+                <span className="text-[10px] text-muted-foreground">Bin / compartment location inside rack</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Description */}
           <div>
             <Label className="text-xs font-semibold">Short Description / Fitment Notes</Label>
             <Textarea

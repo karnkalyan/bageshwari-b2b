@@ -88,21 +88,35 @@ export default async function AdminUsersPage({ params, searchParams }: UsersPage
               emailVerified: new Date(),
             },
           });
+        } else {
+          user = await tx.user.update({
+            where: { id: user.id },
+            data: {
+              name,
+              phone: phone || user.phone,
+              passwordHash,
+              status: "ACTIVE",
+              emailVerified: new Date(),
+              loginAttempts: 0,
+              lockedUntil: null,
+            },
+          });
         }
 
         // 2. Link Seller Membership
-        await tx.userSellerMembership.upsert({
+        const membership = await tx.userSellerMembership.upsert({
           where: {
             userId_sellerId: {
               userId: user.id,
               sellerId: actionCtx.sellerId,
             },
           },
-          update: { status: "ACTIVE" },
+          update: { status: "active", isDefault: true },
           create: {
             userId: user.id,
             sellerId: actionCtx.sellerId,
-            status: "ACTIVE",
+            status: "active",
+            isDefault: true,
           },
         });
 
@@ -117,7 +131,7 @@ export default async function AdminUsersPage({ params, searchParams }: UsersPage
               code: roleCode,
               name: roleCode.replace(/_/g, " "),
               sellerId: actionCtx.sellerId,
-              systemRole: false,
+              systemRole: true,
             },
           });
         }
@@ -131,14 +145,17 @@ export default async function AdminUsersPage({ params, searchParams }: UsersPage
               sellerId: actionCtx.sellerId,
             },
           },
-          update: {},
+          update: { membershipId: membership.id },
           create: {
             userId: user.id,
             roleId: role.id,
             sellerId: actionCtx.sellerId,
+            membershipId: membership.id,
           },
         });
       });
+
+      await ensureRbacPermissions(actionCtx.sellerId);
     } catch (err) {
       console.error("Create staff user error:", err);
     }

@@ -376,6 +376,7 @@ async function main() {
     { code: "DISPATCH_USER", name: "Dispatch User", scope: "SELLER" as const },
     { code: "REPORT_VIEWER", name: "Report Viewer", scope: "SELLER" as const },
     { code: "SELLER_AUDITOR", name: "Seller Auditor", scope: "SELLER" as const },
+    { code: "STAFF", name: "Staff", scope: "SELLER" as const },
   ];
 
   const sellerRoles: Record<string, string> = {};
@@ -554,6 +555,15 @@ async function main() {
   const salesperson2 = await createSellerUser("Sunita Adhikari", "sunita@bageshwari.com.np", "SALES_REP");
   const salesperson3 = await createSellerUser("Nabin Tharu", "nabin@bageshwari.com.np", "SALES_REP");
   const dispatchUser = await createSellerUser("Gopal Shrestha", "dispatch@bageshwari.com.np", "DISPATCH_USER");
+
+  // Operational staff members requested for Bageshwari B2B
+  await createSellerUser("GOKARNA DEVKOTA", "gokarna@btnepal.com.np", "SALESPERSON");
+  await createSellerUser("JOGINDER KASHYAP", "joginder@btnepal.com.np", "WAREHOUSE_MANAGER");
+  await createSellerUser("RAM BACHAN", "ram@btnepal.com.np", "WAREHOUSE_USER");
+  await createSellerUser("ANURAG AWASTHI", "anurag@btnepal.com.np", "WAREHOUSE_MANAGER");
+  await createSellerUser("DILIP PASI", "dilip@btnepal.com.np", "DISPATCH_USER");
+  await createSellerUser("ABHISHEK MISHRA", "abhishek@btnepal.com.np", "ACCOUNTANT");
+  await createSellerUser("PRAJWAL BUDATHOKI", "prajwal@btnepal.com.np", "ACCOUNT_MANAGER");
 
   // ============================================================
   // 8. DEALER GROUPS & PRICING GROUPS

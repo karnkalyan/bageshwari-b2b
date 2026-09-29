@@ -21,6 +21,21 @@ interface BulkProductManagerModalProps {
   onImportSuccess?: () => void;
 }
 
+function formatErrorMessage(err: any): string {
+  if (!err) return "An unexpected error occurred during bulk import.";
+  if (typeof err === "string") return err;
+  if (typeof err === "object") {
+    if (err.message && typeof err.message === "string") {
+      return err.code ? `[${err.code}] ${err.message}` : err.message;
+    }
+    if (err.error && typeof err.error === "string") return err.error;
+    if (err.error && typeof err.error === "object") return formatErrorMessage(err.error);
+    if (err.code) return `Error: ${err.code}`;
+    return JSON.stringify(err);
+  }
+  return String(err);
+}
+
 export function BulkProductManagerModal({
   isOpen,
   onClose,
@@ -164,11 +179,12 @@ export function BulkProductManagerModal({
         });
       }
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const errorMsg = formatErrorMessage(data?.error || data?.message || "Failed to process bulk import.");
         setImportResult({
           success: false,
-          errors: [data.error || data.message || "Failed to process bulk import."],
+          errors: [errorMsg],
         });
       } else {
         const payload = data.data || data;
@@ -176,7 +192,7 @@ export function BulkProductManagerModal({
         const created = payload.createdCount ?? payload.created ?? 0;
         const updated = payload.updatedCount ?? payload.updated ?? 0;
         const errList = Array.isArray(payload.errors)
-          ? payload.errors.map((e: any) => typeof e === "string" ? e : `${e.sku ? e.sku + ": " : ""}${e.error || JSON.stringify(e)}`)
+          ? payload.errors.map((e: any) => formatErrorMessage(e))
           : [];
 
         setImportResult({
@@ -194,7 +210,7 @@ export function BulkProductManagerModal({
     } catch (err: any) {
       setImportResult({
         success: false,
-        errors: [err.message || "Network error occurred during import."],
+        errors: [formatErrorMessage(err)],
       });
     } finally {
       setIsImporting(false);
@@ -298,6 +314,8 @@ export function BulkProductManagerModal({
                         <th className="p-2 text-right">Dealer Price</th>
                         <th className="p-2 text-right">MRP</th>
                         <th className="p-2 text-right">Stock</th>
+                        <th className="p-2">Rack</th>
+                        <th className="p-2">Bin</th>
                         <th className="p-2">Category</th>
                       </tr>
                     </thead>
@@ -311,6 +329,8 @@ export function BulkProductManagerModal({
                           </td>
                           <td className="p-2 text-right">{item.mrp !== undefined ? item.mrp : "—"}</td>
                           <td className="p-2 text-right font-semibold">{item.stock !== undefined ? item.stock : 0}</td>
+                          <td className="p-2 text-indigo-700 font-bold">{item.rackLocation || item.rack || "—"}</td>
+                          <td className="p-2 text-purple-700 font-bold">{item.binLocation || item.bin || "—"}</td>
                           <td className="p-2 font-sans text-slate-500">{item.category || "—"}</td>
                         </tr>
                       ))}
@@ -344,7 +364,7 @@ export function BulkProductManagerModal({
                         <div className="font-semibold">Noticeable notices:</div>
                         <ul className="list-disc pl-4 space-y-0.5 mt-1">
                           {importResult.errors.slice(0, 5).map((e, i) => (
-                            <li key={i}>{e}</li>
+                            <li key={i}>{formatErrorMessage(e)}</li>
                           ))}
                         </ul>
                       </div>
@@ -357,7 +377,7 @@ export function BulkProductManagerModal({
                     </div>
                     <ul className="list-disc pl-4 space-y-0.5">
                       {importResult.errors?.map((err, i) => (
-                        <li key={i}>{err}</li>
+                        <li key={i}>{formatErrorMessage(err)}</li>
                       ))}
                     </ul>
                   </div>

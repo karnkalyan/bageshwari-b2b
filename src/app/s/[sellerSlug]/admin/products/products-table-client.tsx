@@ -55,6 +55,8 @@ export interface SerializedProduct {
   mrp: number;
   dealerPrice: number;
   stock: number;
+  rackLocation?: string | null;
+  binLocation?: string | null;
   images: Array<{
     id?: string;
     url: string;
@@ -128,6 +130,8 @@ export function ProductsTableClient({
       shortDescription: p.shortDescription,
       categoryName: p.categoryName,
       brandName: p.brandName,
+      rackLocation: p.rackLocation,
+      binLocation: p.binLocation,
       images: p.images || [],
     });
     setIsEditModalOpen(true);
@@ -314,10 +318,15 @@ export function ProductsTableClient({
                         )}
                         <div>
                           <div className="font-bold text-foreground line-clamp-1">{p.name}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-2">
+                          <div className="text-[10px] text-muted-foreground font-mono flex flex-wrap items-center gap-2">
                             <span>SKU: {p.sku}</span>
                             {p.images?.length > 0 && (
                               <span className="text-[9px] text-primary">({p.images.length} photo)</span>
+                            )}
+                            {(p.rackLocation || p.binLocation) && (
+                              <span className="inline-flex items-center gap-1 font-sans text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                📍 {p.rackLocation ? `Rack: ${p.rackLocation}` : ""}{p.rackLocation && p.binLocation ? " · " : ""}{p.binLocation ? `Bin: ${p.binLocation}` : ""}
+                              </span>
                             )}
                           </div>
                         </div>

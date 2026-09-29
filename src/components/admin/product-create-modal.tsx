@@ -24,6 +24,7 @@ import {
   Image as ImageIcon,
   Calculator,
   Plus,
+  MapPin,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -53,6 +54,8 @@ export function ProductCreateModal({
     mrp: 0,
     dealerPrice: 0,
     stock: 10,
+    rackLocation: "",
+    binLocation: "",
     taxPercent: null as number | null,
     status: "ACTIVE" as "ACTIVE" | "INACTIVE",
     shortDescription: "",
@@ -136,6 +139,8 @@ export function ProductCreateModal({
           mrp: Number(formData.mrp),
           dealerPrice: Number(formData.dealerPrice) || 0,
           stock: Number(formData.stock) || 0,
+          rackLocation: formData.rackLocation.trim() || undefined,
+          binLocation: formData.binLocation.trim() || undefined,
           taxPercent: formData.taxPercent !== null && formData.taxPercent !== ("" as any)
             ? Number(formData.taxPercent)
             : null,
@@ -164,6 +169,8 @@ export function ProductCreateModal({
         mrp: 0,
         dealerPrice: 0,
         stock: 10,
+        rackLocation: "",
+        binLocation: "",
         taxPercent: null,
         status: "ACTIVE",
         shortDescription: "",
@@ -375,6 +382,36 @@ export function ProductCreateModal({
                 <div className="text-[10px] text-muted-foreground">
                   Leave blank to inherit global ({globalVatPercent}%)
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Warehouse Storage Location (Pick List Routing) */}
+          <div className="p-3 bg-muted/30 border border-border rounded-lg space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-primary" /> Warehouse Storage Location
+              </Label>
+              <span className="text-[10px] text-muted-foreground">Pick List & Packing Manifest Routing</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-[11px] font-semibold">Rack Number / Shelf</Label>
+                <Input
+                  placeholder="e.g. R-01, RACK-A3"
+                  value={formData.rackLocation}
+                  onChange={(e) => setFormData({ ...formData, rackLocation: e.target.value })}
+                  className="mt-1 h-8 text-xs font-mono font-bold"
+                />
+              </div>
+              <div>
+                <Label className="text-[11px] font-semibold">Bin Number / Box</Label>
+                <Input
+                  placeholder="e.g. B-04, BIN-12"
+                  value={formData.binLocation}
+                  onChange={(e) => setFormData({ ...formData, binLocation: e.target.value })}
+                  className="mt-1 h-8 text-xs font-mono font-bold"
+                />
               </div>
             </div>
           </div>

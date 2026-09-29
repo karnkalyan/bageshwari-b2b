@@ -40,7 +40,7 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
         images: { orderBy: { displayOrder: "asc" } },
         variants: { where: { isDefault: true }, take: 1 },
         prices: { where: { priceType: "DEFAULT_DEALER" }, take: 1 },
-        inventories: { select: { availableQuantity: true } },
+        inventories: { select: { availableQuantity: true, rackLocation: true, binLocation: true } },
       },
     }),
     prisma.product.count({ where }),
@@ -81,7 +81,10 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
     const price = p.prices[0];
     const mrp = variant ? Number(variant.mrp) : 0;
     const dp = price ? Number(price.amount) : 0;
-    const stock = p.inventories[0]?.availableQuantity ? Number(p.inventories[0].availableQuantity) : 0;
+    const firstInv = p.inventories[0];
+    const stock = firstInv?.availableQuantity ? Number(firstInv.availableQuantity) : 0;
+    const rackLocation = firstInv?.rackLocation ?? null;
+    const binLocation = firstInv?.binLocation ?? null;
     const customTax = p.taxPercent !== null && p.taxPercent !== undefined ? Number(p.taxPercent) : null;
     const catTax = p.categoryId && categoryTaxMap.has(p.categoryId) ? categoryTaxMap.get(p.categoryId)! : null;
 
@@ -103,6 +106,8 @@ export default async function AdminProductsPage({ params, searchParams }: AdminP
       mrp,
       dealerPrice: dp,
       stock,
+      rackLocation,
+      binLocation,
       images: (p.images || []).map((img: any) => ({
         id: img.id,
         url: img.url || "",

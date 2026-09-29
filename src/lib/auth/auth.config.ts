@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { checkRateLimit, getClientAddress } from "@/lib/security/request-guard";
+import { ensureRbacPermissions } from "@/lib/auth/rbac-sync";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -40,7 +41,7 @@ export const authConfig: NextAuthConfig = {
           where: { email },
           include: {
             memberships: {
-              where: { status: "active", seller: { status: "ACTIVE" } },
+              where: { status: { in: ["active", "ACTIVE"] }, seller: { status: "ACTIVE" } },
               include: {
                 seller: { select: { id: true, slug: true, tradingName: true, status: true, code: true } },
               },
@@ -174,6 +175,28 @@ export const authConfig: NextAuthConfig = {
               permissions.add(rp.permission.code);
             });
           });
+
+        // Auto-heal: If user has assigned roles but 0 permissions found in DB (e.g. production before seed/migration),
+        // sync RBAC permissions automatically so users never get locked out of authorized pages.
+        if (permissions.size === 0 && roles.length > 0 && defaultSeller?.id) {
+          try {
+            await ensureRbacPermissions(defaultSeller.id);
+            const freshRolePerms = await prisma.rolePermission.findMany({
+              where: {
+                role: {
+                  code: { in: roles },
+                  sellerId: defaultSeller.id,
+                },
+              },
+              include: { permission: true },
+            });
+            freshRolePerms.forEach((rp) => {
+              permissions.add(rp.permission.code);
+            });
+          } catch (e) {
+            console.error("Auto-sync RBAC during login failed:", e);
+          }
+        }
 
         return {
           id: user.id,

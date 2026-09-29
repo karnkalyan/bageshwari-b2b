@@ -41,6 +41,8 @@ const createProductSchema = z.object({
   publishStatus: z.enum(["DRAFT", "PUBLISHED", "SCHEDULED", "ARCHIVED"]).default("PUBLISHED"),
   shortDescription: z.string().trim().max(1000).optional().nullable(),
   description: z.string().trim().max(5000).optional().nullable(),
+  rackLocation: z.string().trim().max(50).optional().nullable(),
+  binLocation: z.string().trim().max(50).optional().nullable(),
   images: z.array(
     z.object({
       url: z.string().min(1),
@@ -146,6 +148,8 @@ export async function POST(request: Request) {
             productId: product.id,
             variantId: variant.id,
             availableQuantity: new Prisma.Decimal(data.stock),
+            rackLocation: data.rackLocation?.trim() || null,
+            binLocation: data.binLocation?.trim() || null,
           },
         });
       }
